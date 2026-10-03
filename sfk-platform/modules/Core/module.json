@@ -1,0 +1,10 @@
+{
+    "name": "Core",
+    "slug": "core",
+    "type": "kernel",
+    "description": "Shared kernel: money & rounding, tax rates, billing cycles (締日/月度), document numbering, roles & panel permissions.",
+    "version": "0.1.0",
+    "provider": "Modules\\Core\\Providers\\CoreServiceProvider",
+    "depends_on": [],
+    "order": 0
+}

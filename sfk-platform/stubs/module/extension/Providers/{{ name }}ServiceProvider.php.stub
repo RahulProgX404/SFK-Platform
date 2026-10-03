@@ -1,0 +1,24 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\{{ name }}\Providers;
+
+use App\Modules\ModuleServiceProvider;
+use Modules\{{ name }}\Filament\{{ name }}PanelProvider;
+
+final class {{ name }}ServiceProvider extends ModuleServiceProvider
+{
+    protected string $slug = '{{ slug }}';
+
+    protected function registerModule(): void
+    {
+        // The extension's own Filament panel (/{{ slug }} or its own domain).
+        $this->app->register({{ name }}PanelProvider::class);
+    }
+
+    protected function bootModule(): void
+    {
+        // Schedules, event listeners, external API clients …
+    }
+}

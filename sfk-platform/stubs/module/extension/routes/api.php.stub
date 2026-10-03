@@ -1,0 +1,15 @@
+<?php
+
+use App\Modules\ModuleManager;
+use Illuminate\Support\Facades\Route;
+
+/*
+| Public API of the {{ title }} extension — mounted at /api/{{ slug }}/…, route names "{{ slug }}.api.*".
+| Protect real endpoints with authentication (e.g. Laravel Sanctum tokens) before exposing data.
+*/
+
+Route::get('status', fn (ModuleManager $modules) => response()->json([
+    'module' => '{{ slug }}',
+    'version' => $modules->get('{{ slug }}')->version,
+    'status' => 'ok',
+]))->name('status');

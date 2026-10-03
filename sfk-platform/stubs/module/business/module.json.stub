@@ -1,0 +1,13 @@
+{
+    "name": "{{ name }}",
+    "slug": "{{ slug }}",
+    "type": "business",
+    "description": "{{ description }}",
+    "version": "0.1.0",
+    "provider": "Modules\\{{ name }}\\Providers\\{{ name }}ServiceProvider",
+    "filament_plugin": "Modules\\{{ name }}\\Filament\\{{ name }}Plugin",
+    "panel": "{{ panel }}",
+    "depends_on": ["core", "erp"],
+    "enabled": true,
+    "order": 100
+}

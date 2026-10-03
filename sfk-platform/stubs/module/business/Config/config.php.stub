@@ -1,0 +1,9 @@
+<?php
+
+/*
+| {{ title }} module configuration — config('{{ slug }}.*').
+*/
+
+return [
+    //
+];

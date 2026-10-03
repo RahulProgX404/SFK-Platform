@@ -1,0 +1,7 @@
+<?php
+
+use App\Modules\ModuleManager;
+
+it('registers the {{ slug }} module', function () {
+    expect(app(ModuleManager::class)->isEnabled('{{ slug }}'))->toBeTrue();
+});

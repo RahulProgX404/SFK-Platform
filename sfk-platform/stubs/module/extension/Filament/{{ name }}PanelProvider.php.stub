@@ -1,0 +1,37 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\{{ name }}\Filament;
+
+use App\Modules\Filament\BasePanelProvider;
+use Filament\Pages\Dashboard;
+use Filament\Panel;
+use Filament\Widgets\AccountWidget;
+
+/**
+ * Stand-alone panel of the {{ title }} product. Users need the "panel.{{ slug }}.access"
+ * permission (or super-admin). Same user accounts as the ERP; separate screens and URL/domain.
+ */
+final class {{ name }}PanelProvider extends BasePanelProvider
+{
+    public function panel(Panel $panel): Panel
+    {
+        return $this->configureBase(
+            $panel,
+            id: '{{ slug }}',
+            path: (string) config('{{ slug }}.panel.path', '{{ slug }}'),
+            domain: config('{{ slug }}.panel.domain'),
+            brand: (string) config('{{ slug }}.panel.brand', '{{ title }}'),
+        )
+            ->discoverResources(in: __DIR__.'/Resources', for: 'Modules\\{{ name }}\\Filament\\Resources')
+            ->discoverPages(in: __DIR__.'/Pages', for: 'Modules\\{{ name }}\\Filament\\Pages')
+            ->discoverWidgets(in: __DIR__.'/Widgets', for: 'Modules\\{{ name }}\\Filament\\Widgets')
+            ->pages([
+                Dashboard::class,
+            ])
+            ->widgets([
+                AccountWidget::class,
+            ]);
+    }
+}

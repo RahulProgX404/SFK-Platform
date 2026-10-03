@@ -1,0 +1,17 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 6
+    paths:
+        - app
+        - modules
+    excludePaths:
+        - modules/*/Tests/*
+    tmpDir: storage/framework/phpstan
+    # Module config files (modules/<Name>/Config/config.php) are merged into the app config at boot
+    # and included by `config:cache`, like package config files — env() is allowed there.
+    # Patterns are expanded by Larastan at analysis time, so new modules are covered automatically.
+    configDirectories:
+        - %currentWorkingDirectory%/config
+        - %currentWorkingDirectory%/modules/*/Config

@@ -1,0 +1,7 @@
+{
+    "preset": "laravel",
+    "exclude": ["stubs"],
+    "rules": {
+        "declare_strict_types": false
+    }
+}

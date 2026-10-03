@@ -1,0 +1,10 @@
+{
+    "name": "Erp",
+    "slug": "erp",
+    "type": "kernel",
+    "description": "Main ERP shell: hosts the /erp Filament panel that business modules plug into (navigation groups, dashboard).",
+    "version": "0.1.0",
+    "provider": "Modules\\Erp\\Providers\\ErpServiceProvider",
+    "depends_on": ["core"],
+    "order": 1
+}

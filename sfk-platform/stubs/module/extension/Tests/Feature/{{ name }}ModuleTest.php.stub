@@ -1,0 +1,13 @@
+<?php
+
+use Filament\Facades\Filament;
+
+it('registers the {{ slug }} panel', function () {
+    expect(Filament::getPanel('{{ slug }}', isStrict: false)?->getId())->toBe('{{ slug }}');
+});
+
+it('exposes the {{ slug }} status endpoint', function () {
+    $this->getJson('/api/{{ slug }}/status')
+        ->assertOk()
+        ->assertJson(['module' => '{{ slug }}', 'status' => 'ok']);
+});

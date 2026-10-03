@@ -1,0 +1,11 @@
+{
+    "name": "{{ name }}",
+    "slug": "{{ slug }}",
+    "type": "extension",
+    "description": "{{ description }}",
+    "version": "0.1.0",
+    "provider": "Modules\\{{ name }}\\Providers\\{{ name }}ServiceProvider",
+    "depends_on": ["core"],
+    "enabled": true,
+    "order": 500
+}

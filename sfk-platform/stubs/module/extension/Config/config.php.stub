@@ -1,0 +1,14 @@
+<?php
+
+/*
+| {{ title }} configuration — config('{{ slug }}.*').
+*/
+
+return [
+    'panel' => [
+        'path' => env('{{ SLUG_ENV }}_PANEL_PATH', '{{ slug }}'),
+        // Serve this product on its own (sub)domain, e.g. {{ slug }}.example.co.jp. Null = same host.
+        'domain' => env('{{ SLUG_ENV }}_PANEL_DOMAIN'),
+        'brand' => env('{{ SLUG_ENV }}_PANEL_BRAND', '{{ title }}'),
+    ],
+];
