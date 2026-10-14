@@ -9,30 +9,36 @@ Replacement for SFK's kintone system, built as a **modular monolith** on Laravel
 
 ## Stack
 
-| Layer | Choice |
-|---|---|
-| Runtime | PHP 8.4, Laravel 13 |
-| Admin UI | Filament 5 (Livewire 4) — one panel per product |
-| Database | PostgreSQL 17 (SQLite works for a quick local look and the test suite) |
-| Queue / cache / session | Redis |
-| Permissions / audit | spatie/laravel-permission 8, spatie/laravel-activitylog 5 |
-| PDF | Gotenberg (HTML → PDF, Japanese fonts) |
-| Quality | Pest 4, Larastan 3 (level 6), Pint, GitHub Actions (SQLite + PostgreSQL) |
+| Layer                   | Choice                                                                   |
+| ----------------------- | ------------------------------------------------------------------------ |
+| Runtime                 | PHP 8.4, Laravel 13                                                      |
+| Admin UI                | Filament 5 (Livewire 4) — one panel per product                          |
+| Database                | PostgreSQL 17 (SQLite works for a quick local look and the test suite)   |
+| Queue / cache / session | Redis                                                                    |
+| Permissions / audit     | spatie/laravel-permission 8, spatie/laravel-activitylog 5                |
+| PDF                     | Gotenberg (HTML → PDF, Japanese fonts)                                   |
+| Quality                 | Pest 4, Larastan 3 (level 6), Pint, GitHub Actions (SQLite + PostgreSQL) |
 
 ## Quick start
 
 ### A. Docker (recommended — matches production)
+
 ```bash
-cp .env.example .env              # set ADMIN_EMAIL / ADMIN_PASSWORD
+cp .env.example .env              # set SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD
 docker compose up -d --build
 docker compose exec app composer install
 docker compose exec app php artisan key:generate
 docker compose exec app php artisan migrate --seed
 ```
-Open http://localhost:8080 → redirects to the ERP panel `/erp`. Mail: http://localhost:8025.
+
+Open http://localhost:8080 → sign in → the dashboard selection portal (`/portal`) offers the ERP (`/erp`)
+and the platform settings (`/settings`: users, organizations & positions). Mail: http://localhost:8025.
+After changing `SUPER_ADMIN_*` in `.env`, run `php artisan core:super-admin` to apply it.
 
 ### B. Without Docker (Laravel Herd / local PHP)
+
 The host PHP needs `pdo_pgsql` for PostgreSQL; otherwise use SQLite for a quick look:
+
 ```bash
 cp .env.example .env
 # set DB_CONNECTION=sqlite and delete the other DB_* lines; set CACHE_STORE/SESSION_DRIVER/QUEUE_CONNECTION=database
@@ -43,14 +49,14 @@ php artisan serve                 # http://localhost:8000/erp
 
 ## Everyday commands
 
-| Command | Purpose |
-|---|---|
-| `php artisan module:list` | Modules, type, enabled state, dependencies |
-| `php artisan make:module Sales` | New business module (plugs into the ERP panel) |
+| Command                                        | Purpose                                                  |
+| ---------------------------------------------- | -------------------------------------------------------- |
+| `php artisan module:list`                      | Modules, type, enabled state, dependencies               |
+| `php artisan make:module Sales`                | New business module (plugs into the ERP panel)           |
 | `php artisan make:module Sns --type=extension` | New extension product (own panel `/sns`, API `/api/sns`) |
-| `composer test` | Pest test suite (app + all modules) |
-| `composer analyse` | PHPStan / Larastan |
-| `composer lint` | Pint formatter |
+| `composer test`                                | Pest test suite (app + all modules)                      |
+| `composer analyse`                             | PHPStan / Larastan                                       |
+| `composer lint`                                | Pint formatter                                           |
 
 ## Repository layout
 

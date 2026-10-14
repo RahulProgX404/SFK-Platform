@@ -25,4 +25,18 @@ return [
         'invoice' => ['prefix' => '', 'padding' => 7, 'start' => 1],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Super administrator
+    |--------------------------------------------------------------------------
+    | The super-admin account is owned by the environment, not by the user management screens.
+    | `php artisan core:super-admin` (also run by `db:seed`) creates/updates it from these values;
+    | it cannot be edited or deleted in the settings panel. ADMIN_* are the older variable names.
+    */
+    'super_admin' => [
+        'name' => env('SUPER_ADMIN_NAME', env('ADMIN_NAME', 'システム管理者')),
+        'email' => env('SUPER_ADMIN_EMAIL', env('ADMIN_EMAIL')),
+        'password' => env('SUPER_ADMIN_PASSWORD', env('ADMIN_PASSWORD')),
+    ],
+
 ];

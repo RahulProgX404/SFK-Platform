@@ -62,6 +62,17 @@ modules/Sales/
 ## 5. Panels, authentication and access
 
 - One `users` table and one `web` guard for all panels. Each panel has its own login page (`/erp/login`, `/sns/login`).
+- After signing in on any login page the user lands on the **portal** (`/portal`, Core module) and chooses a dashboard
+  (panel) among those they may open; with a single dashboard they go straight to it. `/` redirects to the portal.
+- The **super admin** is owned by the environment (`SUPER_ADMIN_NAME/EMAIL/PASSWORD`): `php artisan core:super-admin`
+  (also run by `db:seed`) creates/updates it. It is read-only in user management and the `super-admin` role cannot be
+  assigned from the UI.
+- Users, roles (typed freely by the administrator), panel access, 在籍状況 and organization/position memberships are
+  managed in the **settings panel** (`/settings`, Settings extension module). Data lives in Core (`users` profile columns,
+  `organizations`, `positions`, `organization_user`) so ERP modules can use it.
+- **Password policy:** any password set by an administrator (new user or reset) is temporary; the user must change it at
+  the next sign-in (`must_change_password`, enforced by `EnsurePasswordIsChanged` on the portal and every panel).
+  Users who left the company (退職・定年退職・解雇) can no longer sign in.
 - `User::canAccessPanel()` allows **super-admin** or the permission `panel.<panel-id>.access`. The Core seeder creates one permission per registered panel, so re-run it after enabling an extension.
 - Panels can be served on separate (sub)domains through env (`ERP_PANEL_DOMAIN`, `<SLUG>_PANEL_DOMAIN`). This is how an extension is "outside" the ERP while sharing the codebase.
 - Business roles (accounting admin, sales, production, approver) will replace the hard-coded single user of the kintone system (SYSTEM_BRAIN 11_PERMISSIONS).

@@ -1,0 +1,11 @@
+{
+    "name": "Settings",
+    "slug": "settings",
+    "type": "extension",
+    "description": "Platform settings panel: user management, organizations & positions.",
+    "version": "0.1.0",
+    "provider": "Modules\\Settings\\Providers\\SettingsServiceProvider",
+    "depends_on": ["core"],
+    "enabled": true,
+    "order": 500
+}

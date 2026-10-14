@@ -7,8 +7,8 @@ use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 
 beforeEach(fn () => $this->seed(CoreDatabaseSeeder::class));
 
-it('redirects the site root to the ERP panel', function () {
-    $this->get('/')->assertRedirect('/erp');
+it('redirects the site root to the dashboard selection portal', function () {
+    $this->get('/')->assertRedirect('/portal');
 });
 
 it('sends guests to the ERP login page', function () {

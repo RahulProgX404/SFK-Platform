@@ -1,6 +1,6 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-
-// The site root opens the ERP panel.
-Route::redirect('/', '/'.trim((string) config('erp.panel.path', 'erp'), '/'))->name('home');
+/*
+| Public (non-panel) web routes of the ERP shell. The site root ("/") opens the dashboard
+| selection portal, defined by the Core module.
+*/
