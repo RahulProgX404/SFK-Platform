@@ -2,6 +2,7 @@
 #   docker compose up -d --build
 #   docker compose exec app composer install
 #   docker compose exec app php artisan migrate --seed
+#   (after changing composer.lock: docker compose exec app composer install — vendor/ is a Docker volume)
 # App:      http://localhost:8080        (ERP panel at /erp)
 # Mail UI:  http://localhost:8025        (Mailpit)
 # Postgres: localhost:5433  (user/pass/db from .env)
@@ -15,8 +16,17 @@ x-app: &app
       GID: ${DOCKER_GID:-1000}
   image: sfk-platform-php
   env_file: .env
+  environment:
+    # Compiled Blade views on the container's own filesystem: Filament renders hundreds of small views per
+    # page, and reading each one through the host file sharing is slow. Recompiled after a container restart.
+    VIEW_COMPILED_PATH: /tmp/views
   volumes:
     - ./:/var/www/html
+    # vendor/ lives on a Docker volume (Linux filesystem) instead of the host bind mount: ~15,000 PHP files
+    # are far too slow to read through the Windows/macOS file sharing. Fill it with
+    # `docker compose exec app composer install` (again whenever composer.lock changes).
+    # The host keeps its own vendor/ for the IDE, Pint and PHPStan.
+    - vendor:/var/www/html/vendor
   depends_on:
     pgsql:
       condition: service_healthy
@@ -80,3 +90,4 @@ services:
 volumes:
   pgsql-data:
   redis-data:
+  vendor:

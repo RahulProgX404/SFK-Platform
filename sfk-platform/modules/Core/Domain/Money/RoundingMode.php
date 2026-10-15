@@ -8,7 +8,7 @@ namespace Modules\Core\Domain\Money;
  * 端数区分 — how fractional yen are rounded. Configured per partner (customer and supplier side).
  *
  * BR-TX-01 / BR-TX-02: a blank setting means truncation (切捨).
- * Behaviour matches kintone ROUNDDOWN / ROUNDUP / ROUND (towards / away from zero).
+ * Behaviour matches legacy ROUNDDOWN / ROUNDUP / ROUND (towards / away from zero).
  */
 enum RoundingMode: string
 {

@@ -26,15 +26,14 @@ final class UserStatsOverview extends StatsOverviewWidget
         $total = $statistics->total();
         $active = $statistics->withStatus(EmploymentStatus::Active);
         $onLeave = $statistics->withStatus(EmploymentStatus::OnLeave);
-        $newThisMonth = $statistics->registeredSince(now()->startOfMonth());
+        $monthly = $statistics->monthlyRegistrations(6);
+        $newThisMonth = $monthly[array_key_last($monthly)];
 
         return [
             Stat::make('登録ユーザー', number_format($total).' 名')
-                ->description("今月の新規登録 {$newThisMonth} 名")
-                ->chart(array_map(floatval(...), $statistics->monthlyRegistrations(6)))
+                ->chart(array_map(floatval(...), $monthly))
                 ->icon(Heroicon::OutlinedUsers),
             Stat::make('在籍中', number_format($active).' 名')
-                ->description("休職中 {$onLeave} 名")
                 ->icon(Heroicon::OutlinedIdentification),
         ];
     }

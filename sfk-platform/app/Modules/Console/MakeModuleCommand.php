@@ -88,8 +88,7 @@ final class MakeModuleCommand extends Command
         $this->line('Next steps:');
         $this->line('  1. php artisan migrate');
         if ($type === ModuleType::Extension) {
-            $this->line('  2. php artisan db:seed --class="Modules\\Core\\Database\\Seeders\\CoreDatabaseSeeder"   (creates panel.'.$slug.'.access)');
-            $this->line("  3. open /{$slug} — grant the permission to users who should see this product");
+            $this->line("  2. 共通管理: allow the new dashboard on the 従業員カテゴリ (or users) who should use /{$slug}");
         } else {
             $this->line('  2. add Filament resources under modules/'.$name.'/Filament/Resources — they appear in the "'.$this->option('panel').'" panel');
         }

@@ -16,7 +16,7 @@ One deployable Laravel application, divided into **modules** with explicit bound
 │                      │                                   │                          │               │
 │   ┌──────────────────▼───────────────────────────────────▼──────────────────────────▼─────────┐     │
 │   │ Erp (kernel): panel shell, navigation      Core (kernel): money, tax, 締日/月度,            │     │
-│   │                                            numbering, roles & panel permissions             │     │
+│   │                                            numbering, users, categories & dashboard access  │     │
 │   └──────────────────────────────────────────────────────────────────────────────────────────┘     │
 │   app/Modules: module discovery, base service provider, base panel provider, generators            │
 └────────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -24,11 +24,11 @@ One deployable Laravel application, divided into **modules** with explicit bound
 
 ## 2. Module types
 
-| Type | Purpose | UI | May depend on | Can disable |
-|---|---|---|---|---|
-| **kernel** | Foundation (Core shared kernel, Erp panel shell) | Erp owns `/erp` | other kernel modules | no |
-| **business** | ERP features | Filament plugin added to the host panel (`"panel": "erp"`) | kernel + other business modules (declared in `depends_on`) | yes |
-| **extension** | Secondary products used outside the ERP | Own panel (`/<slug>` or own domain) + own API (`/api/<slug>`) | kernel only | yes |
+| Type          | Purpose                                          | UI                                                            | May depend on                                              | Can disable |
+| ------------- | ------------------------------------------------ | ------------------------------------------------------------- | ---------------------------------------------------------- | ----------- |
+| **kernel**    | Foundation (Core shared kernel, Erp panel shell) | Erp owns `/erp`                                               | other kernel modules                                       | no          |
+| **business**  | ERP features                                     | Filament plugin added to the host panel (`"panel": "erp"`)    | kernel + other business modules (declared in `depends_on`) | yes         |
+| **extension** | Secondary products used outside the ERP          | Own panel (`/<slug>` or own domain) + own API (`/api/<slug>`) | kernel only                                                | yes         |
 
 A module is a folder `modules/<Name>/` with a `module.json` manifest. The `ModuleManager` discovers manifests, applies switches (`MODULE_<SLUG>_ENABLED`), checks dependencies (a module whose dependency is off is disabled too, with a reason) and registers providers in **dependency order**.
 
@@ -61,42 +61,54 @@ modules/Sales/
 
 ## 5. Panels, authentication and access
 
-- One `users` table and one `web` guard for all panels. Each panel has its own login page (`/erp/login`, `/sns/login`).
-- After signing in on any login page the user lands on the **portal** (`/portal`, Core module) and chooses a dashboard
+- One `users` table and one `web` guard for all panels, and **one login page for the whole system: `/login`**
+  (Core `LoginController`, titled by `core.system_name`). Panels have no login of their own; guests of any panel are sent
+  to `/login`, and logging out of any panel returns there.
+- After signing in the user lands on the **portal** (`/portal`, Core module) and chooses a dashboard
   (panel) among those they may open; with a single dashboard they go straight to it. `/` redirects to the portal.
 - The **super admin** is owned by the environment (`SUPER_ADMIN_NAME/EMAIL/PASSWORD`): `php artisan core:super-admin`
-  (also run by `db:seed`) creates/updates it. It is read-only in user management and the `super-admin` role cannot be
-  assigned from the UI.
-- Users, roles (typed freely by the administrator), panel access, 在籍状況 and organization/position memberships are
-  managed in the **settings panel** (`/settings`, Settings extension module). Data lives in Core (`users` profile columns,
-  `organizations`, `positions`, `organization_user`) so ERP modules can use it.
+  (also run by `db:seed`) creates/updates it with ユーザー種別 `super_admin`. It is read-only in user management, and
+  `super_admin` cannot be assigned from the UI.
+- **ユーザー種別** (`users.user_type`, `Modules\Core\Access\UserType`) decides what a user may do in the system:
+  super_admin manages admins and employees, admin manages employees, employee manages nobody. **Roles** are the
+  person's position/duty in the company — 従業員カテゴリ (there are no roles).
+- Users, ユーザー種別, 従業員カテゴリ (with their dashboards), 役職 and 在籍状況 are managed in the **settings panel**
+  (`/settings`, Settings extension module). Data lives in Core (`users` profile columns, `employee_categories`,
+  `positions`) so ERP modules can use it. There are no organizations.
 - **Password policy:** any password set by an administrator (new user or reset) is temporary; the user must change it at
-  the next sign-in (`must_change_password`, enforced by `EnsurePasswordIsChanged` on the portal and every panel).
+  the next sign-in (`must_change_password`, enforced by `EnsurePasswordIsChanged` on the portal and every panel). That
+  page asks only for the ne共通管理rd, or keeps the temporary one (「仮パスワードをそのまま使う」). Voluntary changes are made on
+  the **プロフィール** page of every panel (Core `ProfilePage`: own 氏名・フリガナ・性別・住所・連絡先, password, ログアウト).
   Users who left the company (退職・定年退職・解雇) can no longer sign in.
-- `User::canAccessPanel()` allows **super-admin** or the permission `panel.<panel-id>.access`. The Core seeder creates one permission per registered panel, so re-run it after enabling an extension.
+- `User::canAccessPanel()` (`Modules\Core\Access\DashboardAccess`): super_admin opens every panel; panels with
+  `<id>.panel.admin_only` (共通管理) ar共通管理per_admin / admin only; every other panel must be listed in the
+  user's own `dashboards` or in the `dashboards` of their 従業員カテゴリ. The dashboard name (in place of the panel brand) opens a dropdown of the user's dashboards (Core render hooks). A dashboard's home can be the legacy-style ポータル (`Modules\Core\Filament\Portal\PortalPage`: お知らせ, アプリショートカット, スペース, アプリ), as on 白石封筒.
+- Inside a dashboard, access to each app (feature) follows the legacy system: spaces, app permissions (個人 → 従業員カテゴリ → 全員)
+  and the app status pipeline — see `docs/permissions.md`. Every business dashboard has an administrator-only
+  ダッシュボード設定 (spaces, app permissions); 共通管理 has アプリ設定 (app registry board).
 - Panels can be served on separate (sub)domains through env (`ERP_PANEL_DOMAIN`, `<SLUG>_PANEL_DOMAIN`). This is how an extension is "outside" the ERP while sharing the codebase.
-- Business roles (accounting admin, sales, production, approver) will replace the hard-coded single user of the kintone system (SYSTEM_BRAIN 11_PERMISSIONS).
+- ユーザー種別 and 従業員カテゴリ (with its dashboards) replace the hard-coded single user of the legacy system (SYSTEM_BRAIN 11_PERMISSIONS).
 
-## 6. Data principles (lessons from the kintone audit)
+## 6. Data principles (lessons from the legacy-system audit)
 
-| kintone problem (SYSTEM_BRAIN 17) | Rule in this codebase |
-|---|---|
+| Legacy-system problem (SYSTEM_BRAIN 17)                         | Rule in this codebase                                                                                                          |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | Totals stored and updated by scripts drift (D-05-1, C-01) | Derive aggregates from source rows (SQL views / queries). Persist snapshots only for closed periods, with a recompute command. |
-| Text join keys (`得意先ID_2026年06月`) | Real foreign keys and unique constraints, e.g. `(customer_id, period)`. |
-| `max+1` numbering, duplicates (D-GEN-1) | `Core` `DocumentNumberGenerator` (row-locked sequence table). |
-| Logic bound to one login | Roles and permissions; no user names in code. |
-| Float/rounding inconsistencies | Integer yen + `Core\Domain\Money\Yen` (bcmath) + per-partner `RoundingMode`. |
-| Dev code in production (C-04) | Environments via `.env`; CI gate (Pint, PHPStan, Pest on SQLite & PostgreSQL). |
+| Text join keys (`得意先ID_2026年06月`)                    | Real foreign keys and unique constraints, e.g. `(customer_id, period)`.                                                        |
+| `max+1` numbering, duplicates (D-GEN-1)                   | `Core` `DocumentNumberGenerator` (row-locked sequence table).                                                                  |
+| Logic bound to one login                                  | Roles and permissions; no user names in code.                                                                                  |
+| Float/rounding inconsistencies                            | Integer yen + `Core\Domain\Money\Yen` (bcmath) + per-partner `RoundingMode`.                                                   |
+| Dev code in production (C-04)                             | Environments via `.env`; CI gate (Pint, PHPStan, Pest on SQLite & PostgreSQL).                                                 |
 
 ## 7. Cross-cutting services
 
-| Concern | Implementation |
-|---|---|
-| Audit trail | spatie/laravel-activitylog (add `LogsActivity` to business models) |
-| Permissions | spatie/laravel-permission |
+| Concern         | Implementation                                                                                 |
+| --------------- | ---------------------------------------------------------------------------------------------- |
+| Audit trail     | spatie/laravel-activitylog (add `LogsActivity` to business models)                             |
+| Permissions     | spatie/laravel-permission                                                                      |
 | Background work | Laravel queues (Redis) for bulk invoicing, month opening, imports; scheduler for periodic jobs |
-| PDF documents | Blade HTML templates rendered by Gotenberg (planned Core/Documents service) |
-| Locale/time | `ja`, `Asia/Tokyo` by default |
+| PDF documents   | Blade HTML templates rendered by Gotenberg (planned Core/Documents service)                    |
+| Locale/time     | `ja`, `Asia/Tokyo` by default                                                                  |
 
 ## 8. Decisions
 

@@ -22,24 +22,28 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Modules\Core\Access\DashboardAccess;
+use Modules\Core\Filament\DashboardSettings\DashboardSettingsPlugin;
+use Modules\Core\Filament\Profile\ProfilePage;
 use Modules\Core\Http\Middleware\EnsurePasswordIsChanged;
 
 /**
  * Common configuration for every Filament panel in the platform (ERP panel and extension panels):
  * standard middleware stack, login page, shared users/guard, colours and branding.
  *
- * Look & feel follows kintone, which the staff already know: light theme only, kintone blue actions,
- * flat bordered boxes and a Meiryo-first font (core::filament.kintone-theme).
+ * Look & feel follows the legacy system, which the staff already know: light theme only, legacy blue actions,
+ * flat bordered boxes and a Meiryo-first font (core::filament.theme).
  *
  * Panels differ only in id, path/domain, brand label and which components they load.
- * Access to each panel is checked in User::canAccessPanel() via the "panel.<id>.access" permission.
+ * Access to each panel is checked in User::canAccessPanel() (user / 従業員カテゴリ dashboards and ユーザー種別,
+ * see Modules\Core\Access\DashboardAccess). Core replaces the brand with the dashboard name, which opens a dashboard switcher.
  */
 abstract class BasePanelProvider extends PanelProvider
 {
-    /** kintone's action blue; also used by the portal and the charts. */
-    public const KINTONE_BLUE = '#3498db';
+    /** the legacy system's action blue; also used by the portal and the charts. */
+    public const BRAND_BLUE = '#3498db';
 
-    public const KINTONE_RED = '#e74c3c';
+    public const BRAND_RED = '#e74c3c';
 
     protected function configureBase(Panel $panel, string $id, string $path, ?string $domain = null, ?string $brand = null): Panel
     {
@@ -49,18 +53,19 @@ abstract class BasePanelProvider extends PanelProvider
             ->id($id)
             ->path($path)
             ->domain($domain ?: null)
-            ->login()
+            // No login page per dashboard: guests go to the single /login page (Core), logout returns there.
+            ->profile(ProfilePage::class, isSimple: false)
             ->authGuard('web')
             ->brandName($brand ?? (string) config('app.name'))
             ->colors([
-                'primary' => Color::hex(self::KINTONE_BLUE),
-                'danger' => Color::hex(self::KINTONE_RED),
+                'primary' => Color::hex(self::BRAND_BLUE),
+                'danger' => Color::hex(self::BRAND_RED),
                 'gray' => Color::Gray,
             ])
             ->darkMode(false)
             // System Japanese fonts (no web-font download); the full stack is set by the theme view.
             ->font('Meiryo', provider: LocalFontProvider::class)
-            ->renderHook(PanelsRenderHook::HEAD_END, fn (): string => view('core::filament.kintone-theme')->render())
+            ->renderHook(PanelsRenderHook::HEAD_END, fn (): string => view('core::filament.theme')->render())
             ->sidebarCollapsibleOnDesktop()
             ->middleware([
                 EncryptCookies::class,
@@ -77,15 +82,15 @@ abstract class BasePanelProvider extends PanelProvider
                 Authenticate::class,
                 EnsurePasswordIsChanged::class,
             ])
+            // Profile icon: プロフィール, ダッシュボード選択, ログアウト (password changes live on the profile page).
             ->userMenuItems([
+                'profile' => fn (Action $action): Action => $action->label('プロフィール')->icon(Heroicon::OutlinedUserCircle),
                 Action::make('portal')
                     ->label('ダッシュボード選択')
                     ->icon(Heroicon::OutlinedSquares2x2)
                     ->url(fn (): string => route('core.portal')),
-                Action::make('change-password')
-                    ->label('パスワード変更')
-                    ->icon(Heroicon::OutlinedKey)
-                    ->url(fn (): string => route('core.password.edit')),
-            ]);
+            ])
+            // Every business dashboard gets the administrators' ダッシュボード設定 (spaces, app permissions).
+            ->plugins(DashboardAccess::isAdminOnly($id) ? [] : [DashboardSettingsPlugin::make()]);
     }
 }

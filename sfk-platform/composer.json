@@ -58,6 +58,10 @@
             "@php artisan config:clear --ansi",
             "@php vendor/bin/pest"
         ],
+        "test:pgsql": [
+            "@php artisan config:clear --ansi",
+            "@php vendor/bin/pest -c phpunit.pgsql.xml"
+        ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi",

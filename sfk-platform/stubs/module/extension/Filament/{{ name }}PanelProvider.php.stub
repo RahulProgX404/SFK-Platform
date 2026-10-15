@@ -10,8 +10,8 @@ use Filament\Panel;
 use Filament\Widgets\AccountWidget;
 
 /**
- * Stand-alone panel of the {{ title }} product. Users need the "panel.{{ slug }}.access"
- * permission (or super-admin). Same user accounts as the ERP; separate screens and URL/domain.
+ * Stand-alone panel of the {{ title }} product. Users granted this dashboard (directly or via 従業員カテゴリ)
+ * may open it (super admins always). Same user accounts as the ERP; separate screens and URL/domain.
  */
 final class {{ name }}PanelProvider extends BasePanelProvider
 {

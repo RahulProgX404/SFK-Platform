@@ -7,10 +7,11 @@ namespace Modules\Core\Http\Portal;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Panel;
+use Modules\Core\Access\DashboardAccess;
 
 /**
  * Dashboards (Filament panels) a user may open, as shown on the portal. Card texts come from the
- * owning module's config `<panel-id>.portal` (label, description, icon); the panel's brand name is
+ * owning module's config `<panel-id>.portal` (label, icon); the panel's brand name is
  * the fallback label.
  */
 final class DashboardDirectory
@@ -38,8 +39,7 @@ final class DashboardDirectory
 
         return new DashboardEntry(
             id: $id,
-            label: (string) ($card['label'] ?? $panel->getBrandName()),
-            description: (string) ($card['description'] ?? ''),
+            label: DashboardAccess::label($panel),
             icon: (string) ($card['icon'] ?? 'default'),
             url: (string) $panel->getUrl(),
         );

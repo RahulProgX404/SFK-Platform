@@ -11,5 +11,5 @@
 | `Application/` | Use cases / actions orchestrating domain + persistence (one class per action) |
 | `Models/` | Eloquent models |
 | `Database/Migrations`, `Database/Seeders` | Schema and reference data |
-| `Filament/Resources`, `Pages`, `Widgets` | UI — auto-discovered into the `{{ panel }}` panel |
+| `Filament/Resources`, `Pages`, `Widgets` | UI — auto-discovered into the `{{ panel }}` panel. App screens extend `Modules\Core\Filament\AppResource` (see docs/permissions.md) |
 | `Tests/Unit`, `Tests/Feature` | Pest tests |

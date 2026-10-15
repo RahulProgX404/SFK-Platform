@@ -8,14 +8,13 @@ use App\Modules\Filament\BasePanelProvider;
 use App\Modules\Module;
 use App\Modules\ModuleManager;
 use Filament\Contracts\Plugin;
-use Filament\Pages\Dashboard;
 use Filament\Panel;
-use Filament\Widgets\AccountWidget;
-use Modules\Erp\Filament\Widgets\ModulesOverviewWidget;
+use Modules\Core\Filament\Portal\PortalPage;
 
 /**
- * The main ERP panel (/erp). It contains no business screens itself: every enabled business
- * module whose module.json says `"panel": "erp"` contributes its Filament plugin here.
+ * The main ERP panel (/erp, dashboard 白石封筒). Its home is the legacy-style ポータル (お知らせ, スペース, アプリ).
+ * It contains no business screens itself: every enabled business module whose module.json says
+ * `"panel": "erp"` contributes its Filament plugin here.
  */
 final class ErpPanelProvider extends BasePanelProvider
 {
@@ -33,11 +32,7 @@ final class ErpPanelProvider extends BasePanelProvider
             ->default()
             ->navigationGroups(NavigationGroup::labels())
             ->pages([
-                Dashboard::class,
-            ])
-            ->widgets([
-                AccountWidget::class,
-                ModulesOverviewWidget::class,
+                PortalPage::class,
             ])
             ->plugins($this->businessModulePlugins());
     }

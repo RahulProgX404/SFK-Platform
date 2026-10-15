@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace Modules\Settings\Filament\Widgets;
 
 use Filament\Widgets\Widget;
-use Modules\Core\Models\Organization;
+use Modules\Core\Domain\Apps\AppStatus;
+use Modules\Core\Models\BusinessApp;
+use Modules\Core\Models\EmployeeCategory;
 use Modules\Core\Models\Position;
 use Modules\Settings\Application\UserStatistics;
-use Modules\Settings\Filament\Resources\Organizations\OrganizationResource;
+use Modules\Settings\Filament\Pages\AppsSettings;
+use Modules\Settings\Filament\Resources\EmployeeCategories\EmployeeCategoryResource;
+use Modules\Settings\Filament\Resources\Positions\PositionResource;
 use Modules\Settings\Filament\Resources\Users\UserResource;
 
 /**
@@ -34,19 +38,28 @@ final class SettingsMenuWidget extends Widget
             'sections' => [
                 [
                     'title' => 'ユーザー管理',
-                    'description' => 'ユーザーの登録・編集・削除、ロールやダッシュボード利用権限、在籍状況、所属組織を管理します。',
                     'icon' => 'heroicon-o-users',
                     'url' => UserResource::getUrl('index'),
                     'metric' => number_format($statistics->total()).' 名',
-                    'action' => 'ユーザー管理を開く',
                 ],
                 [
-                    'title' => '組織・役職',
-                    'description' => '部署などの組織と、組織ごとの役職を作成・管理します。作成した組織と役職はユーザーに割り当てられます。',
-                    'icon' => 'heroicon-o-building-office-2',
-                    'url' => OrganizationResource::getUrl('index'),
-                    'metric' => number_format(Organization::query()->count()).' 組織 / '.number_format(Position::query()->count()).' 役職',
-                    'action' => '組織管理を開く',
+                    'title' => '従業員カテゴリ',
+                    'icon' => 'heroicon-o-tag',
+                    'url' => EmployeeCategoryResource::getUrl('index'),
+                    'metric' => number_format(EmployeeCategory::query()->where('is_active', true)->count()).' カテゴリ',
+                ],
+                [
+                    'title' => '役職',
+                    'icon' => 'heroicon-o-identification',
+                    'url' => PositionResource::getUrl('index'),
+                    'metric' => number_format(Position::query()->where('is_active', true)->count()).' 役職',
+                ],
+                [
+                    'title' => 'アプリ設定',
+                    'icon' => 'heroicon-o-squares-2x2',
+                    'url' => AppsSettings::getUrl(),
+                    'metric' => number_format(BusinessApp::query()->count()).' アプリ / 公開中 '
+                        .number_format(BusinessApp::query()->where('status', AppStatus::Published->value)->count()),
                 ],
             ],
         ];

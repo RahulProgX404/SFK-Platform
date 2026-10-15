@@ -45,7 +45,7 @@ it('parses and formats year-months', function () {
         ->and(YearMonth::parse('2026-02')->lastDay()->toDateString())->toBe('2026-02-28');
 });
 
-it('maps kintone closing-day labels', function () {
+it('maps legacy closing-day labels', function () {
     expect(ClosingDay::fromLabel('末日'))->toBe(ClosingDay::EndOfMonth)
         ->and(ClosingDay::fromLabel(''))->toBeNull()
         ->and(ClosingDay::Day25->dayOfMonth())->toBe(25);

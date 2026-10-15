@@ -12,6 +12,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Access\UserType;
 use Modules\Settings\Filament\NavigationGroup;
 use Modules\Settings\Filament\Resources\Users\Pages\CreateUser;
 use Modules\Settings\Filament\Resources\Users\Pages\EditUser;
@@ -24,7 +25,9 @@ use Modules\Settings\Filament\Resources\Users\Widgets\UserStatsOverview;
 use UnitEnum;
 
 /**
- * ユーザー管理. The env-managed super admin is read-only here, and nobody can delete themselves.
+ * ユーザー管理. Who may create/edit/delete whom follows the ユーザー種別 hierarchy (super admin → admins and
+ * employees, admin → employees; employees only view). The env-managed super admin is read-only here,
+ * and nobody can delete themselves. UserAccountService enforces the same rules.
  */
 final class UserResource extends Resource
 {
@@ -59,22 +62,38 @@ final class UserResource extends Resource
         return UsersTable::configure($table);
     }
 
+    public static function actor(): ?User
+    {
+        $user = auth()->user();
+
+        return $user instanceof User ? $user : null;
+    }
+
+    /** @return list<UserType> types the signed-in user may create or assign */
+    public static function assignableTypes(): array
+    {
+        return self::actor()?->user_type->manageableTypes() ?? [];
+    }
+
+    public static function canCreate(): bool
+    {
+        return self::assignableTypes() !== [];
+    }
+
     public static function canEdit(Model $record): bool
     {
-        return $record instanceof User && ! $record->managed_by_env;
+        return $record instanceof User && (self::actor()?->canManageUser($record) ?? false);
     }
 
     public static function canDelete(Model $record): bool
     {
-        return $record instanceof User
-            && ! $record->managed_by_env
-            && ! $record->is(auth()->user());
+        return self::canEdit($record) && ! $record->is(self::actor());
     }
 
     /** @return list<string> */
     public static function getGloballySearchableAttributes(): array
     {
-        return ['name', 'email', 'last_name', 'first_name', 'employee_code'];
+        return ['name', 'email', 'last_name', 'first_name', 'employee_code', 'sales_staff_code', 'worker_code'];
     }
 
     public static function getWidgets(): array
@@ -102,15 +121,11 @@ final class UserResource extends Resource
         $notification = Notification::make()->success()->title($title);
 
         if ($generatedPassword === null) {
-            return $notification->body('ユーザーは次回ログイン時にパスワードの変更が必要です。');
+            return $notification;
         }
 
         return $notification
             ->persistent()
-            ->body(
-                '仮パスワード：<strong>'.e($generatedPassword).'</strong><br>'
-                .'この通知を閉じると再表示できません。安全な方法でユーザーへ伝えてください。'
-                .'ユーザーは初回ログイン時にパスワードの変更が必要です。'
-            );
+            ->body('仮パスワード：<strong>'.e($generatedPassword).'</strong>');
     }
 }

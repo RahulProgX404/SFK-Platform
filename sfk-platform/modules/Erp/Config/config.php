@@ -15,7 +15,6 @@ return [
     // Card shown on the dashboard selection portal (/portal).
     'portal' => [
         'label' => '白石封筒',
-        'description' => '受注・生産・購買・売上・請求など、日々の業務を行います。',
         'icon' => 'erp',
     ],
 ];

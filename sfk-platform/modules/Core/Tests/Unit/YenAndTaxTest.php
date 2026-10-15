@@ -11,10 +11,10 @@ dataset('rounding', [
     ['1234.9', 1234, 1235, 1235],
     ['1234', 1234, 1234, 1234],
     ['1234.0000', 1234, 1234, 1234],
-    ['-1234.7', -1234, -1235, -1235], // credit notes round towards / away from zero like kintone
+    ['-1234.7', -1234, -1235, -1235], // credit notes round towards / away from zero like the legacy system
 ]);
 
-it('rounds yen like kintone ROUNDDOWN / ROUNDUP / ROUND', function (string $amount, int $truncate, int $up, int $halfUp) {
+it('rounds yen like the legacy system ROUNDDOWN / ROUNDUP / ROUND', function (string $amount, int $truncate, int $up, int $halfUp) {
     expect(Yen::round($amount, RoundingMode::Truncate))->toBe($truncate)
         ->and(Yen::round($amount, RoundingMode::RoundUp))->toBe($up)
         ->and(Yen::round($amount, RoundingMode::HalfUp))->toBe($halfUp);
@@ -42,7 +42,7 @@ it('computes tax contained in a tax-inclusive amount (内税)', function () {
         ->and(TaxRate::OutOfScope->taxIncludedIn(10000, RoundingMode::Truncate))->toBe(0);
 });
 
-it('accepts the full-width ８% label found in kintone app 10 (C-07)', function () {
+it('accepts the full-width ８% label found in legacy app 10 (C-07)', function () {
     expect(TaxRate::fromLabel('８%'))->toBe(TaxRate::Reduced)
         ->and(TaxRate::fromLabel('10%'))->toBe(TaxRate::Standard);
 });

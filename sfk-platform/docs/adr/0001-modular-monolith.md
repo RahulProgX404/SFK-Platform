@@ -3,7 +3,7 @@
 - Status: accepted · Date: 2026-10-03
 
 ## Context
-The kintone system has 28 apps covering one company's ERP. Future secondary products (SNS management, SEO analyzer) must be addable without touching the ERP, and usable outside it. The team is small.
+The legacy system has 28 apps covering one company's ERP. Future secondary products (SNS management, SEO analyzer) must be addable without touching the ERP, and usable outside it. The team is small.
 
 ## Decision
 One Laravel application. Features live in `modules/<Name>/` with a `module.json` manifest (type `kernel` | `business` | `extension`). `App\Modules\ModuleManager` discovers modules, applies env switches, resolves dependencies and registers providers in dependency order. A generator (`make:module`) enforces the folder conventions.

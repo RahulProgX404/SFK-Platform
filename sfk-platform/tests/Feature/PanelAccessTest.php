@@ -1,19 +1,16 @@
 <?php
 
 use App\Models\User;
-use Modules\Core\Access\PanelPermission;
-use Modules\Core\Access\Roles;
-use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
-
-beforeEach(fn () => $this->seed(CoreDatabaseSeeder::class));
 
 it('redirects the site root to the dashboard selection portal', function () {
     $this->get('/')->assertRedirect('/portal');
 });
 
-it('sends guests to the ERP login page', function () {
-    $this->get('/erp')->assertRedirect('/erp/login');
-    $this->get('/erp/login')->assertOk();
+it('sends guests of every dashboard to the single /login page', function () {
+    $this->get('/erp')->assertRedirect('/login');
+    $this->get('/settings')->assertRedirect('/login');
+    $this->get('/erp/login')->assertNotFound();
+    $this->get('/settings/login')->assertNotFound();
 });
 
 it('forbids users without the panel permission', function () {
@@ -24,17 +21,17 @@ it('forbids users without the panel permission', function () {
 
 it('allows users with the panel permission', function () {
     $user = User::factory()->create();
-    $user->givePermissionTo(PanelPermission::for('erp'));
+    grantDashboards($user, 'erp');
 
     $this->actingAs($user)->get('/erp')->assertOk();
 });
 
-it('allows super admins and shows the modules overview', function () {
-    $admin = User::factory()->create();
-    $admin->assignRole(Roles::SUPER_ADMIN);
+it('allows super admins without the モジュール card or a greeting on 白石封筒', function () {
+    $admin = User::factory()->superAdmin()->create();
 
     $this->actingAs($admin)
         ->get('/erp')
         ->assertOk()
-        ->assertSee('モジュール');
+        ->assertDontSee('モジュール')
+        ->assertDontSee('今日も一日よろしくお願いします');
 });

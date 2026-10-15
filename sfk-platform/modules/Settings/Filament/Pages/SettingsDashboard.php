@@ -12,9 +12,4 @@ final class SettingsDashboard extends Dashboard
     protected static ?string $title = '設定ダッシュボード';
 
     protected static ?string $navigationLabel = 'ダッシュボード';
-
-    public function getSubheading(): string
-    {
-        return 'システム全体の設定をここから管理します。';
-    }
 }

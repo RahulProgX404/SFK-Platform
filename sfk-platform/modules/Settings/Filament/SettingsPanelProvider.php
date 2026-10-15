@@ -8,8 +8,8 @@ use App\Modules\Filament\BasePanelProvider;
 use Filament\Panel;
 
 /**
- * ERP 共通管理 (/settings): platform settings — user management, organizations & positions, and future
- * system-wide settings. Users need "panel.settings.access" (or super-admin).
+ * 共通管理 (/settings): platform settings — user management, 従業員カテゴリ (with their dashboards), 役職, and future
+ * system-wide settings. Only ユーザー種別 super_admin / admin may open it (`settings.panel.admin_only`).
  */
 final class SettingsPanelProvider extends BasePanelProvider
 {
@@ -22,7 +22,7 @@ final class SettingsPanelProvider extends BasePanelProvider
             id: self::PANEL_ID,
             path: (string) config('settings.panel.path', 'settings'),
             domain: config('settings.panel.domain'),
-            brand: (string) config('settings.panel.brand', 'ERP 共通管理'),
+            brand: (string) config('settings.panel.brand', '共通管理'),
         )
             ->navigationGroups(NavigationGroup::labels())
             ->discoverResources(in: __DIR__.'/Resources', for: 'Modules\\Settings\\Filament\\Resources')

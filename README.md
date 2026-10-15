@@ -163,7 +163,7 @@ Main settings (all in `sfk-platform/.env`; see `.env.example`):
 | `DB_CONNECTION` …                                       | `pgsql` (Docker service `pgsql`) | Database                                  |
 | `CACHE_STORE`, `SESSION_DRIVER`, `QUEUE_CONNECTION`     | `redis`                          | Use `database` without Docker             |
 | `ADMIN_NAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`           | —                                | Initial super-admin created by `db:seed`  |
-| `ERP_PANEL_PATH`, `ERP_PANEL_DOMAIN`, `ERP_PANEL_BRAND` | `erp`, —, `SFK システム`     | ERP panel URL, optional own domain, title |
+| `ERP_PANEL_PATH`, `ERP_PANEL_DOMAIN`, `ERP_PANEL_BRAND` | `erp`, —, `SFK システム`         | ERP panel URL, optional own domain, title |
 | `<SLUG>_PANEL_PATH`, `<SLUG>_PANEL_DOMAIN`              | slug, —                          | Same for each extension product           |
 | `MODULE_<SLUG>_ENABLED`                                 | manifest default                 | Switch business/extension modules on/off  |
 | `GOTENBERG_URL`                                         | `http://gotenberg:3000`          | PDF rendering service                     |

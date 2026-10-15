@@ -9,7 +9,7 @@ use DateTimeInterface;
 use Modules\Core\Domain\Calendar\YearMonth;
 
 /**
- * Billing-cycle rules of the kintone system (SYSTEM_BRAIN 12_BUSINESS_RULES, section G/F).
+ * Billing-cycle rules of the legacy system (SYSTEM_BRAIN 12_BUSINESS_RULES, section G/F).
  */
 final class BillingCycle
 {

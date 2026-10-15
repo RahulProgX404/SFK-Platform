@@ -9,7 +9,7 @@ use Modules\Core\Domain\Money\Yen;
 
 /**
  * 税率 — consumption-tax categories used on sales lines and documents (BR-TX-03).
- * Values are the labels stored in kintone, so migrated data maps directly.
+ * Values are the labels stored in the legacy system, so migrated data maps directly.
  */
 enum TaxRate: string
 {
@@ -21,7 +21,7 @@ enum TaxRate: string
     case OutOfScope = '対象外';
 
     /**
-     * Accepts kintone labels including the full-width "８%" found in app 10 (contradiction C-07).
+     * Accepts legacy labels including the full-width "８%" found in app 10 (contradiction C-07).
      */
     public static function fromLabel(string $label): self
     {

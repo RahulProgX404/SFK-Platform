@@ -7,7 +7,7 @@ This document describes the whole project: why it exists, how it is structured, 
 | Version             | foundation (Phase 0)                                                               |
 | Stack               | PHP 8.4 · Laravel 13 · Filament 5 (Livewire 4) · PostgreSQL 17 · Redis · Gotenberg |
 | Style               | Modular monolith                                                                   |
-| Requirements source | `SYSTEM_BRAIN/` (local, git-ignored), the reverse-engineered kintone system        |
+| Requirements source | `SYSTEM_BRAIN/` (local, git-ignored), the reverse-engineered legacy system        |
 
 ---
 
@@ -15,7 +15,7 @@ This document describes the whole project: why it exists, how it is structured, 
 
 1. [Context and goals](#1-context-and-goals)
 2. [Technology stack](#2-technology-stack)
-3. [System overview](#3-system-overview)
+3. [System overview](#3-system-overvi
 4. [Repository and code layout](#4-repository-and-code-layout)
 5. [Module system](#5-module-system)
 6. [User interface: panels and plugins](#6-user-interface-panels-and-plugins)
@@ -39,7 +39,7 @@ This document describes the whole project: why it exists, how it is structured, 
 
 ### 1.1 Background
 
-SFK runs its business on **kintone** (Cybozu's no-code database): 28 apps covering order intake (注番), estimating, production reports, purchasing, sales, delivery notes, invoices, receipts and receivables/payables. Logic is spread across gusuku **Customine** automations (about 1,600 actions), custom **JavaScript**, **PrintCreator** document templates and 31 plugins.
+SFK runs its business on a **legacy no-code database system**: 28 apps covering order intake (注番), estimating, production reports, purchasing, sales, delivery notes, invoices, receipts and receivables/payables. Logic is spread across gusuku **Customine** automations (about 1,600 actions), custom **JavaScript**, **PrintCreator** document templates and 31 plugins.
 
 A full reverse-engineering (`SYSTEM_BRAIN/`) documented 75 business rules and found 13 contradictions and 31 defects. Examples: totals stored and updated by scripts drift; purchases saved by users other than one administrator never reach payables; job cost has two conflicting writers; every billing function depends on a single login.
 
@@ -47,8 +47,8 @@ A full reverse-engineering (`SYSTEM_BRAIN/`) documented 75 business rules and fo
 
 | Goal                                                                                | How the architecture supports it                                                         |
 | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Replace kintone with an equivalent but correct system                               | Business rules implemented once, unit-tested, traced to SYSTEM_BRAIN rule ids            |
-| Build step by step                                                                  | Independent business modules; each phase can run in parallel with kintone                |
+| Replace the legacy system with an equivalent but correct system                               | Business rules implemented once, unit-tested, traced to SYSTEM_BRAIN rule ids            |
+| Build step by step                                                                  | Independent business modules; each phase can run in parallel with the legacy system                |
 | Add secondary products later (SNS handling, SEO analyzer, …) usable outside the ERP | **Extension modules**: own panel (URL/domain), own API, same users, same codebase        |
 | Small team, low operating cost                                                      | One deployable app, one database, standard Laravel tooling                               |
 | Financial correctness                                                               | Integer yen, exact decimal maths, derived aggregates, locked numbering, real constraints |
@@ -67,11 +67,11 @@ A full reverse-engineering (`SYSTEM_BRAIN/`) documented 75 business rules and fo
 | ------------------- | -------------------------- | ---------------- | --------------------------------------------------------------------------------------------- |
 | Language/runtime    | PHP                        | 8.4              | Modern typing, enums, readonly classes                                                        |
 | Framework           | Laravel                    | 13.x             | Mature; queues, scheduler, mail, migrations, testing; common among Japanese vendors           |
-| Back-office UI      | Filament (on Livewire)     | 5.9 (Livewire 4) | Forms, tables, filters, bulk actions, multi-panel. Closest to how users work in kintone.      |
+| Back-office UI      | Filament (on Livewire)     | 5.9 (Livewire 4) | Forms, tables, filters, bulk actions, multi-panel. Closest to how users work today.      |
 | Database            | PostgreSQL                 | 17               | Foreign keys, constraints, row locks, views; strong reporting                                 |
 | Cache/queue/session | Redis                      | 7                | Background jobs (bulk invoicing, imports), fast sessions                                      |
 | Permissions         | spatie/laravel-permission  | 8.3              | Roles and permissions, per-panel access                                                       |
-| Audit trail         | spatie/laravel-activitylog | 5.1              | Change history (kintone kept history on every record)                                         |
+| Audit trail         | spatie/laravel-activitylog | 5.1              | Change history (the legacy system kept history on every record)                                         |
 | PDF                 | Gotenberg (HTML → PDF)     | 8                | Japanese-font documents (delivery notes, invoices, work instructions), replacing PrintCreator |
 | Mail (dev)          | Mailpit                    | latest           | Captures outgoing mail locally                                                                |
 | Tests               | Pest (+ Laravel plugin)    | 4.x              | Readable tests; run per module                                                                |
@@ -137,7 +137,7 @@ Dashed modules are planned (roadmap Phase 1–4).
 ```
 sfk-brain/                              repository root
 ├── README.md · ARCHITECTURE.md
-├── .gitignore                          ignores SYSTEM_BRAIN/, kintone-templates/, gusuku/
+├── .gitignore                          ignores SYSTEM_BRAIN/, the legacy app templates, gusuku/
 └── sfk-platform/
     ├── app/
     │   ├── Models/User.php             platform user (FilamentUser + HasRoles)
@@ -323,7 +323,7 @@ The **ERP panel** (`Modules\Erp\Filament\ErpPanelProvider`) is the default panel
 
 Defined once in `Modules\Erp\Filament\NavigationGroup`, in sidebar order:
 
-| Enum case      | Label      | Old kintone apps     |
+| Enum case      | Label      | Old apps     |
 | -------------- | ---------- | -------------------- |
 | MasterData     | マスタ     | 01, 02, 03, 19       |
 | Orders         | 受注・見積 | 04, 09               |
@@ -379,7 +379,7 @@ Core holds rules used by several business modules, implemented **once**, framewo
 | Class                 | Responsibility                                                                                                                       | Rules                                                           |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
 | `RoundingMode` (enum) | 端数区分: `Truncate` = 切捨, `RoundUp` = 切上, `HalfUp` = 四捨五入. `fromLabel(null/'')` → `Truncate`                                | BR-TX-01/02                                                     |
-| `Yen`                 | `round($amount, RoundingMode)` → int; `multiply()`, `divide()` exact decimals via **bcmath** (scale 10); rejects non-decimal strings | matches kintone ROUNDDOWN/ROUNDUP/ROUND (toward/away from zero) |
+| `Yen`                 | `round($amount, RoundingMode)` → int; `multiply()`, `divide()` exact decimals via **bcmath** (scale 10); rejects non-decimal strings | matches the legacy ROUNDDOWN/ROUNDUP/ROUND (toward/away from zero) |
 
 ```php
 Yen::round('1234.5', RoundingMode::Truncate);   // 1234
@@ -388,7 +388,7 @@ Yen::round('-1234.7', RoundingMode::HalfUp);    // -1235  (credit notes)
 
 ### 8.2 Tax: `Modules\Core\Domain\Tax\TaxRate`
 
-Enum with the kintone labels: `Standard` 10%, `Reduced` 8%, `NonTaxable` 非課税, `OutOfScope` 対象外.
+Enum with the legacy labels: `Standard` 10%, `Reduced` 8%, `NonTaxable` 非課税, `OutOfScope` 対象外.
 
 - `taxOn($net, $rounding)`: tax-exclusive (外税), e.g. ¥12,345 → ¥1,234 (切捨). BR-TX-04/05.
 - `taxIncludedIn($gross, $rounding)`: tax-inclusive (内税), gross − gross ÷ (1 + rate), e.g. ¥10,000 → ¥909. BR-TX-07.
@@ -411,7 +411,7 @@ Immutable month value: `of()`, `fromDate()`, `parse('2026年07月' | '2026-07')`
 
 - Table `document_sequences(key unique, prefix, padding, next_value)`, created lazily from `config('core.sequences')`.
 - `next($key)` runs in a transaction: `firstOrCreate`, then `SELECT … FOR UPDATE`, take the value, increment, format. This is concurrency-safe (fixes D-GEN-1). Call it **inside** the transaction that saves the document so a rollback also rolls back the number.
-- `peek($key)` previews the next number; `ensureNextAtLeast($key, $n)` continues numbering after migrated kintone data (never moves backwards).
+- `peek($key)` previews the next number; `ensureNextAtLeast($key, $n)` continues numbering after migrated legacy data (never moves backwards).
 
 | Key             | Format        | Old system                     |
 | --------------- | ------------- | ------------------------------ |
@@ -430,9 +430,9 @@ Immutable month value: `of()`, `fromDate()`, `parse('2026年07月' | '2026-07')`
 
 ## 9. Data architecture
 
-### 9.1 Principles (derived from the kintone audit)
+### 9.1 Principles (derived from the legacy-system audit)
 
-| Problem found in kintone                                                | Rule here                                                                                                                      |
+| Problem found in the legacy system                                                | Rule here                                                                                                                      |
 | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | Totals stored and incremented by scripts drift (job cost, AR/AP, stock) | **Derive** aggregates from source rows (queries/views). Persist only closed-period snapshots, always re-computable.            |
 | Text join keys like `得意先ID_2026年06月`, `2026年06月_仕入先ID`        | Real **foreign keys**; composite **unique constraints** such as `(customer_id, period)`                                        |
@@ -602,7 +602,7 @@ Then:
 
 ## 16. Roadmap and mapping to the old system
 
-| Phase | Modules (planned slugs)                         | Old kintone apps                                 | SYSTEM_BRAIN refs                                          |
+| Phase | Modules (planned slugs)                         | Old apps                                 | SYSTEM_BRAIN refs                                          |
 | ----- | ----------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------------- |
 | 0 ✅  | Core, Erp                                       | —                                                | BR-TX-01..07, BR-AR-01/02, BR-SA-10/14, BR-OR-01, BR-PU-01 |
 | 1     | `master-data`, `orders`, `sales`, `receivables` | 01, 02, 03, 19, 04, 09, 06, 10, 11, 21, 23, 23-2 | BP-01/03/06/07/08, BR-MD, BR-OR, BR-SA, BR-AR              |
@@ -636,7 +636,7 @@ Then:
 | No business modules yet                          | No ERP screens                                                                     | Phase 1                                                                     |
 | Module boundaries enforced by convention         | A developer could import across modules                                            | code review; optional architecture tests later                              |
 | Manifests read on every request                  | Negligible today                                                                   | add a manifest cache command if module count grows                          |
-| Missing old-system inputs                        | Some rules unknown (numbering of 売上No/見積書番号, permissions, document layouts) | export from kintone (AUDIT_REPORT §8)                                       |
+| Missing old-system inputs                        | Some rules unknown (numbering of 売上No/見積書番号, permissions, document layouts) | export from the legacy system (AUDIT_REPORT §8)                                       |
 
 ---
 
@@ -653,4 +653,4 @@ Then:
 | 売掛 / 買掛                          | Accounts receivable / payable                                        |
 | Panel                                | A Filament application with its own URL, login and access rule       |
 | Kernel / business / extension module | Module types (§5.2)                                                  |
-| SYSTEM_BRAIN                         | Local knowledge base of the old kintone system (requirements source) |
+| SYSTEM_BRAIN                         | Local knowledge base of the old system (requirements source) |

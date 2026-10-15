@@ -20,6 +20,8 @@ use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Modules\Core\Access\EmployeeDataAccess;
+use Modules\Core\Access\UserType;
 use Modules\Core\Application\Users\ProtectedAccountException;
 use Modules\Core\Application\Users\UserAccountService;
 use Modules\Core\Domain\People\EmploymentStatus;
@@ -32,37 +34,83 @@ final class UsersTable
     public static function configure(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $query) => $query->with(['roles', 'organizations']))
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['employeeCategories', 'position']))
             ->columns([
                 TextColumn::make('name')
                     ->label('表示名')
-                    ->description(fn (User $record): string => $record->email)
                     ->weight(FontWeight::SemiBold)
-                    ->searchable(['name', 'email', 'last_name', 'first_name', 'last_name_kana', 'first_name_kana'])
+                    ->searchable(['name', 'last_name', 'first_name', 'last_name_kana', 'first_name_kana'])
                     ->sortable(),
+                TextColumn::make('email')
+                    ->label('メールアドレス')
+                    ->searchable()
+                    ->toggleable(),
                 TextColumn::make('full_name')
                     ->label('氏名')
                     ->state(fn (User $record): ?string => UserPresenter::fullName($record))
-                    ->description(fn (User $record): ?string => UserPresenter::fullNameKana($record))
                     ->placeholder('—')
                     ->toggleable(),
+                TextColumn::make('full_name_kana')
+                    ->label('フリガナ')
+                    ->state(fn (User $record): ?string => UserPresenter::fullNameKana($record))
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('employee_code')
                     ->label('社員番号')
                     ->searchable()
                     ->sortable()
                     ->placeholder('—')
                     ->toggleable(),
-                TextColumn::make('roles.name')
-                    ->label('ロール')
+                TextColumn::make('sales_staff_code')
+                    ->label('担当者コード')
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('worker_code')
+                    ->label('作業員コード')
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('department_code')
+                    ->label('部課コード')
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('employeeCategories.name')
+                    ->label('従業員カテゴリ')
                     ->badge()
                     ->color('gray')
-                    ->formatStateUsing(fn (string $state): string => UserPresenter::roleLabel($state))
-                    ->placeholder('—'),
-                TextColumn::make('organizations.name')
-                    ->label('所属組織')
+                    ->placeholder('—')
+                    ->toggleable(),
+                // Rates are confidential: the columns exist only for administrators.
+                TextColumn::make('work_rate')
+                    ->label('作業単価')
+                    ->formatStateUsing(fn ($state): string => UserPresenter::hourlyRate($state))
+                    ->placeholder('—')
+                    ->alignEnd()
+                    ->sortable()
+                    ->visible(fn (): bool => EmployeeDataAccess::isAdmin(UserResource::actor()))
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('overtime_rate')
+                    ->label('残業単価')
+                    ->formatStateUsing(fn ($state): string => UserPresenter::hourlyRate($state))
+                    ->placeholder('—')
+                    ->alignEnd()
+                    ->sortable()
+                    ->visible(fn (): bool => EmployeeDataAccess::isAdmin(UserResource::actor()))
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('user_type')
+                    ->label('ユーザー種別')
                     ->badge()
-                    ->color('info')
-                    ->placeholder('未所属')
+                    ->formatStateUsing(fn ($state): string => UserPresenter::typeLabel($state))
+                    ->color(fn ($state): string => UserPresenter::typeColor($state))
+                    ->sortable(),
+                TextColumn::make('position.name')
+                    ->label('役職')
+                    ->placeholder('—')
                     ->toggleable(),
                 TextColumn::make('employment_status')
                     ->label('在籍状況')
@@ -84,18 +132,22 @@ final class UsersTable
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
+                SelectFilter::make('user_type')
+                    ->label('ユーザー種別')
+                    ->options(UserType::options())
+                    ->multiple(),
                 SelectFilter::make('employment_status')
                     ->label('在籍状況')
                     ->options(EmploymentStatus::options())
                     ->multiple(),
-                SelectFilter::make('roles')
-                    ->label('ロール')
-                    ->relationship('roles', 'name')
+                SelectFilter::make('employeeCategories')
+                    ->label('従業員カテゴリ')
+                    ->relationship('employeeCategories', 'name', fn (Builder $query) => $query->orderBy('sort_order'))
                     ->multiple()
                     ->preload(),
-                SelectFilter::make('organizations')
-                    ->label('所属組織')
-                    ->relationship('organizations', 'name')
+                SelectFilter::make('position')
+                    ->label('役職')
+                    ->relationship('position', 'name', fn (Builder $query) => $query->orderBy('sort_order'))
                     ->multiple()
                     ->preload(),
                 TernaryFilter::make('must_change_password')
@@ -111,9 +163,8 @@ final class UsersTable
                     ResetPasswordAction::make(),
                     DeleteAction::make()
                         ->visible(fn (User $record): bool => UserResource::canDelete($record))
-                        ->modalDescription('このユーザーを削除します。所属情報も削除され、元に戻せません。退職者は削除せず「在籍状況」を変更することをおすすめします。')
                         ->using(function (User $record): bool {
-                            app(UserAccountService::class)->delete($record, self::actor());
+                            app(UserAccountService::class)->delete($record, UserResource::actor());
 
                             return true;
                         }),
@@ -125,9 +176,9 @@ final class UsersTable
                         ->label('選択したユーザーを削除')
                         ->icon(Heroicon::OutlinedTrash)
                         ->color('danger')
+                        ->visible(fn (): bool => UserResource::canCreate())
                         ->requiresConfirmation()
                         ->modalHeading('選択したユーザーを削除')
-                        ->modalDescription('スーパー管理者と自分自身のアカウントは削除されません。この操作は元に戻せません。')
                         ->deselectRecordsAfterCompletion()
                         ->action(function (Collection $records): void {
                             $deleted = 0;
@@ -135,7 +186,7 @@ final class UsersTable
 
                             foreach ($records as $record) {
                                 try {
-                                    app(UserAccountService::class)->delete($record, self::actor());
+                                    app(UserAccountService::class)->delete($record, UserResource::actor());
                                     $deleted++;
                                 } catch (ProtectedAccountException) {
                                     $skipped++;
@@ -145,20 +196,12 @@ final class UsersTable
                             Notification::make()
                                 ->success()
                                 ->title("{$deleted} 件のユーザーを削除しました")
-                                ->body($skipped > 0 ? "{$skipped} 件は保護されたアカウントのため削除していません。" : null)
+                                ->body($skipped > 0 ? "{$skipped} 件は削除する権限がないため削除していません。" : null)
                                 ->send();
                         }),
                 ]),
             ])
             ->emptyStateIcon(Heroicon::OutlinedUsers)
-            ->emptyStateHeading('ユーザーが登録されていません')
-            ->emptyStateDescription('「新規作成」からユーザーを登録してください。');
-    }
-
-    private static function actor(): ?User
-    {
-        $user = auth()->user();
-
-        return $user instanceof User ? $user : null;
+            ->emptyStateHeading('ユーザーが登録されていません');
     }
 }

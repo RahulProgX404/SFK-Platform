@@ -9,7 +9,6 @@ final readonly class DashboardEntry
     public function __construct(
         public string $id,
         public string $label,
-        public string $description,
         public string $icon,
         public string $url,
     ) {}

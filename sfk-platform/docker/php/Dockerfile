@@ -16,7 +16,10 @@ RUN apt-get update \
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 COPY docker/php/php.ini /usr/local/etc/php/conf.d/zz-platform.ini
 
-RUN groupmod -o -g "${GID}" www-data && usermod -o -u "${UID}" -g www-data www-data
+# The vendor directory is the mount point of the `vendor` volume (docker-compose.yml); owned by www-data so
+# composer can write it.
+RUN groupmod -o -g "${GID}" www-data && usermod -o -u "${UID}" -g www-data www-data \
+    && mkdir -p /var/www/html/vendor && chown www-data:www-data /var/www/html/vendor
 
 WORKDIR /var/www/html
 USER www-data

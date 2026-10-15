@@ -22,17 +22,10 @@ final class CreateUser extends CreateRecord
     /** @param  array<string, mixed>  $data */
     protected function handleRecordCreation(array $data): Model
     {
-        $roles = (array) ($data['roles'] ?? []);
-        $panels = (array) ($data['panels'] ?? []);
         $password = $data['password'] ?? null;
-        unset($data['roles'], $data['panels'], $data['password']);
+        unset($data['password']);
 
-        $issued = app(UserAccountService::class)->create(
-            $data,
-            UserAccountService::normalizeRoles($roles),
-            array_values(array_map('strval', $panels)),
-            $password,
-        );
+        $issued = app(UserAccountService::class)->create($data, $password, UserResource::actor());
         $this->generatedPassword = $issued->generatedPassword;
 
         return $issued->user;

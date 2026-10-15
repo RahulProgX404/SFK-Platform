@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Domain\Billing;
 
 /**
- * 請求締日 — a customer's billing closing day (01 取引先マスタ). Values are the kintone labels.
+ * 請求締日 — a customer's billing closing day (01 取引先マスタ). Values are the legacy labels.
  */
 enum ClosingDay: string
 {
@@ -19,7 +19,7 @@ enum ClosingDay: string
     /** 随時請求 — ad-hoc billing; each sale carries its own billing date. */
     case AdHoc = '随時請求';
 
-    /** Blank in kintone means "no closing day set" → null. */
+    /** Blank in the legacy system means "no closing day set" → null. */
     public static function fromLabel(?string $label): ?self
     {
         $label = $label === null ? '' : trim($label);

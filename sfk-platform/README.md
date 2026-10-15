@@ -1,6 +1,6 @@
 # SFK Platform
 
-Replacement for SFK's kintone system, built as a **modular monolith** on Laravel 13 · Filament 5 · PostgreSQL 17.
+Replacement for SFK's legacy system, built as a **modular monolith** on Laravel 13 · Filament 5 · PostgreSQL 17.
 
 - **ERP core**: masters, orders (注番), production, purchasing, sales → delivery notes → invoices, receivables/payables. Implemented step by step from the reverse-engineered knowledge base in `../SYSTEM_BRAIN`.
 - **Extension products** (SNS management, SEO analyzer, …): live in the same codebase and share users and the core kernel, but each has its own panel (URL or domain) and its own API, so it can be used outside the ERP.
@@ -32,7 +32,7 @@ docker compose exec app php artisan migrate --seed
 ```
 
 Open http://localhost:8080 → sign in → the dashboard selection portal (`/portal`) offers the ERP (`/erp`)
-and the platform settings (`/settings`: users, organizations & positions). Mail: http://localhost:8025.
+and the platform settings (`/settings`: users, 従業員カテゴリ, 役職). Mail: http://localhost:8025.
 After changing `SUPER_ADMIN_*` in `.env`, run `php artisan core:super-admin` to apply it.
 
 ### B. Without Docker (Laravel Herd / local PHP)
@@ -63,7 +63,7 @@ php artisan serve                 # http://localhost:8000/erp
 ```
 app/Modules/              Module system (discovery, base providers, panel base, generators) — framework glue
 modules/
-  Core/                   kernel    shared kernel: money & rounding, tax, 締日/月度, numbering, roles
+  Core/                   kernel    shared kernel: money & rounding, tax, 締日/月度, numbering, users
   Erp/                    kernel    ERP shell: /erp panel, navigation groups, dashboard
   <Business>/             business  ERP features (to be built: MasterData, Orders, Sales, …)
   <Extension>/            extension secondary products (Sns, SeoAnalyzer, …)

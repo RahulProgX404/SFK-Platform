@@ -1,25 +1,21 @@
 <?php
 
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Illuminate\Support\Arr;
 use Livewire\Livewire;
-use Modules\Core\Access\PanelPermission;
-use Modules\Core\Access\Roles;
-use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Domain\People\EmploymentStatus;
-use Modules\Core\Models\Organization;
+use Modules\Core\Models\EmployeeCategory;
 use Modules\Core\Models\Position;
+use Modules\Settings\Filament\Resources\Positions\Pages\ManagePositions;
 use Modules\Settings\Filament\Resources\Users\Pages\CreateUser;
 use Modules\Settings\Filament\Resources\Users\Pages\EditUser;
 use Modules\Settings\Filament\Resources\Users\Pages\ListUsers;
 use Modules\Settings\Filament\Resources\Users\Pages\ViewUser;
-use Spatie\Permission\Models\Role;
 
 beforeEach(function () {
-    $this->seed(CoreDatabaseSeeder::class);
-
-    $this->admin = User::factory()->create(['name' => '管理者']);
-    $this->admin->assignRole(Roles::SUPER_ADMIN);
+    $this->admin = User::factory()->superAdmin()->create(['name' => '管理者']);
     $this->admin->forceFill(['managed_by_env' => true])->save();
 
     $this->actingAs($this->admin);
@@ -48,8 +44,8 @@ it('creates a user with only the required fields and a generated password', func
         ->fillForm([
             'name' => '鈴木 一郎',
             'email' => 'suzuki@example.test',
-            'roles' => ['営業'],
             'employment_status' => EmploymentStatus::Active->value,
+            ...employeeMasterFields(),
         ])
         ->call('create')
         ->assertHasNoFormErrors()
@@ -57,95 +53,106 @@ it('creates a user with only the required fields and a generated password', func
 
     $user = User::query()->where('email', 'suzuki@example.test')->firstOrFail();
     expect($user->must_change_password)->toBeTrue()
-        ->and($user->hasRole('営業'))->toBeTrue();
+        ->and($user->employeeCategories()->count())->toBe(1);
 });
 
-it('requires name, email, roles and working status', function () {
+it('requires name, email, user type and working status', function () {
     Livewire::test(CreateUser::class)
-        ->fillForm(['name' => '', 'email' => '', 'roles' => [], 'employment_status' => null])
+        ->fillForm(['name' => '', 'email' => '', 'user_type' => null, 'employment_status' => null])
         ->call('create')
         ->assertHasFormErrors([
             'name' => 'required',
             'email' => 'required',
-            'roles' => 'required',
+            'user_type' => 'required',
             'employment_status' => 'required',
         ]);
 });
 
-it('rejects the reserved super-admin role typed in the form', function () {
+it('no longer asks for roles or dashboards on the user form', function () {
+    Livewire::test(CreateUser::class)
+        ->assertFormFieldDoesNotExist('roles')
+        ->assertFormFieldDoesNotExist('panels');
+});
+
+it('does not offer the super admin user type in the form', function () {
     Livewire::test(CreateUser::class)
         ->fillForm([
             'name' => 'X',
             'email' => 'x@example.test',
-            'roles' => ['super-admin'],
+            'user_type' => 'super_admin',
             'employment_status' => 'active',
+            ...employeeMasterFields(),
         ])
         ->call('create')
-        ->assertHasFormErrors(['roles.0']);
+        ->assertHasFormErrors(['user_type']);
 });
 
-it('creates a full profile with dashboards and several organizations', function () {
-    $sales = Organization::query()->create(['name' => '営業部']);
-    $manager = Position::query()->create(['organization_id' => $sales->id, 'name' => '部長', 'rank' => 50]);
-    $factory = Organization::query()->create(['name' => '製造部']);
+it('creates a full profile with a 役職', function () {
+    $manager = Position::createAtEnd('課長');
 
     Livewire::test(CreateUser::class)
         ->fillForm([
             'name' => '田中',
             'email' => 'tanaka@example.test',
             'password' => 'Initial-123',
-            'roles' => ['営業', '承認者'],
-            'panels' => ['erp'],
             'employment_status' => 'active',
+            ...employeeMasterFields(['position_id' => $manager->id]),
             'last_name' => '田中',
             'first_name' => '次郎',
             'birthday' => '1990-04-01',
             'address' => '東京都千代田区1-1',
             'phone' => '03-1234-5678',
-            'organizationMemberships' => [
-                ['organization_id' => $sales->id, 'position_id' => $manager->id, 'is_primary' => true],
-                ['organization_id' => $factory->id, 'position_id' => null, 'is_primary' => false],
-            ],
         ])
         ->call('create')
         ->assertHasNoFormErrors();
 
     $user = User::query()->where('email', 'tanaka@example.test')->firstOrFail();
-    expect($user->organizations()->pluck('name')->sort()->values()->all())->toBe(['営業部', '製造部'])
-        ->and($user->organizationMemberships()->where('organization_id', $sales->id)->value('position_id'))->toBe($manager->id)
-        ->and($user->hasDirectPermission(PanelPermission::for('erp')))->toBeTrue()
+    expect($user->position_id)->toBe($manager->id)
         ->and($user->birthday?->format('Y-m-d'))->toBe('1990-04-01');
+
+    Livewire::test(ViewUser::class, ['record' => $user->getRouteKey()])->assertSee('課長');
 });
 
-it('rejects a position that belongs to another organization', function () {
-    $sales = Organization::query()->create(['name' => '営業部']);
-    $factory = Organization::query()->create(['name' => '製造部']);
-    $foreman = Position::query()->create(['organization_id' => $factory->id, 'name' => '班長']);
+it('keeps 役職 optional and single-choice, from active options only', function () {
+    $retired = Position::createAtEnd('相談役', active: false);
 
-    $component = Livewire::test(CreateUser::class)
-        ->fillForm([
-            'name' => 'X',
-            'email' => 'x@example.test',
-            'roles' => ['営業'],
-            'employment_status' => 'active',
-            'organizationMemberships' => [
-                ['organization_id' => $sales->id, 'position_id' => $foreman->id, 'is_primary' => true],
-            ],
-        ])
-        ->call('create');
+    Livewire::test(CreateUser::class)
+        ->fillForm(['name' => 'A', 'email' => 'a@example.test', 'employment_status' => 'active', ...employeeMasterFields()])
+        ->call('create')
+        ->assertHasNoFormErrors();
 
-    expect(collect($component->errors()->keys())->contains(fn (string $key): bool => str_ends_with($key, 'position_id')))->toBeTrue()
-        ->and(User::query()->where('email', 'x@example.test')->exists())->toBeFalse();
+    expect(User::query()->where('email', 'a@example.test')->value('position_id'))->toBeNull()
+        ->and(Position::options())->not->toContain('相談役')
+        ->and(Position::options($retired->id))->toContain('相談役');
+
+    Livewire::test(CreateUser::class)
+        ->fillForm(['name' => 'B', 'email' => 'b@example.test', 'employment_status' => 'active', ...employeeMasterFields(['position_id' => 999])])
+        ->call('create')
+        ->assertHasFormErrors(['position_id']);
+});
+
+it('adds a 役職 option from the dropdown', function () {
+    Position::createAtEnd('部長');
+
+    Livewire::test(CreateUser::class)
+        ->callAction(TestAction::make('createOption')->schemaComponent('position_id'), data: ['name' => '部長'])
+        ->assertHasActionErrors(['name' => 'unique']);
+
+    Livewire::test(CreateUser::class)
+        ->callAction(TestAction::make('createOption')->schemaComponent('position_id'), data: ['name' => '主任'])
+        ->assertHasNoFormErrors()
+        ->assertSchemaStateSet(['position_id' => Position::query()->where('name', '主任')->value('id')]);
+});
+
+it('no longer has organizations on the user form', function () {
+    Livewire::test(CreateUser::class)->assertFormFieldDoesNotExist('organizationMemberships');
 });
 
 it('edits a user and forces a password change when the admin sets a new password', function () {
-    $user = User::factory()->create();
-    $user->assignRole(Role::findOrCreate('営業', 'web'));
+    $user = User::factory()->inCategories((int) EmployeeCategory::query()->value('id'))->create(Arr::except(employeeMasterFields(), 'employee_category_ids'));
 
     Livewire::test(EditUser::class, ['record' => $user->getRouteKey()])
-        ->assertSchemaStateSet(['roles' => ['営業']])
         ->fillForm([
-            'roles' => ['製造'],
             'employment_status' => EmploymentStatus::Retired->value,
             'password' => 'Reset-9876',
         ])
@@ -154,7 +161,6 @@ it('edits a user and forces a password change when the admin sets a new password
 
     $user->refresh();
     expect($user->employment_status)->toBe(EmploymentStatus::Retired)
-        ->and($user->getRoleNames()->all())->toBe(['製造'])
         ->and($user->must_change_password)->toBeTrue();
 });
 
@@ -182,4 +188,19 @@ it('deletes a user', function () {
     Livewire::test(ListUsers::class)->callTableAction('delete', $user);
 
     expect(User::query()->whereKey($user->id)->exists())->toBeFalse();
+});
+
+it('manages 役職 options on their own screen and protects options in use', function () {
+    $manager = Position::createAtEnd('課長');
+    User::factory()->create(['position_id' => $manager->id]);
+    $unused = Position::createAtEnd('係長');
+
+    Livewire::test(ManagePositions::class)
+        ->assertCanSeeTableRecords([$manager, $unused])
+        ->callAction('create', data: ['name' => '部長', 'is_active' => true])
+        ->assertHasNoActionErrors()
+        ->assertTableActionHidden('delete', $manager)
+        ->callTableAction('delete', $unused);
+
+    expect(Position::query()->orderBy('sort_order')->pluck('name')->all())->toBe(['課長', '部長']);
 });

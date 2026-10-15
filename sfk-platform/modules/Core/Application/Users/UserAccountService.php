@@ -5,15 +5,11 @@ declare(strict_types=1);
 namespace Modules\Core\Application\Users;
 
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
-use Modules\Core\Access\PanelPermission;
-use Modules\Core\Access\Roles;
-use Spatie\Permission\Contracts\Permission as PermissionContract;
-use Spatie\Permission\Contracts\Role as RoleContract;
-use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
+use Modules\Core\Access\DashboardAccess;
+use Modules\Core\Access\UserType;
+use Modules\Core\Models\EmployeeCategory;
 
 /**
  * Account lifecycle used by user management.
@@ -21,61 +17,64 @@ use Spatie\Permission\Models\Role;
  * Password policy: any password set by an administrator (on creation or reset) is temporary — the
  * user must replace it on their next sign-in (`must_change_password`). Only the user's own change
  * clears the flag.
+ *
+ * ユーザー種別 hierarchy ({@see UserType::manageableTypes()}): a super admin creates/edits/deletes admins
+ * and employees, an admin only employees, an employee nobody. super_admin itself is never assigned
+ * here (SuperAdminProvisioner only). A null `$actor` is a trusted system call (console, seeders).
+ * Dashboards: `dashboards` grants extra dashboards to the user on top of their 従業員カテゴリ; administrator-only
+ * dashboards (共通管理) are always dropped from it because they follow ユーザー種別 (DashboardAccess).
  */
 final class UserAccountService
 {
-    private const GUARD = 'web';
-
     /**
-     * @param  array<string, mixed>  $attributes  profile attributes (name, email, 氏名, 在籍状況 …)
-     * @param  list<string>  $roles  role names typed by the administrator; created when new
-     * @param  list<string>  $panelIds  panels the user may open (panel.<id>.access)
+     * @param  array<string, mixed>  $attributes  profile attributes (name, email, 氏名, 在籍状況, user_type …)
      */
-    public function create(array $attributes, array $roles, array $panelIds = [], ?string $password = null): IssuedCredentials
+    public function create(array $attributes, ?string $password = null, ?User $actor = null): IssuedCredentials
     {
+        $type = $this->assignableType($attributes['user_type'] ?? null, $actor, UserType::Employee);
+        unset($attributes['user_type']);
+        $attributes = $this->withGrantableDashboards($attributes);
+        [$attributes, $categoryIds] = $this->extractCategories($attributes);
         $generated = blank($password) ? $this->generatePassword() : null;
 
-        $user = DB::transaction(function () use ($attributes, $roles, $panelIds, $password, $generated): User {
-            $user = new User($attributes);
-            $user->password = $generated ?? (string) $password;
-            $user->forceFill(['must_change_password' => true, 'managed_by_env' => false])->save();
-
-            $this->syncRoles($user, $roles);
-            $this->syncPanelAccess($user, $panelIds);
-
-            return $user;
-        });
+        $user = new User($attributes);
+        $user->password = $generated ?? (string) $password;
+        $user->forceFill(['user_type' => $type, 'must_change_password' => true, 'managed_by_env' => false])->save();
+        if ($categoryIds !== null) {
+            $user->employeeCategories()->sync($categoryIds);
+        }
 
         return new IssuedCredentials($user, $generated);
     }
 
-    /**
-     * @param  array<string, mixed>  $attributes
-     * @param  list<string>  $roles
-     * @param  list<string>  $panelIds
-     */
-    public function update(User $user, array $attributes, array $roles, array $panelIds = [], ?string $password = null): IssuedCredentials
+    /** @param  array<string, mixed>  $attributes */
+    public function update(User $user, array $attributes, ?string $password = null, ?User $actor = null): IssuedCredentials
     {
-        $this->guardManaged($user);
+        $this->authorizeManage($user, $actor);
+        $type = $this->assignableType($attributes['user_type'] ?? null, $actor);
+        unset($attributes['user_type']);
+        $attributes = $this->withGrantableDashboards($attributes);
+        [$attributes, $categoryIds] = $this->extractCategories($attributes);
 
-        DB::transaction(function () use ($user, $attributes, $roles, $panelIds, $password): void {
-            $user->fill($attributes);
-            if (filled($password)) {
-                $this->applyTemporaryPassword($user, (string) $password);
-            }
-            $user->save();
-
-            $this->syncRoles($user, $roles);
-            $this->syncPanelAccess($user, $panelIds);
-        });
+        $user->fill($attributes);
+        if ($type !== null) {
+            $user->forceFill(['user_type' => $type]);
+        }
+        if (filled($password)) {
+            $this->applyTemporaryPassword($user, (string) $password);
+        }
+        $user->save();
+        if ($categoryIds !== null) {
+            $user->employeeCategories()->sync($categoryIds);
+        }
 
         return new IssuedCredentials($user);
     }
 
     /** Administrator sets (or generates) a new password; the user must change it at next sign-in. */
-    public function resetPassword(User $user, ?string $password = null): IssuedCredentials
+    public function resetPassword(User $user, ?string $password = null, ?User $actor = null): IssuedCredentials
     {
-        $this->guardManaged($user);
+        $this->authorizeManage($user, $actor);
 
         $generated = blank($password) ? $this->generatePassword() : null;
         $this->applyTemporaryPassword($user, $generated ?? (string) $password);
@@ -91,92 +90,102 @@ final class UserAccountService
         $user->forceFill(['must_change_password' => false, 'password_changed_at' => now()])->save();
     }
 
+    /** The user keeps the temporary password set by an administrator; they are no longer asked to change it. */
+    public function keepTemporaryPassword(User $user): void
+    {
+        $user->forceFill(['must_change_password' => false])->save();
+    }
+
     public function delete(User $user, ?User $actor = null): void
     {
-        $this->guardManaged($user);
-
         if ($actor !== null && $actor->is($user)) {
             throw new ProtectedAccountException('自分自身のアカウントは削除できません。');
         }
 
+        $this->authorizeManage($user, $actor);
+
         $user->delete();
     }
 
-    public function canManage(User $user): bool
+    /**
+     * Resolves the requested ユーザー種別 (or `$default` when none was requested) and checks the actor may
+     * assign it. Null only when nothing was requested and there is no default (update keeps the type).
+     */
+    private function assignableType(mixed $requested, ?User $actor, ?UserType $default = null): ?UserType
     {
-        return ! $user->managed_by_env;
-    }
+        $type = match (true) {
+            $requested instanceof UserType => $requested,
+            blank($requested) => $default,
+            default => UserType::tryFrom((string) $requested) ?? throw new InvalidArgumentException('このユーザー種別は割り当てできません。'),
+        };
 
-    /** @return list<string> panel ids the user has direct access to */
-    public function panelAccess(User $user): array
-    {
-        $panelIds = [];
-        foreach ($user->getDirectPermissions() as $permission) {
-            if (preg_match('/^panel\.(.+)\.access$/', (string) $permission->name, $match) === 1) {
-                $panelIds[] = $match[1];
-            }
+        if ($type === null) {
+            return null;
         }
 
-        return $panelIds;
+        if ($type === UserType::SuperAdmin) {
+            throw new InvalidArgumentException('このユーザー種別は割り当てできません。');
+        }
+
+        if ($actor !== null && ! $actor->user_type->canManage($type)) {
+            throw new ProtectedAccountException("「{$type->label()}」のユーザーを登録・変更する権限がありません。");
+        }
+
+        return $type;
     }
 
     /**
-     * Trims, de-duplicates and drops empty role names.
+     * Takes `employee_category_ids` (従業員カテゴリ, several allowed) out of the attributes; null when not given.
      *
-     * @param  array<array-key, mixed>  $roles
-     * @return list<string>
+     * @param  array<string, mixed>  $attributes
+     * @return array{0: array<string, mixed>, 1: list<int>|null}
      */
-    public static function normalizeRoles(array $roles): array
+    private function extractCategories(array $attributes): array
     {
-        $names = array_map(fn (mixed $role): string => trim((string) $role), $roles);
-
-        return array_values(array_unique(array_filter($names, fn (string $role): bool => $role !== '')));
-    }
-
-    /** @param  list<string>  $roles */
-    private function syncRoles(User $user, array $roles): void
-    {
-        $roles = self::normalizeRoles($roles);
-
-        foreach ($roles as $role) {
-            if (Roles::isReserved($role)) {
-                throw new InvalidArgumentException("ロール「{$role}」は予約されているため割り当てできません。");
-            }
+        if (! array_key_exists('employee_category_ids', $attributes)) {
+            return [$attributes, null];
         }
 
-        $user->syncRoles(array_map(fn (string $role): RoleContract => Role::findOrCreate($role, self::GUARD), $roles));
+        $requested = array_map('intval', (array) $attributes['employee_category_ids']);
+        unset($attributes['employee_category_ids']);
+
+        return [$attributes, EmployeeCategory::query()->whereIn('id', $requested)->pluck('id')->map(fn (mixed $id): int => (int) $id)->values()->all()];
     }
 
     /**
-     * Replaces the user's panel permissions; other direct permissions are kept.
+     * Keeps only dashboards that may be granted per user (drops 共通管理 and duplicates).
      *
-     * @param  list<string>  $panelIds
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
      */
-    private function syncPanelAccess(User $user, array $panelIds): void
+    private function withGrantableDashboards(array $attributes): array
     {
-        $keep = $user->getDirectPermissions()
-            ->reject(fn (Permission $permission): bool => str_starts_with((string) $permission->name, 'panel.'))
-            ->all();
+        if (array_key_exists('dashboards', $attributes)) {
+            $ids = array_map(fn (mixed $id): string => (string) $id, (array) $attributes['dashboards']);
+            $attributes['dashboards'] = array_values(array_unique(array_filter(
+                $ids,
+                fn (string $id): bool => ! DashboardAccess::isAdminOnly($id),
+            )));
+        }
 
-        $panel = array_map(
-            fn (string $id): PermissionContract => Permission::findOrCreate(PanelPermission::for($id), self::GUARD),
-            array_values(array_unique($panelIds)),
-        );
+        return $attributes;
+    }
 
-        $user->syncPermissions([...$keep, ...$panel]);
+    private function authorizeManage(User $user, ?User $actor): void
+    {
+        if ($user->managed_by_env) {
+            throw new ProtectedAccountException('スーパー管理者は環境変数で管理されているため、ここでは変更できません。');
+        }
+
+        if ($actor !== null && ! $actor->canManageUser($user)) {
+            throw new ProtectedAccountException("「{$user->user_type->label()}」のユーザーを変更する権限がありません。");
+        }
     }
 
     private function applyTemporaryPassword(User $user, string $password): void
     {
         $user->password = $password;
         $user->forceFill(['must_change_password' => true]);
-    }
-
-    private function guardManaged(User $user): void
-    {
-        if ($user->managed_by_env) {
-            throw new ProtectedAccountException('スーパー管理者は環境変数で管理されているため、ここでは変更できません。');
-        }
     }
 
     private function generatePassword(): string

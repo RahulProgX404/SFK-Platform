@@ -2,7 +2,7 @@
 
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
-use Modules\Core\Access\Roles;
+use Modules\Core\Access\UserType;
 use Modules\Core\Application\Users\SuperAdminProvisioner;
 
 beforeEach(function () {
@@ -18,7 +18,7 @@ it('creates the super admin from the environment', function () {
 
     expect($user)->not->toBeNull()
         ->and($user->email)->toBe('root@example.test')
-        ->and($user->hasRole(Roles::SUPER_ADMIN))->toBeTrue()
+        ->and($user->user_type)->toBe(UserType::SuperAdmin)
         ->and($user->managed_by_env)->toBeTrue()
         ->and($user->must_change_password)->toBeFalse()
         ->and(Hash::check('Secret-123', $user->password))->toBeTrue();
@@ -43,7 +43,7 @@ it('revokes super admin from the previous account when the configured email chan
     app(SuperAdminProvisioner::class)->sync();
 
     $old->refresh();
-    expect($old->hasRole(Roles::SUPER_ADMIN))->toBeFalse()
+    expect($old->user_type)->toBe(UserType::Employee)
         ->and($old->managed_by_env)->toBeFalse();
 });
 

@@ -22,7 +22,8 @@ final class ListUsers extends ListRecords
         return [
             CreateAction::make()
                 ->label('ユーザーを登録')
-                ->icon(Heroicon::OutlinedUserPlus),
+                ->icon(Heroicon::OutlinedUserPlus)
+                ->visible(fn (): bool => UserResource::canCreate()),
         ];
     }
 

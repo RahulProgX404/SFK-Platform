@@ -10,8 +10,12 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-use Modules\Core\Models\OrganizationMembership;
+use Modules\Core\Access\EmployeeDataAccess;
+use Modules\Core\Domain\People\Gender;
+use Modules\Core\Http\Portal\DashboardDirectory;
+use Modules\Core\Http\Portal\DashboardEntry;
 use Modules\Settings\Filament\Resources\Users\UserPresenter;
+use Modules\Settings\Filament\Resources\Users\UserResource;
 
 final class UserInfolist
 {
@@ -32,12 +36,20 @@ final class UserInfolist
                             ->badge()
                             ->formatStateUsing(fn ($state): string => UserPresenter::statusLabel($state))
                             ->color(fn ($state): string => UserPresenter::statusColor($state)),
-                        TextEntry::make('roles.name')
-                            ->label('ロール')
+                        TextEntry::make('user_type')
+                            ->label('ユーザー種別')
                             ->badge()
-                            ->color('gray')
-                            ->formatStateUsing(fn (string $state): string => UserPresenter::roleLabel($state))
-                            ->placeholder('—'),
+                            ->formatStateUsing(fn ($state): string => UserPresenter::typeLabel($state))
+                            ->color(fn ($state): string => UserPresenter::typeColor($state)),
+                        TextEntry::make('dashboards')
+                            ->label('利用可能なダッシュボード')
+                            ->state(fn (User $record): array => array_map(
+                                fn (DashboardEntry $entry): string => $entry->label,
+                                app(DashboardDirectory::class)->for($record),
+                            ))
+                            ->badge()
+                            ->color('info')
+                            ->placeholder('なし（従業員カテゴリで設定します）'),
                     ]),
                 Section::make('ログイン状況')
                     ->icon(Heroicon::OutlinedShieldCheck)
@@ -70,13 +82,26 @@ final class UserInfolist
                             ->state(fn (User $record): ?string => UserPresenter::fullNameKana($record))
                             ->placeholder('—'),
                         TextEntry::make('employee_code')->label('社員番号')->placeholder('—'),
-                        TextEntry::make('employee_category')
-                            ->label('従業員区分')
-                            ->formatStateUsing(fn ($state): string => UserPresenter::categoryLabel($state))
+                        TextEntry::make('gender')
+                            ->label('性別')
+                            ->formatStateUsing(fn (Gender $state): string => $state->label())
                             ->placeholder('—'),
                         TextEntry::make('birthday')->label('生年月日')->date('Y年n月j日')->placeholder('—'),
                         TextEntry::make('hired_on')->label('入社日')->date('Y年n月j日')->placeholder('—'),
                         TextEntry::make('left_on')->label('退職日')->date('Y年n月j日')->placeholder('—'),
+                    ]),
+                Section::make('従業員マスタ情報')
+                    ->icon(Heroicon::OutlinedBriefcase)
+                    ->columns(3)
+                    ->columnSpanFull()
+                    ->schema([
+                        TextEntry::make('sales_staff_code')->label('担当者コード')->placeholder('—'),
+                        TextEntry::make('worker_code')->label('作業員コード')->placeholder('—'),
+                        TextEntry::make('department_code')->label('部課コード')->placeholder('—'),
+                        TextEntry::make('employeeCategories.name')->label('従業員カテゴリ')->badge()->color('gray')->placeholder('—'),
+                        TextEntry::make('position.name')->label('役職')->placeholder('—'),
+                        self::rateEntry('work_rate', '作業単価'),
+                        self::rateEntry('overtime_rate', '残業単価'),
                     ]),
                 Section::make('住所・連絡先')
                     ->icon(Heroicon::OutlinedMapPin)
@@ -91,28 +116,21 @@ final class UserInfolist
                         TextEntry::make('emergency_contact_name')->label('緊急連絡先（氏名・続柄）')->placeholder('—'),
                         TextEntry::make('emergency_contact_phone')->label('緊急連絡先（電話番号）')->placeholder('—'),
                     ]),
-                Section::make('所属組織・役職')
-                    ->icon(Heroicon::OutlinedBuildingOffice2)
-                    ->columnSpanFull()
-                    ->schema([
-                        TextEntry::make('memberships')
-                            ->hiddenLabel()
-                            ->state(fn (User $record): array => $record->organizationMemberships()
-                                ->with(['organization', 'position'])
-                                ->get()
-                                ->map(fn (OrganizationMembership $membership): string => $membership->organization->name
-                                    .($membership->position !== null ? ' ／ '.$membership->position->name : '')
-                                    .($membership->is_primary ? '（主所属）' : ''))
-                                ->all())
-                            ->listWithLineBreaks()
-                            ->bulleted()
-                            ->placeholder('所属組織はありません'),
-                    ]),
                 Section::make('備考')
                     ->columnSpanFull()
                     ->schema([
                         TextEntry::make('notes')->hiddenLabel()->placeholder('—'),
                     ]),
             ]);
+    }
+
+    /** 作業単価 / 残業単価 are shown only to administrators and the user themselves (EmployeeDataAccess). */
+    private static function rateEntry(string $name, string $label): TextEntry
+    {
+        return TextEntry::make($name)
+            ->label($label)
+            ->formatStateUsing(fn ($state): string => UserPresenter::hourlyRate($state))
+            ->placeholder('—')
+            ->visible(fn (User $record): bool => EmployeeDataAccess::canViewRates(UserResource::actor(), $record));
     }
 }

@@ -3,7 +3,7 @@
 - Status: accepted · Date: 2026-10-03
 
 ## Context
-Rules such as 端数区分 rounding, tax per rate, closing days (締日), billing-cycle month (月度) and invoice dates are used by several modules (orders, sales, receivables, payables). In kintone they were copy-pasted into many formulas and drifted.
+Rules such as 端数区分 rounding, tax per rate, closing days (締日), billing-cycle month (月度) and invoice dates are used by several modules (orders, sales, receivables, payables). In the legacy system they were copy-pasted into many formulas and drifted.
 
 ## Decision
 Cross-module business rules are implemented once in `modules/Core/Domain`, as framework-free classes with unit tests that use the examples and rule IDs from `SYSTEM_BRAIN/12_BUSINESS_RULES` (e.g. BR-AR-01, BR-SA-10). Module-specific rules stay in that module's `Domain/`.

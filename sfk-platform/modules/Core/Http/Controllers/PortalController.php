@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Core\Http\Controllers;
 
 use App\Models\User;
-use Filament\Facades\Filament;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -22,7 +21,7 @@ final class PortalController
         $user = $request->user();
 
         if (! $user instanceof User) {
-            return redirect()->guest((string) Filament::getDefaultPanel()->getLoginUrl());
+            return redirect()->guest(route('login'));
         }
 
         $entries = $dashboards->for($user);
@@ -34,7 +33,6 @@ final class PortalController
         return view('core::portal', [
             'user' => $user,
             'dashboards' => $entries,
-            'logoutUrl' => Filament::getDefaultPanel()->getLogoutUrl(),
         ]);
     }
 }

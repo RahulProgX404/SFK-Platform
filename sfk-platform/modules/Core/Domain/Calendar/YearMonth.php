@@ -31,7 +31,7 @@ final readonly class YearMonth implements Stringable
         return new self((int) $date->format('Y'), (int) $date->format('n'));
     }
 
-    /** Parses "YYYY年MM月" (kintone label) or "YYYY-MM". */
+    /** Parses "YYYY年MM月" (legacy label) or "YYYY-MM". */
     public static function parse(string $value): self
     {
         if (preg_match('/^(\d{4})(?:年|-)(\d{1,2})月?$/u', trim($value), $m) !== 1) {
@@ -72,7 +72,7 @@ final readonly class YearMonth implements Stringable
         return sprintf('%04d-%02d', $this->year, $this->month);
     }
 
-    /** "2026年07月" — label format used throughout the kintone system. */
+    /** "2026年07月" — label format used throughout the legacy system. */
     public function label(): string
     {
         return sprintf('%04d年%02d月', $this->year, $this->month);

@@ -12,7 +12,7 @@ use Modules\Core\Models\DocumentSequence;
  * Issues sequential document numbers (注番, 納品書番号, 請求書番号 …) without gaps caused by
  * races: the sequence row is locked (SELECT … FOR UPDATE) inside a transaction.
  *
- * Replaces the kintone pattern "max(existing) + 1" which could produce duplicates under
+ * Replaces the legacy pattern "max(existing) + 1" which could produce duplicates under
  * concurrent use (SYSTEM_BRAIN 17 D-GEN-1).
  *
  * Call next() inside the same transaction that saves the document so a rollback also rolls
@@ -42,7 +42,7 @@ final class DocumentNumberGenerator
         return $sequence->format($sequence->next_value);
     }
 
-    /** Migration helper: make sure the next number is at least $nextValue (e.g. max kintone number + 1). */
+    /** Migration helper: make sure the next number is at least $nextValue (e.g. max legacy number + 1). */
     public function ensureNextAtLeast(string $key, int $nextValue): void
     {
         $this->db->transaction(function () use ($key, $nextValue): void {

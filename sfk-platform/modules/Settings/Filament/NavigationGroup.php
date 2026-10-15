@@ -8,7 +8,7 @@ namespace Modules\Settings\Filament;
 enum NavigationGroup: string
 {
     case Users = 'ユーザー管理';
-    case Organizations = '組織管理';
+    case Apps = 'アプリ管理';
 
     /** @return list<string> */
     public static function labels(): array

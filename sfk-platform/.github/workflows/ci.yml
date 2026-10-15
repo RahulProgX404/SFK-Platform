@@ -52,7 +52,7 @@ jobs:
           DB_CONNECTION: pgsql
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
-          DB_DATABASE: sfk_test
           DB_USERNAME: sfk
           DB_PASSWORD: secret
-        run: vendor/bin/pest
+        # phpunit.xml forces SQLite (so tests never touch a dev database); this config forces sfk_test on PostgreSQL.
+        run: vendor/bin/pest -c phpunit.pgsql.xml

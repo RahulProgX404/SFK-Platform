@@ -6,8 +6,8 @@ An extension is a secondary product that lives in this codebase but is used **ou
 
 - Own panel: `/{{ slug }}` (or its own domain via `{{ SLUG_ENV }}_PANEL_DOMAIN`)
 - Own API: `/api/{{ slug }}/…` (`routes/api.php`)
-- Access: permission `panel.{{ slug }}.access` (run the Core seeder after enabling), same user accounts
+- Access: allow the dashboard on 従業員カテゴリ or individual users (共通管理), same user accounts
 - Toggle: `MODULE_{{ SLUG_ENV }}_ENABLED=false`
 
-It may use the Core kernel (numbering, money, roles). It must **not** depend on ERP business modules;
+It may use the Core kernel (numbering, money, users). It must **not** depend on ERP business modules;
 if it needs ERP data, read it through an Application service exposed by that module.

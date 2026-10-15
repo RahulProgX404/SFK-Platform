@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Modules\Core\Access\UserType;
 
 /**
  * @extends Factory<User>
@@ -31,6 +32,24 @@ class UserFactory extends Factory
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
         ];
+    }
+
+    /** ユーザー種別 スーパー管理者 (normally provisioned from the environment). */
+    public function superAdmin(): static
+    {
+        return $this->state(fn (array $attributes) => ['user_type' => UserType::SuperAdmin]);
+    }
+
+    /** ユーザー種別 管理者. */
+    public function admin(): static
+    {
+        return $this->state(fn (array $attributes) => ['user_type' => UserType::Admin]);
+    }
+
+    /** 従業員カテゴリ (several allowed). */
+    public function inCategories(int ...$categoryIds): static
+    {
+        return $this->afterCreating(fn (User $user) => $user->employeeCategories()->attach($categoryIds));
     }
 
     /**

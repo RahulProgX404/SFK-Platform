@@ -2,7 +2,7 @@
 
 use Modules\Core\Application\Numbering\DocumentNumberGenerator;
 
-it('issues sequential job numbers in the kintone format (BR-OR-01)', function () {
+it('issues sequential job numbers in the legacy format (BR-OR-01)', function () {
     $numbers = app(DocumentNumberGenerator::class);
 
     expect($numbers->peek('order'))->toBe('sfk-0000001')
@@ -11,7 +11,7 @@ it('issues sequential job numbers in the kintone format (BR-OR-01)', function ()
         ->and($numbers->next('invoice'))->toBe('0000001');
 });
 
-it('continues after migrated kintone numbers', function () {
+it('continues after migrated legacy numbers', function () {
     $numbers = app(DocumentNumberGenerator::class);
 
     $numbers->ensureNextAtLeast('delivery_note', 4568);

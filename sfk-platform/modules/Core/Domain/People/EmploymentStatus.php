@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Domain\People;
 
 /**
- * 在籍状況 of a person. Extends the kintone options 在籍中 / 休職中 / 退職済 (SYSTEM_BRAIN APP_02)
+ * 在籍状況 of a person. Extends the legacy options 在籍中 / 休職中 / 退職済 (SYSTEM_BRAIN APP_02)
  * by splitting 退職済 into its reasons.
  */
 enum EmploymentStatus: string

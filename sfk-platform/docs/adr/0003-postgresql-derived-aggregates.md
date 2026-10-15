@@ -3,7 +3,7 @@
 - Status: accepted · Date: 2026-10-03
 
 ## Context
-The kintone audit (SYSTEM_BRAIN 17) found that most financial defects come from stored totals updated by scripts (job costs, AR/AP balances, stock), from string join keys, and from `max+1` numbering.
+The legacy-system audit (SYSTEM_BRAIN 17) found that most financial defects come from stored totals updated by scripts (job costs, AR/AP balances, stock), from string join keys, and from `max+1` numbering.
 
 ## Decision
 - PostgreSQL 17 with real foreign keys and unique constraints.

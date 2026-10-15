@@ -25,7 +25,6 @@ final class ResetPasswordAction
             ->color('warning')
             ->visible(fn (User $record): bool => UserResource::canEdit($record))
             ->modalHeading(fn (User $record): string => "{$record->name} さんのパスワード再設定")
-            ->modalDescription('再設定後、ユーザーは次回ログイン時にパスワードの変更が必要になります。')
             ->modalSubmitActionLabel('再設定する')
             ->schema([
                 TextInput::make('password')
@@ -33,11 +32,10 @@ final class ResetPasswordAction
                     ->password()
                     ->revealable()
                     ->autocomplete('new-password')
-                    ->rule(Password::min(8)->letters()->numbers())
-                    ->helperText('空欄の場合は仮パスワードを自動発行します。'),
+                    ->rule(Password::min(8)->letters()->numbers()),
             ])
             ->action(function (User $record, array $data): void {
-                $issued = app(UserAccountService::class)->resetPassword($record, $data['password'] ?? null);
+                $issued = app(UserAccountService::class)->resetPassword($record, $data['password'] ?? null, UserResource::actor());
 
                 UserResource::credentialsNotification('パスワードを再設定しました', $issued->generatedPassword)->send();
             });

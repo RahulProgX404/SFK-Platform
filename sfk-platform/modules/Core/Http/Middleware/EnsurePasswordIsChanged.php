@@ -22,7 +22,7 @@ final class EnsurePasswordIsChanged
         if (
             $user instanceof User
             && $user->must_change_password
-            && ! $request->routeIs('core.password.*', 'filament.*.auth.logout')
+            && ! $request->routeIs('core.password.*', 'logout', 'filament.*.auth.logout')
         ) {
             if ($request->expectsJson()) {
                 abort(403, 'パスワードの変更が必要です。');

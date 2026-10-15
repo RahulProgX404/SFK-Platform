@@ -2,7 +2,7 @@
     "name": "Settings",
     "slug": "settings",
     "type": "extension",
-    "description": "Platform settings panel: user management, organizations & positions.",
+    "description": "Platform settings panel: users, employee categories, positions and the app registry (アプリ設定).",
     "version": "0.1.0",
     "provider": "Modules\\Settings\\Providers\\SettingsServiceProvider",
     "depends_on": ["core"],

@@ -20,18 +20,12 @@ final class ViewUser extends ViewRecord
         return "{$this->record->name} さん";
     }
 
-    public function getSubheading(): ?string
-    {
-        return $this->record->managed_by_env
-            ? 'このアカウントは環境変数で管理されるスーパー管理者のため、編集・削除できません。'
-            : null;
-    }
-
     protected function getHeaderActions(): array
     {
         return [
             ResetPasswordAction::make(),
-            EditAction::make(),
+            EditAction::make()
+                ->visible(fn (User $record): bool => UserResource::canEdit($record)),
         ];
     }
 }
