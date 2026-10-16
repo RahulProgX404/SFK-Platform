@@ -24,6 +24,8 @@ use Modules\Core\Domain\Apps\AppStatus;
  * @property int|null $space_id
  * @property int $sort_order
  * @property Carbon|null $list_views_seeded_at when the code-defined 一覧 were stored (ListViewService)
+ * @property bool $record_duplicate_enabled その他の設定: 「レコードの再利用」 on the record page
+ * @property bool $record_history_enabled その他の設定: 「変更履歴」 of the records
  * @property-read Space|null $space
  */
 final class BusinessApp extends Model
@@ -33,6 +35,8 @@ final class BusinessApp extends Model
     protected $attributes = [
         'status' => 'developing',
         'sort_order' => 0,
+        'record_duplicate_enabled' => true,
+        'record_history_enabled' => true,
     ];
 
     protected function casts(): array
@@ -41,6 +45,8 @@ final class BusinessApp extends Model
             'status' => AppStatus::class,
             'sort_order' => 'integer',
             'list_views_seeded_at' => 'datetime',
+            'record_duplicate_enabled' => 'boolean',
+            'record_history_enabled' => 'boolean',
         ];
     }
 

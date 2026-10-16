@@ -116,6 +116,7 @@ final class SpaceResource extends Resource
             ->defaultSort('sort_order')
             ->reorderable('sort_order')
             ->paginated(false)
+            ->striped()
             ->recordActions([
                 EditAction::make()
                     ->mutateRecordDataUsing(fn (array $data, Space $record): array => [

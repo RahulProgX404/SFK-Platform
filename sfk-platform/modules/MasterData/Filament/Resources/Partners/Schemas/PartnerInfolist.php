@@ -9,6 +9,8 @@ use BackedEnum;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Schema;
+use Illuminate\Support\HtmlString;
+use Modules\Core\Filament\Support\UserPopup;
 use Modules\MasterData\Domain\Partners\PartnerRole;
 use Modules\MasterData\Filament\Resources\Partners\PartnerLayout;
 use Modules\MasterData\Models\Partner;
@@ -38,8 +40,9 @@ final class PartnerInfolist
                 ->state(fn (Partner $record): array => array_map(fn (PartnerRole $role): string => $role->label(), $record->roles()))
                 ->badge()
                 ->color('info'),
-            $name === 'staff' => $entry->state(fn (Partner $record): array => $record->staff->pluck('name')->all())->badge()->color('gray'),
-            $name === 'creator', $name === 'updater' => $entry->state(fn (Partner $record): ?string => $record->{$name}?->name),
+            // user names open the ユーザー情報 popup
+            $name === 'staff' => $entry->state(fn (Partner $record): HtmlString => UserPopup::list($record->staff))->html(),
+            $name === 'creator', $name === 'updater' => $entry->state(fn (Partner $record): HtmlString => UserPopup::html($record->{$name}))->html(),
             $name === 'created_at', $name === 'updated_at' => $entry->dateTime('Y-m-d H:i'),
             $name === 'collects_by_bill' => $entry->state(fn (Partner $record): ?string => $record->getAttribute('collects_by_bill') ? '手形' : null),
             in_array($name, self::FLAGS, true) => $entry->state(fn (Partner $record): ?string => $record->getAttribute($name) ? '✓' : null),

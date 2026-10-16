@@ -79,6 +79,7 @@ final class PortalPage extends Dashboard
         $user = self::actor();
         $portal = DashboardPortal::for(self::panelId());
         $apps = $this->visibleApps();
+        $spaces = $this->spaces();
 
         return [
             'notice' => filled($portal->notice) ? RichContentRenderer::make($portal->notice)->toHtml() : null,
@@ -86,7 +87,13 @@ final class PortalPage extends Dashboard
                 ->map(fn (int $id): ?BusinessApp => $apps->firstWhere('id', $id))
                 ->filter()
                 ->values(),
-            'spaces' => $this->spaces(),
+            'spaces' => $spaces,
+            // ⚙ of each space (administrators): its settings (the edit dialog of スペース)
+            'spaceSettingsUrls' => self::isAdministrator()
+                ? $spaces->mapWithKeys(fn (Space $space): array => [
+                    $space->id => SpaceResource::getUrl('index', ['tableAction' => 'edit', 'tableActionRecord' => $space->id]),
+                ])->all()
+                : [],
             'filterSpaces' => $this->spaces(forFilter: true),
             'apps' => $this->appSpace === null ? $apps : $apps->where('space_id', $this->appSpace)->values(),
             'appUrls' => $apps->mapWithKeys(fn (BusinessApp $app): array => [$app->id => AppResource::urlForApp($app->code, Filament::getCurrentOrDefaultPanel())])->all(),

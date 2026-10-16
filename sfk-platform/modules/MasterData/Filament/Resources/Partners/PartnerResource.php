@@ -14,6 +14,7 @@ use Modules\MasterData\Filament\Resources\Partners\Pages\CreatePartner;
 use Modules\MasterData\Filament\Resources\Partners\Pages\EditPartner;
 use Modules\MasterData\Filament\Resources\Partners\Pages\ListPartners;
 use Modules\MasterData\Filament\Resources\Partners\Pages\PartnerListViewSettings;
+use Modules\MasterData\Filament\Resources\Partners\Pages\PartnerSettings;
 use Modules\MasterData\Filament\Resources\Partners\Pages\ViewPartner;
 use Modules\MasterData\Filament\Resources\Partners\Schemas\PartnerForm;
 use Modules\MasterData\Filament\Resources\Partners\Schemas\PartnerInfolist;
@@ -90,6 +91,7 @@ final class PartnerResource extends AppResource
             'index' => ListPartners::route('/'),
             'create' => CreatePartner::route('/create'),
             'views' => PartnerListViewSettings::route('/views'),
+            'settings' => PartnerSettings::route('/settings'),
             'view' => ViewPartner::route('/{record}'),
             'edit' => EditPartner::route('/{record}/edit'),
         ];

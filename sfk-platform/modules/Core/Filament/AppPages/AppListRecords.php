@@ -23,6 +23,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema as DatabaseSchema;
 use Livewire\Attributes\Session;
 use Livewire\Attributes\Url;
 use Modules\Core\Application\Filters\FilterField;
@@ -39,6 +40,7 @@ use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
  * Record list of an app, in the legacy layout: app frame; the 一覧 dropdown (the app's views from アプリの設定 → 一覧,
  * ListViewService, the topmost being the default, （すべて） last); the 絞り込む funnel (filterFields(),
  * core::filament.app-filter); ＋ / gear (アプリの設定) / 「…」 (optionActions() and 表示件数); 「1 - 100（N件中）」 paging.
+ * Every database column sorts by a click on its header (昇順 ⇄ 降順); the search box sits on the left.
  * A 表形式 view shows its columns in its order (viewColumns(), read by the app's table), a カレンダー形式 view a month
  * calendar of the records by its 日付 field (core::filament.app-calendar).
  *
@@ -51,7 +53,7 @@ abstract class AppListRecords extends ListRecords
     use HasAppChrome;
 
     /** 表示件数 choices; blank = DEFAULT_PAGE_SIZE */
-    public const PAGE_SIZES = [20, 40, 60, 80, 100];
+    public const PAGE_SIZES = [20, 40, 60, 80, 100, 200, 300];
 
     public const DEFAULT_PAGE_SIZE = 100;
 
@@ -171,12 +173,31 @@ abstract class AppListRecords extends ListRecords
         return $this->appResource()::appName();
     }
 
+    /** Every column of a database field sorts by a click on its header; columns of other data define their own sort. */
     public function table(Table $table): Table
     {
+        $fields = self::databaseColumns($table->getQuery()?->getModel());
+
+        foreach ($table->getColumns() as $column) {
+            if (! $column->isSortable() && in_array($column->getName(), $fields, true)) {
+                $column->sortable();
+            }
+        }
+
         return $table
             ->paginated([$this->pageSize()])
             ->defaultPaginationPageOption($this->pageSize())
             ->striped();
+    }
+
+    /** A click on the sorted column's header switches 昇順 ⇄ 降順 (it does not go back to the default order). */
+    public function sortTable(?string $column = null, ?string $direction = null): void
+    {
+        if ($direction === null && $column !== null && $column === $this->getTableSortColumn()) {
+            $direction = $this->getTableSortDirection() === 'asc' ? 'desc' : 'asc';
+        }
+
+        parent::sortTable($column, $direction);
     }
 
     public function content(Schema $schema): Schema
@@ -515,6 +536,18 @@ abstract class AppListRecords extends ListRecords
         $user = auth()->user();
 
         return $user instanceof User && $user->user_type->isAdministrator() && $this->filterFields() !== [];
+    }
+
+    /** @return list<string> */
+    private static function databaseColumns(?Model $model): array
+    {
+        static $columns = [];
+
+        if ($model === null) {
+            return [];
+        }
+
+        return $columns[$model->getTable()] ??= DatabaseSchema::getColumnListing($model->getTable());
     }
 
     /** @return array<string, FilterField> */

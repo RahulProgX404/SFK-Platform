@@ -30,6 +30,18 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   views.md; stored once) and `filterFields()`; its table builds columns from `viewColumns()`; its 「…」 entries go in
   `optionActions()` (表示件数 is added by Core). Register a `views` page (subclass of `AppListViewSettings`, before
   `view`) for アプリの設定 → 一覧: 追加 / 編集 / 複製 / 削除 / drag order (top = default), 表形式 or カレンダー形式.
+- App lists (Core, automatic): search box on the left, one horizontal scroll with its bar at the end of the table,
+  表示件数 20–300 per user, and every column sorts on a header click (昇順 ⇄ 降順). Database columns become sortable by
+  themselves; give computed columns (state from relations or flags) `->sortable(query: …)`.
+- Record features (legacy app settings / record screen), for every app:
+  - register a `settings` page (subclass of `AppSettings`): アプリの設定 → 設定 with アクセス権 and その他の設定
+    (「レコードの再利用」, 「変更履歴」 per app); the gear has a ▾ menu of the settings shortcuts;
+  - the model implements `Modules\Core\Application\History\HasRecordHistory` with `Models\Concerns\RecordsHistory`
+    (override for related data, e.g. users of a ユーザー選択); versions are written by the App create/edit pages;
+  - the create page lists `duplicateExcludedFields()` (auto-numbered codes, attachments, legacy ids) and adds related
+    data in `mutateDuplicateData()` for レコードを再利用する; the view page may give `historyLabels()`;
+  - user names in lists and records use `Modules\Core\Filament\Support\UserPopup` (`->html()`, list cells
+    `->disabledClick()`) for the ユーザー情報 popup; 印刷する (print view) needs nothing per app.
 - Never write the word for the old product anywhere; call it 旧システム in the UI and "legacy system" in English.
 - Cite the SYSTEM_BRAIN rule id in tests/docblocks when implementing a rule.
 

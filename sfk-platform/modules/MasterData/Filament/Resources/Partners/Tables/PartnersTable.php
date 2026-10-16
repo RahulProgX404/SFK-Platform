@@ -14,6 +14,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\HtmlString;
 use Modules\Core\Application\Filters\FilterField;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Domain\Billing\ClosingDay;
@@ -25,6 +26,7 @@ use Modules\Core\Domain\Money\RoundingMode;
 use Modules\Core\Domain\Tax\TaxCalculationUnit;
 use Modules\Core\Domain\Tax\TaxMode;
 use Modules\Core\Filament\AppPages\AppListRecords;
+use Modules\Core\Filament\Support\UserPopup;
 use Modules\MasterData\Domain\Partners\CustomerClassification;
 use Modules\MasterData\Domain\Partners\CustomerStatus;
 use Modules\MasterData\Domain\Partners\DocumentIssuance;
@@ -87,7 +89,7 @@ final class PartnersTable
         $names = $livewire instanceof AppListRecords ? $livewire->viewColumns() : self::LIST_COLUMNS;
 
         return $table
-            ->modifyQueryUsing(fn (Builder $query) => $query->with('staff'))
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['staff.employeeCategories', 'staff.position']))
             ->columns([
                 IconColumn::make('record')
                     ->label('')
@@ -228,16 +230,31 @@ final class PartnersTable
             'name_kana' => $column->searchable()->sortable(),
             'code', 'short_name', 'legacy_customer_code' => $column->searchable()->sortable(),
             'id' => $column->sortable(),
+            // 昇順: 得意先, then 仕入先, then その他 (BR-MD-02 flags)
             'roles' => $column
                 ->state(fn (Partner $record): array => array_map(fn (PartnerRole $role): string => $role->label(), $record->roles()))
-                ->listWithLineBreaks(),
+                ->listWithLineBreaks()
+                ->sortable(query: fn (Builder $query, string $direction): Builder => $query
+                    ->orderBy('is_customer', $direction === 'asc' ? 'desc' : 'asc')
+                    ->orderBy('is_supplier', $direction === 'asc' ? 'desc' : 'asc')
+                    ->orderBy('is_other', $direction === 'asc' ? 'desc' : 'asc')),
+            // names open the ユーザー情報 popup, so the cell is not a link to the record
             'staff' => $column
-                ->state(fn (Partner $record): array => $record->staff
-                    ->map(fn (User $user): string => filled($user->sales_staff_code) ? "【{$user->sales_staff_code}】{$user->name}" : $user->name)
-                    ->all())
-                ->icon(Heroicon::User)
-                ->color('primary')
-                ->listWithLineBreaks(),
+                ->state(fn (Partner $record): HtmlString => UserPopup::list(
+                    $record->staff,
+                    fn (User $user): string => filled($user->sales_staff_code) ? "【{$user->sales_staff_code}】{$user->name}" : $user->name,
+                ))
+                ->html()
+                ->disabledClick()
+                // by the first 自社担当者 name
+                ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy(
+                    User::query()->select('users.name')
+                        ->join('partner_staff', 'partner_staff.user_id', '=', 'users.id')
+                        ->whereColumn('partner_staff.partner_id', 'partners.id')
+                        ->orderBy('users.name')
+                        ->limit(1),
+                    $direction,
+                )),
             'electronic_billing', 'supplier_same_address' => $column->state(fn (Partner $record): string => $record->getAttribute($name) ? '✓' : ''),
             'collects_by_bill' => $column->state(fn (Partner $record): string => $record->getAttribute($name) ? '手形' : ''),
             'created_at', 'updated_at' => $column->dateTime('Y-m-d H:i')->sortable(),

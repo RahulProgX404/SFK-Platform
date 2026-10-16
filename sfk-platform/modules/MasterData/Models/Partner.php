@@ -9,12 +9,14 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Modules\Core\Application\History\HasRecordHistory;
 use Modules\Core\Application\Numbering\DocumentNumberGenerator;
 use Modules\Core\Domain\Billing\ClosingDay;
 use Modules\Core\Domain\Billing\CollectionMonth;
 use Modules\Core\Domain\Money\RoundingMode;
 use Modules\Core\Domain\Tax\TaxCalculationUnit;
 use Modules\Core\Domain\Tax\TaxMode;
+use Modules\Core\Models\Concerns\RecordsHistory;
 use Modules\MasterData\Domain\Partners\CustomerClassification;
 use Modules\MasterData\Domain\Partners\CustomerStatus;
 use Modules\MasterData\Domain\Partners\DocumentIssuance;
@@ -47,8 +49,14 @@ use Modules\MasterData\Domain\Partners\PurchaseCategory;
  * @property int|null $created_by
  * @property int|null $updated_by
  */
-final class Partner extends Model
+final class Partner extends Model implements HasRecordHistory
 {
+    use RecordsHistory {
+        historySnapshot as private columnSnapshot;
+        historyPreview as private columnPreview;
+        restoreHistorySnapshot as private restoreColumns;
+    }
+
     /** Address fields copied to the supplier side when 「仕入先住所も同様」 is checked. */
     private const SUPPLIER_ADDRESS = [
         'postal_code' => 'supplier_postal_code',
@@ -205,6 +213,42 @@ final class Partner extends Model
     public function scopeSuppliers(Builder $query): Builder
     {
         return $query->where('is_supplier', true);
+    }
+
+    /**
+     * 変更履歴: the columns, with 取引先カテゴリ as `roles` (instead of the three flags) and 自社担当者 as `staff` (user
+     * ids).
+     *
+     * @return array<string, mixed>
+     */
+    public function historySnapshot(): array
+    {
+        $snapshot = $this->columnSnapshot();
+        unset($snapshot['is_customer'], $snapshot['is_supplier'], $snapshot['is_other']);
+        $snapshot['roles'] = array_map(fn (PartnerRole $role): string => $role->value, $this->roles());
+        $snapshot['staff'] = $this->staff()->pluck('users.id')->map(fn (mixed $id): int => (int) $id)->sort()->values()->all();
+        ksort($snapshot);
+
+        return $snapshot;
+    }
+
+    /** @param  array<string, mixed>  $snapshot */
+    public function historyPreview(array $snapshot): Model
+    {
+        $copy = $this->columnPreview($snapshot);
+        $copy->forceFill(self::roleColumns((array) ($snapshot['roles'] ?? [])));
+        $copy->setRelation('staff', User::query()->whereIn('id', (array) ($snapshot['staff'] ?? []))->orderBy('name')->get());
+
+        return $copy;
+    }
+
+    /** @param  array<string, mixed>  $snapshot */
+    public function restoreHistorySnapshot(array $snapshot): void
+    {
+        $this->forceFill(self::roleColumns((array) ($snapshot['roles'] ?? [])));
+        $this->restoreColumns($snapshot);
+        $this->staff()->sync(User::query()->whereIn('id', (array) ($snapshot['staff'] ?? []))->pluck('id')->all());
+        $this->unsetRelation('staff');
     }
 
     /**

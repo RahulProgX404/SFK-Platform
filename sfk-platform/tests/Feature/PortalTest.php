@@ -110,6 +110,28 @@ it('does not render script from the お知らせ', function () {
         ->assertDontSee('<script>alert(1)</script>', escape: false);
 });
 
+it('shows the お知らせ in the text colours chosen in the editor', function () {
+    DashboardPortal::for('erp')->fill(['notice' => '<p><span class="color" data-color="#e74c3c">赤い文字</span></p>'])->save();
+
+    $this->actingAs($this->employee)->get('/erp')
+        ->assertSee('赤い文字')
+        ->assertSee('style="--color: #e74c3c', escape: false)
+        ->assertSee('.sfk-notice-content .color { color: var(--color); }', escape: false);
+});
+
+it('links every space to its settings for administrators', function () {
+    $this->actingAs($this->admin);
+
+    Livewire::test(PortalPage::class)
+        ->assertSee('スペースの設定（営業スペース）')
+        ->assertSee('スペースの設定（製造スペース）')
+        ->assertSee('tableAction=edit&amp;tableActionRecord='.$this->sales->id, escape: false)
+        ->assertSee('tableActionRecord='.$this->factory->id, escape: false);
+
+    $this->actingAs($this->employee);
+    Livewire::test(PortalPage::class)->assertDontSee('スペースの設定');
+});
+
 it('lets administrators choose アプリショートカット, shown only when the user may view the app', function () {
     $this->actingAs($this->admin);
 

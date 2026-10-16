@@ -24,7 +24,14 @@
         .sfk-panel-filter select:focus { outline: 2px solid var(--kt-blue, #3498db); outline-offset: 2px; }
 
         .sfk-list { margin: 0; padding: 0; list-style: none; }
-        .sfk-list li:nth-child(even) .sfk-row { background: #f5f6f7; }
+        .sfk-list li:nth-child(even) .sfk-row, .sfk-list li.sfk-space-item:nth-child(even) { background: #f5f6f7; }
+        /* スペース row: the name (filters the apps) and ⚙ to the space's settings (administrators) */
+        .sfk-space-item { display: flex; align-items: center; }
+        .sfk-space-item .sfk-row { flex: 1; min-width: 0; }
+        .sfk-space-settings { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; margin-right: .5rem; flex-shrink: 0; color: #999; }
+        .sfk-space-settings:hover { background: var(--kt-blue-soft, #e2f2fe); color: var(--kt-blue, #3498db); }
+        .sfk-space-settings:focus-visible { outline: 2px solid var(--kt-blue, #3498db); outline-offset: -2px; }
+        .sfk-space-settings svg { width: 1.25rem; height: 1.25rem; }
         .sfk-row { display: flex; align-items: center; gap: .75rem; width: 100%; min-height: 3rem; padding: .5rem 1rem; font-size: .875rem; text-align: left; color: #333; text-decoration: none; }
         a.sfk-row:hover, button.sfk-row:hover { background: var(--kt-blue-soft, #ebf5fb) !important; color: var(--kt-blue, #3498db); }
         .sfk-row.is-selected { box-shadow: inset 3px 0 0 var(--kt-blue, #3498db); }
@@ -46,6 +53,8 @@
         .sfk-notice-content ol { list-style: decimal; padding-left: 1.5rem; }
         .sfk-notice-content a { color: var(--kt-blue, #3498db); text-decoration: underline; }
         .sfk-notice-content mark { padding: 0 .125rem; }
+        /* 文字色 of the editor: <span class="color" style="--color: …"> (Filament only colours it inside .fi-prose) */
+        .sfk-notice-content .color { color: var(--color); }
         .sfk-notice-content table { border-collapse: collapse; margin: .5rem 0; }
         .sfk-notice-content td, .sfk-notice-content th { border: 1px solid var(--kt-border, #e3e7e8); padding: .25rem .5rem; }
 
@@ -136,12 +145,18 @@
                     @else
                         <ul class="sfk-list">
                             @foreach ($spaces as $space)
-                                <li wire:key="space-{{ $space->id }}">
+                                <li wire:key="space-{{ $space->id }}" class="sfk-space-item">
                                     <button type="button" wire:click="showSpace({{ $space->id }})" @class(['sfk-row', 'is-selected' => $appSpace === $space->id])>
                                         <span class="sfk-space-icon" aria-hidden="true"></span>
                                         <x-filament::icon icon="heroicon-s-lock-closed" class="sfk-lock" />
                                         <span>{{ $space->name }}</span>
                                     </button>
+                                    @if (isset($spaceSettingsUrls[$space->id]))
+                                        <a href="{{ $spaceSettingsUrls[$space->id] }}" class="sfk-space-settings" title="スペースの設定（{{ $space->name }}）">
+                                            <x-filament::icon icon="heroicon-o-cog-6-tooth" />
+                                            <span class="fi-sr-only">スペースの設定（{{ $space->name }}）</span>
+                                        </a>
+                                    @endif
                                 </li>
                             @endforeach
                         </ul>

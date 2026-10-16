@@ -159,6 +159,7 @@ final class AppSettingsResource extends Resource
             ])
             ->defaultSort('sort_order')
             ->paginated(false)
+            ->striped()
             ->recordActions([
                 EditAction::make()->label('権限を設定'),
             ])

@@ -59,6 +59,12 @@ abstract class AppListViewSettings extends Page
         return 'settings';
     }
 
+    /** Tab of アプリの設定 shown by this page. */
+    public function settingsTab(): string
+    {
+        return 'views';
+    }
+
     public function getTitle(): string
     {
         return 'アプリの設定';

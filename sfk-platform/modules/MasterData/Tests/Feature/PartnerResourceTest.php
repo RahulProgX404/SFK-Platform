@@ -13,13 +13,16 @@ use Modules\Core\Application\Apps\AppDiscovery;
 use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\AppStatus;
 use Modules\Core\Domain\Apps\PermissionSubject;
+use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Models\BusinessApp;
+use Modules\Core\Models\RecordVersion;
 use Modules\Core\Models\Space;
 use Modules\MasterData\Domain\Partners\DocumentRecipient;
 use Modules\MasterData\Filament\Resources\Partners\Pages\CreatePartner;
 use Modules\MasterData\Filament\Resources\Partners\Pages\EditPartner;
 use Modules\MasterData\Filament\Resources\Partners\Pages\ListPartners;
 use Modules\MasterData\Filament\Resources\Partners\Pages\PartnerListViewSettings;
+use Modules\MasterData\Filament\Resources\Partners\Pages\PartnerSettings;
 use Modules\MasterData\Filament\Resources\Partners\Pages\ViewPartner;
 use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Filament\Resources\Partners\Tables\PartnersTable;
@@ -232,7 +235,8 @@ it('hides the pencil and 削除する from employees who may only view', functio
     Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
         ->assertActionHidden('edit')
         ->assertActionHidden('delete')
-        ->assertDontSee('その他の操作');
+        ->assertActionHidden('duplicate')
+        ->assertActionVisible('print');
 });
 
 it('offers the legacy views 取引先一覧 and （すべて）', function () {
@@ -581,7 +585,7 @@ it('opens アプリの設定 → 一覧 from the gear, for administrators only',
 
     $this->get(PartnerListViewSettings::getUrl())
         ->assertOk()
-        ->assertSeeInOrder(['アプリ: 01. 取引先マスタ（得意先・仕入先）', 'アプリの設定', '一覧', 'アクセス権', '作成済みの一覧', '一覧を追加する', 'ドラッグして並び替え', '取引先一覧', '編集', '複製', '削除', '（すべて）']);
+        ->assertSeeInOrder(['アプリ: 01. 取引先マスタ（得意先・仕入先）', 'アプリの設定', '一覧', '設定', '作成済みの一覧', '一覧を追加する', 'ドラッグして並び替え', '取引先一覧', '編集', '複製', '削除', '（すべて）']);
 
     $this->actingAs($employee);
     $this->get(PartnerListViewSettings::getUrl())->assertForbidden();
@@ -704,4 +708,197 @@ it('lets each user choose 表示件数 for every app list', function () {
     expect($this->admin->refresh()->list_page_size)->toBe(20);
 
     Livewire::test(ListPartners::class)->assertSee('1 - 20（25件中）')->assertCountTableRecords(25);
+});
+
+it('sorts by every column on a click of its header, switching between 昇順 and 降順', function () {
+    $a = makePartner(['name' => 'あ商事', 'short_name' => 'あ', 'phone' => '03-0000-0002', 'roles' => ['仕入先']]);
+    $b = makePartner(['name' => 'い商事', 'short_name' => 'い', 'phone' => '03-0000-0001', 'roles' => ['得意先']]);
+    $staff = User::factory()->create(['name' => '佐藤']);
+    $a->staff()->attach($staff);
+    $this->actingAs($this->admin);
+
+    $list = Livewire::test(ListPartners::class);
+    expect($list->instance()->getTable()->getColumn('phone')->isSortable())->toBeTrue()
+        ->and($list->instance()->getTable()->getColumn('closing_day')->isSortable())->toBeTrue();
+
+    $list->call('sortTable', 'phone')
+        ->assertSet('tableSort', 'phone:asc')
+        ->assertCanSeeTableRecords([$b, $a], inOrder: true)
+        ->call('sortTable', 'phone')
+        ->assertSet('tableSort', 'phone:desc')
+        ->assertCanSeeTableRecords([$a, $b], inOrder: true)
+        ->call('sortTable', 'phone')
+        ->assertSet('tableSort', 'phone:asc')
+        ->call('sortTable', 'roles')
+        ->assertCanSeeTableRecords([$b, $a], inOrder: true)
+        ->call('sortTable', 'roles')
+        ->assertCanSeeTableRecords([$a, $b], inOrder: true)
+        ->call('sortTable', 'staff')
+        ->assertSet('tableSort', 'staff:asc')
+        ->assertCountTableRecords(2);
+});
+
+it('offers 200 and 300 件 in 表示件数', function () {
+    $this->actingAs($this->admin);
+
+    expect(AppListRecords::PAGE_SIZES)->toBe([20, 40, 60, 80, 100, 200, 300]);
+
+    Livewire::test(ListPartners::class)->callAction('pageSize', data: ['size' => '300'])->assertHasNoActionErrors();
+
+    expect($this->admin->refresh()->list_page_size)->toBe(300);
+});
+
+it('puts the search box on the left and one horizontal scroll at the end of the list', function () {
+    $this->actingAs($this->admin);
+
+    $this->get('/erp/partners')
+        ->assertOk()
+        ->assertSee('.sfk-app-page-list .fi-ta-header-toolbar > :not(.fi-ta-actions) { order: -1; margin-inline-start: 0; }', escape: false)
+        ->assertSee('.sfk-app-page-list .fi-ta-main { overflow-x: auto; }', escape: false);
+});
+
+/*
+ * Record features of the legacy app screens: アプリの設定 → 設定 (アクセス権, その他の設定), レコードを再利用する,
+ * 印刷する, the ユーザー情報 popup and the 変更履歴 (versions, 更新内容を表示, このバージョンに戻す).
+ */
+
+it('reuses a record without its code, attachments and history (レコードを再利用する)', function () {
+    $app = publishedPartnerApp();
+    $staff = User::factory()->create(['name' => '佐藤']);
+    $source = makePartner(['name' => '元の取引先', 'short_name' => '元', 'code' => '000005', 'roles' => ['仕入先'], 'contract_files' => ['partners/a.pdf'], 'phone' => '03-1234-5678']);
+    $source->staff()->attach($staff);
+    $this->actingAs($this->admin);
+
+    Livewire::test(ViewPartner::class, ['record' => $source->getRouteKey()])
+        ->assertActionVisible('duplicate')
+        ->assertActionHasUrl('duplicate', PartnerResource::getUrl('create', ['duplicate' => $source->id]));
+
+    Livewire::withQueryParams(['duplicate' => (string) $source->id])
+        ->test(CreatePartner::class)
+        ->assertFormSet(['name' => '元の取引先', 'phone' => '03-1234-5678', 'roles' => ['仕入先'], 'staff' => [$staff->id], 'code' => null])
+        ->fillForm(['name' => '再利用した取引先'])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $copy = Partner::query()->where('name', '再利用した取引先')->sole();
+    expect($copy->code)->not->toBe('000005')
+        ->and($copy->is_supplier)->toBeTrue()
+        ->and($copy->contract_files)->toBeEmpty()
+        ->and($copy->staff->pluck('id')->all())->toBe([$staff->id])
+        ->and(RecordVersion::query()->where('record_id', $copy->id)->pluck('version')->all())->toBe([1]);
+
+    $app->forceFill(['record_duplicate_enabled' => false])->save();
+
+    Livewire::test(ViewPartner::class, ['record' => $source->getRouteKey()])->assertActionHidden('duplicate');
+    Livewire::withQueryParams(['duplicate' => (string) $source->id])->test(CreatePartner::class)->assertFormSet(['name' => null]);
+});
+
+it('keeps the 変更履歴 of a record, shows a version with its changes and restores it', function () {
+    publishedPartnerApp();
+    $this->actingAs($this->admin);
+
+    Livewire::test(CreatePartner::class)->fillForm(partnerData(['phone' => '03-1111-1111']))->call('create')->assertHasNoFormErrors();
+    $partner = Partner::query()->sole();
+
+    Livewire::test(EditPartner::class, ['record' => $partner->getRouteKey()])->fillForm(['phone' => '03-2222-2222'])->call('save')->assertHasNoFormErrors();
+    Livewire::test(EditPartner::class, ['record' => $partner->getRouteKey()])->call('save'); // no change: no version
+
+    $versions = RecordVersion::query()->where('record_id', $partner->id)->orderBy('version')->get();
+    expect($versions->pluck('version')->all())->toBe([1, 2])
+        ->and($versions[0]->event)->toBe('created')
+        ->and($versions[1]->changed)->toBe(['phone'])
+        ->and($versions[1]->user_id)->toBe($this->admin->id);
+
+    Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
+        ->assertSeeInOrder(['変更履歴', 'バージョン 2', '更新', 'TEL(得意先)', '更新内容を表示', 'バージョン 1', '作成', '初版を表示', '初版に戻す'])
+        ->assertSee('03-2222-2222')
+        ->call('showVersion', 2)
+        ->assertSee('sfk-history-changed', false)
+        ->call('showVersion', 1)
+        ->assertSee('03-1111-1111')
+        ->assertSee('最新の内容を表示')
+        ->call('showLatest')
+        ->assertSee('03-2222-2222')
+        ->call('showVersion', 2)
+        ->callAction('restoreVersion', arguments: ['version' => 1])
+        ->assertNotified('バージョン 1 に戻しました')
+        ->assertSet('historyVersion', null)
+        ->assertSee('03-1111-1111')
+        ->assertDontSee('最新の内容を表示');
+
+    expect($partner->refresh()->phone)->toBe('03-1111-1111');
+    $restored = RecordVersion::query()->where('record_id', $partner->id)->where('version', 3)->sole();
+    expect($restored->event)->toBe('restored')->and($restored->restored_from)->toBe(1)->and($restored->changed)->toBe(['phone']);
+
+    $partner->delete();
+    expect(RecordVersion::query()->where('record_id', $partner->id)->count())->toBe(0);
+});
+
+it('stops recording and hides the 変更履歴 when it is switched off in その他の設定', function () {
+    $app = publishedPartnerApp();
+    $partner = makePartner();
+    $this->actingAs($this->admin);
+
+    Livewire::test(PartnerSettings::class)
+        ->assertSet('historyEnabled', true)
+        ->set('historyEnabled', false)
+        ->set('duplicateEnabled', false)
+        ->call('saveMisc')
+        ->assertNotified('設定を保存しました');
+
+    expect($app->refresh()->record_history_enabled)->toBeFalse()->and($app->record_duplicate_enabled)->toBeFalse();
+
+    Livewire::test(EditPartner::class, ['record' => $partner->getRouteKey()])->fillForm(['phone' => '03-9999-9999'])->call('save');
+    expect(RecordVersion::query()->count())->toBe(0);
+
+    Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])->assertDontSee('変更履歴');
+});
+
+it('opens アプリの設定 → 設定 with アクセス権 and その他の設定, for administrators only', function () {
+    $employee = employeeWith([AppAbility::View]);
+    $this->actingAs($this->admin);
+
+    $this->get(PartnerSettings::getUrl())
+        ->assertOk()
+        ->assertSeeInOrder(['一覧', '設定', 'アクセス権', 'アプリ', '高度な設定', 'その他の設定', '「レコードの再利用」機能を有効にする', 'レコードの変更履歴を記録する', '保存']);
+
+    $this->get('/erp/partners')->assertSeeInOrder(['アプリの設定メニュー', 'この一覧の設定を開く', '一覧', '設定', 'アクセス権', 'その他の設定']);
+
+    $this->actingAs($employee);
+    $this->get(PartnerSettings::getUrl())->assertForbidden();
+});
+
+it('prints a record without the header, menus and history (印刷する)', function () {
+    publishedPartnerApp();
+    $partner = makePartner(['name' => '印刷する取引先']);
+    $this->actingAs($this->admin);
+
+    Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
+        ->assertActionHasUrl('print', PartnerResource::getUrl('view', ['record' => $partner, 'print' => 1]));
+
+    $this->get(PartnerResource::getUrl('view', ['record' => $partner, 'print' => 1]))
+        ->assertOk()
+        ->assertSee('sfk-app-page-print', false)
+        ->assertSeeInOrder(['印刷', '閉じる', '印刷する取引先'])
+        ->assertDontSee('id="sfk-history-title"', false)
+        ->assertDontSee('レコードを編集する');
+});
+
+it('opens the ユーザー情報 popup from user names, with the profile link only for those who may open it', function () {
+    $employee = employeeWith([AppAbility::View]);
+    $staff = User::factory()->create(['name' => '佐藤 花子']);
+    $partner = makePartner();
+    $partner->staff()->attach($staff);
+    $this->actingAs($this->admin);
+
+    Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
+        ->assertSee('ユーザー情報（佐藤 花子）')
+        ->assertSee('プロフィールを表示');
+
+    Livewire::test(ListPartners::class)->assertSee('ユーザー情報（佐藤 花子）');
+
+    $this->actingAs($employee);
+    Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
+        ->assertSee('ユーザー情報（佐藤 花子）')
+        ->assertDontSee('プロフィールを表示');
 });

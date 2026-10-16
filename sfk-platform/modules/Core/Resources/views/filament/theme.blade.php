@@ -219,7 +219,7 @@
     .fi-main:has(.sfk-app-page) { display: flex; flex-direction: column; padding: 0; }
     .sfk-app-page { display: flex; flex: 1; flex-direction: column; background: #ffffff; }
     .sfk-app-page > .fi-page-header-main-ctn { display: flex; flex: 1; flex-direction: column; row-gap: 0; padding: 0; }
-    .sfk-app-page .fi-page-main { flex: 1; gap: 0; }
+    .sfk-app-page .fi-page-main { display: flex; flex: 1; flex-direction: column; gap: 0; }
     .sfk-app-page .fi-page-content { flex: 1; align-content: start; }
     .sfk-app-header { display: flex; flex-direction: column; }
     .sfk-app-titlebar {
@@ -495,6 +495,89 @@
     .sfk-view-foot { border-top: 1px solid var(--kt-border); background: #ffffff; justify-content: flex-end; }
     .sfk-view-foot .sfk-filter-btn:first-child { margin-right: auto; }
 
+    /* Settings screens (スペース, アプリの権限) in the app frame (core::filament.settings-header) */
+    .sfk-settings-icon-svg { width: 1.25rem; height: 1.25rem; }
+    .sfk-settings-page.sfk-app-page-list .fi-page-content { padding: 0; }
+
+    /* Gear with ▾ (core::filament.app-settings-menu) */
+    .sfk-app-settings { display: inline-flex; }
+    .sfk-app-settings .sfk-app-tool:first-child { border-right: 0; }
+    .sfk-app-settings-more { width: 1.5rem !important; }
+    .sfk-app-settings-more-icon { width: .875rem; height: .875rem; }
+
+    /* アプリの設定 → 設定 (core::filament.app-settings) */
+    .sfk-settings { display: flex; flex-direction: column; gap: 24px; max-width: 960px; }
+    .sfk-settings-group-title { margin: 0 0 10px; padding-left: 10px; border-left: 4px solid var(--kt-blue); font-size: 1rem; font-weight: 700; }
+    .sfk-settings-link {
+        display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 16px; border: 1px solid var(--kt-border);
+        background: #ffffff; color: var(--kt-blue); font-size: .875rem;
+    }
+    .sfk-settings-link:hover { background: var(--kt-blue-soft); }
+    .sfk-settings-link-icon { width: 18px; height: 18px; }
+    .sfk-settings-form { display: flex; flex-direction: column; gap: 12px; border: 1px solid var(--kt-border); }
+    .sfk-settings-form-title { font-weight: 700; }
+    .sfk-settings-check { display: inline-flex; align-items: center; gap: 8px; font-size: .875rem; cursor: pointer; }
+    .sfk-settings-check input { width: 16px; height: 16px; accent-color: var(--kt-blue); }
+    .sfk-settings-form-foot { display: flex; justify-content: flex-end; padding-top: 8px; }
+
+    /* ユーザー情報 popup (core::components.user-popup) */
+    .sfk-user { display: inline-flex; }
+    .sfk-user-line { display: block; }
+    .sfk-user-name { display: inline-flex; align-items: center; gap: 4px; padding: 0; color: var(--kt-blue-dark); font-size: inherit; text-align: left; }
+    .sfk-user-name:hover { text-decoration: underline; }
+    .sfk-user-name:focus-visible { outline: 1px solid var(--kt-blue); outline-offset: 1px; }
+    .sfk-user-avatar {
+        display: inline-grid; place-items: center; flex-shrink: 0; border-radius: 9999px; background: #8fb7d7; color: #ffffff; font-weight: 700;
+    }
+    .sfk-user-avatar-sm { width: 18px; height: 18px; font-size: 10px; }
+    .sfk-user-avatar-lg { width: 56px; height: 56px; font-size: 22px; }
+    .sfk-user-card { display: flex; gap: 14px; padding: 16px; }
+    .sfk-user-card-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .sfk-user-card-name { margin: 0 0 2px; font-size: 1rem; font-weight: 700; color: var(--kt-text); }
+    .sfk-user-card-meta { margin: 0; font-size: .8125rem; color: var(--kt-muted); }
+    .sfk-user-card-link { margin-top: 8px; font-size: .8125rem; color: var(--kt-blue); }
+    .sfk-user-card-link:hover { text-decoration: underline; }
+
+    /* 変更履歴 (core::filament.record-history): panel on the right of the record; changed fields in green */
+    .sfk-history { width: 340px; max-width: 100%; align-self: flex-start; background: #ffffff; border: 1px solid var(--kt-border); }
+    @media (max-width: 1023px) { .sfk-history { width: 100%; } }
+    .sfk-history-head { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px 0 0; border-bottom: 1px solid var(--kt-border); background: var(--kt-header); }
+    .sfk-history-tab { display: inline-grid; place-items: center; width: 44px; height: 44px; background: #ffffff; border-right: 1px solid var(--kt-border); color: var(--kt-blue); }
+    .sfk-history-tab-icon { width: 20px; height: 20px; }
+    .sfk-history-title { margin: 0; font-size: .875rem; font-weight: 700; }
+    .sfk-history-shown { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; background: #e6f4ea; border-bottom: 1px solid #b7dfc2; font-size: .8125rem; font-weight: 700; }
+    .sfk-history-latest { min-width: 0; height: 32px; padding: 0 12px; font-size: .8125rem; }
+    .sfk-history-empty { margin: 0; padding: 16px 12px; font-size: .8125rem; color: var(--kt-muted); }
+    .sfk-history-list { max-height: calc(100vh - 220px); margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+    .sfk-history-item { padding: 10px 12px; border-bottom: 1px solid var(--kt-border); font-size: .8125rem; }
+    .sfk-history-item.is-shown { background: #f1f9f3; box-shadow: inset 3px 0 0 #3c9a5f; }
+    .sfk-history-item-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+    .sfk-history-version { font-weight: 700; }
+    .sfk-history-date { color: var(--kt-muted); font-size: .75rem; }
+    .sfk-history-who { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 0; }
+    .sfk-history-event { color: var(--kt-muted); }
+    .sfk-history-fields { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 0; padding: 0; list-style: none; }
+    .sfk-history-fields li { padding: 1px 6px; background: #e6f4ea; color: #276b40; font-size: .75rem; }
+    .sfk-history-actions { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; }
+    .sfk-history-actions .fi-link { font-size: .8125rem; font-weight: 400; color: var(--kt-blue) !important; }
+    .fi-in-entry.sfk-history-changed .fi-in-entry-content { background: #dff3e4 !important; box-shadow: inset 3px 0 0 #3c9a5f; }
+
+    /* 印刷する: print view (?print=1) without header, menus and history; 印刷 / 閉じる hidden on paper */
+    body:has(.sfk-app-page-print) .fi-topbar, body:has(.sfk-app-page-print) .fi-sidebar,
+    body:has(.sfk-app-page-print) .fi-sidebar-close-overlay { display: none !important; }
+    .sfk-app-page-print .sfk-app-crumbs, .sfk-app-page-print .sfk-app-description { display: none; }
+    /* the whole record is printed: every tab's fields, without the tab bar */
+    .sfk-app-page-print .kt-record-tabs { display: none; }
+    .sfk-app-page-print .kt-record-tabbed [x-show] { display: block !important; }
+    .sfk-print-toolbar { gap: 12px; }
+    @media print {
+        .sfk-print-toolbar, .sfk-app-page-print .sfk-app-toolbar { display: none !important; }
+        .sfk-app-page-print .sfk-app-titlebar { background: #ffffff !important; color: var(--kt-text) !important; border-bottom: 2px solid var(--kt-text); }
+        .sfk-app-page-print .sfk-app-title a { color: var(--kt-text) !important; }
+        .sfk-app-page-print .fi-page-content { background: #ffffff !important; border: 0 !important; padding: 0 !important; }
+        .fi-body { background: #ffffff !important; }
+    }
+
     /* カレンダー形式 of an app list (core::filament.app-calendar) */
     .sfk-calendar-view { padding: 0 .875rem 1rem; }
     .sfk-calendar-view-head { display: flex; align-items: center; gap: 8px; padding: 8px 0 12px; }
@@ -523,22 +606,48 @@
 
     /* App list: the paging is in the toolbar; light-blue striped rows with vertical rules */
     .sfk-app-page-list .fi-ta-ctn .fi-pagination { display: none; }
+    /* Search box on the left of the list toolbar */
+    .sfk-app-page-list .fi-ta-header-toolbar { justify-content: flex-start; }
+    .sfk-app-page-list .fi-ta-header-toolbar > :not(.fi-ta-actions) { order: -1; margin-inline-start: 0; }
+    .sfk-app-page-list .fi-ta-header-toolbar > .fi-ta-actions:empty { display: none; }
+    /* One horizontal scroll for header and rows, with its bar at the end of the table (also below the empty
+       state); the toolbar and the empty state stay in view while scrolling */
+    .sfk-app-page-list .fi-ta-main { overflow-x: auto; }
+    .sfk-app-page-list .fi-ta-content-ctn { overflow-x: visible; }
+    .sfk-app-page-list .fi-ta-header-ctn, .sfk-app-page-list .fi-ta-empty-state { position: sticky; left: 0; }
     .sfk-app-page-list .fi-ta-ctn { box-shadow: 0 1px 0 var(--kt-border), 0 -1px 0 var(--kt-border) !important; }
     .sfk-app-page-list .fi-ta-row.fi-striped > td { background-color: #f2f8fc; }
     .sfk-app-page-list .fi-ta-row:hover > td { background-color: var(--kt-blue-soft); }
     .sfk-app-page-list .fi-ta-table > tbody > tr > td { border-inline-end: 1px solid var(--kt-border); }
 
-    /* App record form / record page: light-blue ground, white inputs, tabs above the fields */
-    .sfk-app-page-create .fi-page-content, .sfk-app-page-edit .fi-page-content, .sfk-app-page-view .fi-page-content {
-        padding: 1rem; background: #e8f1f8; border-top: 1px solid #d3e3ef;
+    /* App record form / record page (and the settings forms): light-blue ground, white cards with room around the
+       fields, even gaps between them, tabs above the fields */
+    :is(.sfk-app-page-create, .sfk-app-page-edit, .sfk-app-page-view) .fi-page-content {
+        padding: 20px 24px 32px; background: #eef4f9; border-top: 1px solid #d3e3ef;
     }
-    .sfk-app-page-create .kt-record, .sfk-app-page-edit .kt-record, .sfk-app-page-view .kt-record {
-        background: transparent; box-shadow: none !important;
+    @media (max-width: 640px) { :is(.sfk-app-page-create, .sfk-app-page-edit, .sfk-app-page-view) .fi-page-content { padding: 12px; } }
+    :is(.sfk-app-page-create, .sfk-app-page-edit, .sfk-app-page-view) .fi-page-content .fi-section:not(.fi-section-not-contained) {
+        border-radius: 8px; background: #ffffff;
+        box-shadow: 0 0 0 1px #d8e4ee, 0 1px 3px rgba(20, 70, 110, .06) !important;
     }
-    .sfk-app-page-create .kt-record .fi-section-content, .sfk-app-page-edit .kt-record .fi-section-content,
-    .sfk-app-page-view .kt-record .fi-section-content { padding: .5rem 0; }
-    .sfk-app-page-view .kt-record .fi-in-entry-content { background: #ffffff; padding-inline: .5rem; }
-    .kt-record-tabbed { display: flex; flex-direction: column; gap: .5rem; }
+    :is(.sfk-app-page-create, .sfk-app-page-edit, .sfk-app-page-view) .fi-page-content .fi-section-header {
+        padding: 12px 20px; border-radius: 8px 8px 0 0; background: #f6f9fc; border-bottom: 1px solid #e3ebf2;
+    }
+    :is(.sfk-app-page-create, .sfk-app-page-edit, .sfk-app-page-view) .fi-page-content .fi-section:not(.fi-section-not-contained) > .fi-section-content-ctn > .fi-section-content {
+        padding: 18px 20px 20px;
+    }
+    :is(.sfk-app-page-create, .sfk-app-page-edit, .sfk-app-page-view) .kt-record .fi-grid { column-gap: 16px; row-gap: 14px; }
+    :is(.sfk-app-page-create, .sfk-app-page-edit) .fi-fo-field-label { margin-bottom: 2px; }
+    :is(.sfk-app-page-create, .sfk-app-page-edit) .fi-fo-field-label-content { font-size: .8125rem; color: #3f5160; }
+    /* drop-downs keep their value on one line, also in narrow legacy columns */
+    .fi-select-input-btn { min-width: 0; }
+    .fi-select-input-value-ctn, .fi-select-input-placeholder, .fi-select-input-value-label {
+        min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .sfk-app-page-view .kt-record .fi-in-entry-content {
+        padding: 6px 10px; border: 1px solid #e6edf3; border-radius: 4px; background: #f8fbfd;
+    }
+    .kt-record-tabbed { display: flex; flex-direction: column; gap: 16px; }
     .kt-record-tabs { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--kt-tab-border); }
     .kt-record-tab {
         min-height: 48px; padding: 0 24px; background: var(--kt-disabled); color: var(--kt-text); font-size: .875rem;
@@ -549,7 +658,7 @@
     .kt-record-tab:hover { background: #e1e3e3; }
     .kt-record-tab.kt-active { background: #ffffff; box-shadow: none; }
     .kt-record-tab:focus-visible { outline: 1px solid var(--kt-blue); outline-offset: -1px; }
-    .kt-record-label { padding: .125rem 0 .125rem .5rem; border-inline-start: 4px solid #555555; }
+    .kt-record-label { margin-top: 4px; padding: 2px 0 2px 10px; border-inline-start: 4px solid var(--kt-blue); color: #2d4a5f; }
     .kt-record-empty { padding: .5rem 0; font-size: .875rem; color: var(--kt-muted); }
 
     /* Dashboard name with switcher (core::filament.dashboard-switcher) replaces the panel brand */

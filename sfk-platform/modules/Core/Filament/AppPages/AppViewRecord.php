@@ -4,26 +4,197 @@ declare(strict_types=1);
 
 namespace Modules\Core\Filament\AppPages;
 
+use App\Models\User;
+use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Infolists\Components\Entry;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\EmbeddedSchema;
+use Filament\Schemas\Components\Flex;
+use Filament\Schemas\Components\Group;
+use Filament\Schemas\Components\View as ViewComponent;
+use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Livewire\Attributes\Url;
+use Modules\Core\Application\History\HasRecordHistory;
+use Modules\Core\Application\History\RecordHistory;
 use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
+use Modules\Core\Models\RecordVersion;
 
 /**
- * A record of an app: app frame; toolbar with the pencil (レコードを編集する) and the 「…」 menu (削除する) on the left,
- * gear and ‹ › to the previous / next record (in the app's list order, recordNavigationColumn()) on the right.
+ * A record of an app, in the legacy layout: app frame; toolbar with the pencil (レコードを編集する), 再利用
+ * (レコードを再利用する, その他の設定) and the 「…」 menu (印刷する, 削除する) on the left, gear and ‹ › to the previous /
+ * next record (in the app's list order, recordNavigationColumn()) on the right; the 変更履歴 panel on the right of the
+ * record (records implementing HasRecordHistory, その他の設定): versions newest first with 更新内容を表示 (changed
+ * fields in green) / このバージョンに戻す, and 最新の内容を表示. 印刷する opens the print view (?print=1): the record
+ * without header, menus and history, with 印刷 / 閉じる.
  */
 abstract class AppViewRecord extends ViewRecord
 {
     use HasAppChrome;
 
+    /** Print view (印刷する) */
+    #[Url(as: 'print')]
+    public bool $printMode = false;
+
+    /** 変更履歴: the version shown instead of the latest content */
+    #[Url(as: 'version')]
+    public ?int $historyVersion = null;
+
+    private ?Model $versionPreview = null;
+
+    private ?RecordVersion $shownVersion = null;
+
     public function appPageKind(): string
     {
         return 'view';
+    }
+
+    /** @return array<string> */
+    public function getPageClasses(): array
+    {
+        return [...parent::getPageClasses(), 'sfk-app-page', 'sfk-app-page-view', ...($this->printMode ? ['sfk-app-page-print'] : [])];
+    }
+
+    /** The shown version of the record while 更新内容を表示 is on, else the record. */
+    public function getRecord(): Model
+    {
+        $version = $this->shownVersion();
+        if ($version === null || ! $this->record instanceof HasRecordHistory) {
+            return $this->record;
+        }
+
+        return $this->versionPreview ??= $this->record->historyPreview($version->snapshot);
+    }
+
+    public function content(Schema $schema): Schema
+    {
+        return $schema->components([
+            Flex::make([
+                Group::make([EmbeddedSchema::make('infolist')])->grow(),
+                ViewComponent::make('core::filament.record-history')
+                    ->visible(fn (): bool => $this->showsHistory())
+                    ->grow(false),
+            ])->from('lg'),
+            $this->getRelationManagersContentComponent(),
+        ]);
+    }
+
+    /** Changed fields of the shown version get the green mark (entries are matched by name). */
+    public function infolist(Schema $schema): Schema
+    {
+        $schema = parent::infolist($schema);
+
+        foreach ($schema->getFlatComponents(withHidden: true) as $component) {
+            if ($component instanceof Entry) {
+                $component->extraEntryWrapperAttributes(
+                    fn (Entry $entry): array => in_array($entry->getName(), $this->highlightedFields(), true) ? ['class' => 'sfk-history-changed'] : [],
+                    merge: true,
+                );
+            }
+        }
+
+        return $schema;
+    }
+
+    public function showsHistory(): bool
+    {
+        return ! $this->printMode && $this->record instanceof HasRecordHistory && $this->appSetting('record_history_enabled');
+    }
+
+    /** @return Collection<int, RecordVersion> */
+    public function historyVersions(): Collection
+    {
+        return $this->showsHistory() ? app(RecordHistory::class)->versions($this->record) : new Collection;
+    }
+
+    public function shownVersion(): ?RecordVersion
+    {
+        if ($this->historyVersion === null || ! $this->showsHistory()) {
+            return null;
+        }
+
+        return $this->shownVersion ??= app(RecordHistory::class)->find($this->record, $this->historyVersion);
+    }
+
+    /** @return list<string> fields marked in green: those changed in the shown version */
+    public function highlightedFields(): array
+    {
+        $changed = $this->shownVersion()->changed ?? [];
+
+        return [...$changed, ...$this->relatedHighlightFields($changed)];
+    }
+
+    /** Label of a field in the 変更履歴: historyLabels(), else the app's list column label, else the field name. */
+    public function historyFieldLabel(string $field): string
+    {
+        if (isset($this->historyLabels()[$field])) {
+            return $this->historyLabels()[$field];
+        }
+
+        $index = static::getResource()::getPages()['index']->getPage();
+        $columns = is_subclass_of($index, AppListRecords::class) ? (new $index)->listColumns() : [];
+
+        return $columns[$field] ?? $field;
+    }
+
+    /** @return array<string, string> field => label for the 変更履歴 (e.g. the app's legacy field names) */
+    protected function historyLabels(): array
+    {
+        return [];
+    }
+
+    public function showVersion(int $version): void
+    {
+        $this->historyVersion = $version;
+        $this->rebindShownRecord();
+    }
+
+    public function showLatest(): void
+    {
+        $this->historyVersion = null;
+        $this->rebindShownRecord();
+    }
+
+    /** The record schema is cached at the start of the request: point it at the newly shown content. */
+    private function rebindShownRecord(): void
+    {
+        $this->shownVersion = null;
+        $this->versionPreview = null;
+        $this->getSchema('infolist')?->record($this->getRecord());
+    }
+
+    public function restoreVersionAction(): Action
+    {
+        return Action::make('restoreVersion')
+            ->label(fn (array $arguments): string => (int) ($arguments['version'] ?? 0) === 1 ? '初版に戻す' : 'このバージョンに戻す')
+            ->link()
+            ->color('gray')
+            ->visible(fn (): bool => $this->showsHistory() && static::getResource()::canEdit($this->record))
+            ->modalIcon(Heroicon::OutlinedArrowUturnLeft)
+            ->modalWidth('md')
+            ->modalHeading(fn (array $arguments): string => 'バージョン '.(int) ($arguments['version'] ?? 0).' に戻しますか？')
+            ->modalSubmitActionLabel('戻す')
+            ->modalCancelActionLabel('キャンセル')
+            ->action(function (array $arguments): void {
+                $version = app(RecordHistory::class)->find($this->record, (int) ($arguments['version'] ?? 0));
+                if ($version === null || ! $this->record instanceof HasRecordHistory) {
+                    return;
+                }
+
+                $user = auth()->user();
+                app(RecordHistory::class)->restore($this->record, $version, $user instanceof User ? $user->id : null);
+                $this->record->refresh();
+                $this->showLatest();
+
+                Notification::make()->title('バージョン '.$version->version.' に戻しました')->success()->send();
+            });
     }
 
     protected function getHeaderActions(): array
@@ -36,11 +207,25 @@ abstract class AppViewRecord extends ViewRecord
                 ->icon(Heroicon::OutlinedPencil)
                 ->iconButton()
                 ->color('gray')
-                ->visible(fn (Model $record): bool => $resource::canEdit($record)),
+                ->visible(fn (): bool => $this->historyVersion === null && $resource::canEdit($this->record)),
+            Action::make('duplicate')
+                ->label('レコードを再利用する')
+                ->icon(Heroicon::OutlinedDocumentDuplicate)
+                ->iconButton()
+                ->color('gray')
+                ->url(fn (): string => $resource::getUrl('create', ['duplicate' => $this->record->getKey()]))
+                ->visible(fn (): bool => $this->historyVersion === null && $resource::hasPage('create') && $resource::canCreate()
+                    && $this->appSetting('record_duplicate_enabled')),
             ActionGroup::make([
+                Action::make('print')
+                    ->label('印刷する')
+                    ->icon(Heroicon::OutlinedPrinter)
+                    ->url(fn (): string => $resource::getUrl('view', ['record' => $this->record, 'print' => 1]))
+                    ->openUrlInNewTab(),
                 DeleteAction::make()
                     ->label('削除する')
-                    ->visible(fn (Model $record): bool => $resource::canDelete($record)),
+                    ->record(fn (): Model => $this->record)
+                    ->visible(fn (): bool => $resource::canDelete($this->record)),
             ])
                 ->label('その他の操作')
                 ->icon(Heroicon::EllipsisHorizontal)
@@ -49,10 +234,21 @@ abstract class AppViewRecord extends ViewRecord
         ];
     }
 
+    /**
+     * Entries to mark besides the changed fields themselves (e.g. an entry built from several fields).
+     *
+     * @param  list<string>  $changed
+     * @return list<string>
+     */
+    protected function relatedHighlightFields(array $changed): array
+    {
+        return [];
+    }
+
     /** Column of the app's default list order, followed by ‹ › (the key breaks ties; a blank value navigates by key). */
     protected function recordNavigationColumn(): string
     {
-        return $this->getRecord()->getKeyName();
+        return $this->record->getKeyName();
     }
 
     /** @return array{previous: string|null, next: string|null} */
@@ -71,9 +267,17 @@ abstract class AppViewRecord extends ViewRecord
         return $urls;
     }
 
+    /** その他の設定 of the app (enabled while the app is not registered). */
+    protected function appSetting(string $setting): bool
+    {
+        $app = $this->appResource()::app();
+
+        return $app === null || (bool) $app->getAttribute($setting);
+    }
+
     private function neighbour(bool $forward): ?Model
     {
-        $record = $this->getRecord();
+        $record = $this->record;
         $key = $record->getQualifiedKeyName();
         $id = $record->getKey();
         $value = $record->getAttribute($this->recordNavigationColumn());

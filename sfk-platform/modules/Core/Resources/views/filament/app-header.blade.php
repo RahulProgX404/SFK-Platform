@@ -72,12 +72,7 @@
                     </a>
                 @endif
 
-                @if ($chrome['settings_url'])
-                    <a href="{{ $chrome['settings_url'] }}" class="sfk-app-tool" title="アプリの設定">
-                        <x-filament::icon :icon="Heroicon::OutlinedCog6Tooth" class="sfk-app-tool-icon" />
-                        <span class="fi-sr-only">アプリの設定</span>
-                    </a>
-                @endif
+                @include('core::filament.app-settings-menu', ['chrome' => $chrome])
 
                 @if ($actions)
                     <x-filament::actions :actions="$actions" class="sfk-app-actions" />
@@ -86,16 +81,23 @@
                 @include('core::filament.app-pager', ['page' => $page, 'position' => 'top'])
             </div>
         @elseif ($kind === 'settings')
-            {{-- アプリの設定: 一覧 here, アクセス権 = the app's permissions --}}
+            {{-- アプリの設定: 一覧 (AppListViewSettings) | 設定 (AppSettings: アクセス権, その他の設定) --}}
             <nav class="sfk-settings-tabs" aria-label="アプリの設定">
-                <a href="{{ $page::getUrl() }}" class="sfk-settings-tab is-active" aria-current="page">一覧</a>
-                @if ($permissionsUrl = $page->appPermissionsUrl($page::getResource()::app() ?? new \Modules\Core\Models\BusinessApp))
-                    <a href="{{ $permissionsUrl }}" class="sfk-settings-tab">アクセス権</a>
-                @endif
+                @foreach ($chrome['settings_tabs'] as $tab => [$tabLabel, $tabUrl])
+                    <a href="{{ $tabUrl }}" @class(['sfk-settings-tab', 'is-active' => $page->settingsTab() === $tab]) @if ($page->settingsTab() === $tab) aria-current="page" @endif>{{ $tabLabel }}</a>
+                @endforeach
             </nav>
         @elseif ($kind === 'create' || $kind === 'edit')
             <div class="sfk-app-toolbar-start">
                 <x-filament::actions :actions="$actions" class="sfk-app-actions" />
+            </div>
+        @elseif ($page->printMode ?? false)
+            {{-- 印刷する: print view --}}
+            <div class="sfk-app-toolbar-start sfk-print-toolbar">
+                <button type="button" class="sfk-filter-btn sfk-filter-btn-submit" x-on:click="window.print()">印刷</button>
+                {{-- 閉じる: closes the print tab; when the browser keeps it open, back to the record --}}
+                <button type="button" class="sfk-filter-btn"
+                        x-on:click="window.close(); setTimeout(() => window.location.href = @js($page::getResource()::getUrl('view', ['record' => $page->record])), 300)">閉じる</button>
             </div>
         @else
             <div class="sfk-app-toolbar-start">
@@ -105,12 +107,7 @@
             </div>
 
             <div class="sfk-app-toolbar-end">
-                @if ($chrome['settings_url'])
-                    <a href="{{ $chrome['settings_url'] }}" class="sfk-app-tool" title="アプリの設定">
-                        <x-filament::icon :icon="Heroicon::OutlinedCog6Tooth" class="sfk-app-tool-icon" />
-                        <span class="fi-sr-only">アプリの設定</span>
-                    </a>
-                @endif
+                @include('core::filament.app-settings-menu', ['chrome' => $chrome])
 
                 @php($neighbours = $page->recordNeighbours())
                 <nav class="sfk-app-pager" aria-label="レコードの移動">
