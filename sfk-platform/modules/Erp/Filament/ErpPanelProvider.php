@@ -30,6 +30,9 @@ final class ErpPanelProvider extends BasePanelProvider
             brand: (string) config('erp.panel.brand'),
         )
             ->default()
+            // Collapsing the menu hides it completely; the content then uses the full screen width.
+            ->sidebarCollapsibleOnDesktop(false)
+            ->sidebarFullyCollapsibleOnDesktop()
             ->navigationGroups(NavigationGroup::labels())
             ->pages([
                 PortalPage::class,

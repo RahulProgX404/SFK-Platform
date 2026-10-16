@@ -50,6 +50,7 @@ use Modules\Core\Models\Space;
  * @property bool $managed_by_env
  * @property Carbon|null $last_login_at
  * @property Carbon|null $password_changed_at
+ * @property int|null $list_page_size 表示件数 of the app lists (blank = 100)
  */
 #[Fillable([
     'name', 'email', 'password',

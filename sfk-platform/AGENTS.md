@@ -21,6 +21,15 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
 - Screens of an app (feature) extend `Modules\Core\Filament\AppResource` (app permissions, spaces, status) and its
   pages extend `Modules\Core\Filament\AppPages\App{List,Create,Edit,View}Record(s)` (the shared app screen design) —
   see `docs/permissions.md`.
+- App lists are filtered only through the shared 絞り込む dialog (legacy design, `design_ref/filter1-3.png`): return the
+  app's fields from `filterFields()` on its `AppListRecords` page (`Modules\Core\Application\Filters\FilterField`:
+  text / textarea / number / date / dateTime / choice / user, `relationship()` or `query()` for special storage). Do not
+  add Filament table `->filters()`. 適用 filters for the session, 保存 (administrators) stores a list view.
+- 一覧 (list views) follow the legacy view settings: an app's list page supplies `listColumns()` (all columns, order of
+  （すべて）), `defaultListViews()` (`Modules\Core\Application\Views\ListView::table()/calendar()`, from SYSTEM_BRAIN
+  views.md; stored once) and `filterFields()`; its table builds columns from `viewColumns()`; its 「…」 entries go in
+  `optionActions()` (表示件数 is added by Core). Register a `views` page (subclass of `AppListViewSettings`, before
+  `view`) for アプリの設定 → 一覧: 追加 / 編集 / 複製 / 削除 / drag order (top = default), 表形式 or カレンダー形式.
 - Never write the word for the old product anywhere; call it 旧システム in the UI and "legacy system" in English.
 - Cite the SYSTEM_BRAIN rule id in tests/docblocks when implementing a rule.
 

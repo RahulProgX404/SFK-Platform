@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\MasterData\Filament\Resources\Partners\Pages;
 
-use Filament\Actions\DeleteAction;
-use Filament\Actions\EditAction;
-use Filament\Support\Icons\Heroicon;
 use Modules\Core\Filament\AppPages\AppViewRecord;
 use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
@@ -21,17 +18,9 @@ final class ViewPartner extends AppViewRecord
         return $this->record->name;
     }
 
-    protected function getHeaderActions(): array
+    /** ‹ › follow the list order of 取引先一覧 (取引先コード). */
+    protected function recordNavigationColumn(): string
     {
-        return [
-            EditAction::make()
-                ->label('編集する')
-                ->icon(Heroicon::OutlinedPencil)
-                ->visible(fn (Partner $record): bool => PartnerResource::canEdit($record)),
-            DeleteAction::make()
-                ->label('削除する')
-                ->color('gray')
-                ->visible(fn (Partner $record): bool => PartnerResource::canDelete($record)),
-        ];
+        return 'code';
     }
 }

@@ -31,8 +31,8 @@ use Modules\Core\Http\Middleware\EnsurePasswordIsChanged;
  * Common configuration for every Filament panel in the platform (ERP panel and extension panels):
  * standard middleware stack, login page, shared users/guard, colours and branding.
  *
- * Look & feel follows the legacy system, which the staff already know: light theme only, legacy blue actions,
- * flat bordered boxes and a Meiryo-first font (core::filament.theme).
+ * Look & feel follows the legacy system, which the staff already know: light theme only, the legacy vendor's
+ * published UI-part colours and sizes, flat square boxes and a Meiryo-first font (core::filament.theme).
  *
  * Panels differ only in id, path/domain, brand label and which components they load.
  * Access to each panel is checked in User::canAccessPanel() (user / 従業員カテゴリ dashboards and ユーザー種別,
@@ -44,6 +44,9 @@ abstract class BasePanelProvider extends PanelProvider
     public const BRAND_BLUE = '#3498db';
 
     public const BRAND_RED = '#e74c3c';
+
+    /** the legacy system's success notification green. */
+    public const BRAND_GREEN = '#91c36c';
 
     protected function configureBase(Panel $panel, string $id, string $path, ?string $domain = null, ?string $brand = null): Panel
     {
@@ -60,12 +63,16 @@ abstract class BasePanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::hex(self::BRAND_BLUE),
                 'danger' => Color::hex(self::BRAND_RED),
+                'success' => Color::hex(self::BRAND_GREEN),
+                'info' => Color::hex(self::BRAND_BLUE),
                 'gray' => Color::Gray,
             ])
             ->darkMode(false)
             // System Japanese fonts (no web-font download); the full stack is set by the theme view.
             ->font('Meiryo', provider: LocalFontProvider::class)
             ->renderHook(PanelsRenderHook::HEAD_END, fn (): string => view('core::filament.theme')->render())
+            // 絞り込む dialog of the app lists (core::filament.app-filter)
+            ->renderHook(PanelsRenderHook::HEAD_END, fn (): string => view('core::filament.app-filter-script')->render())
             ->sidebarCollapsibleOnDesktop()
             ->middleware([
                 EncryptCookies::class,

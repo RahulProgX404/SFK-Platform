@@ -23,25 +23,44 @@
         @endif
         <span class="sfk-app-crumb-sep" aria-hidden="true">›</span>
         <a href="{{ $chrome['index_url'] }}">アプリ: {{ $chrome['name'] }}</a>
+        @if ($kind === 'settings')
+            <span class="sfk-app-crumb-sep" aria-hidden="true">›</span>
+            <span>アプリの設定</span>
+        @endif
     </nav>
 
-    @if (filled($chrome['description']))
+    @if ($kind !== 'settings' && filled($chrome['description']))
         <div class="sfk-app-description">{{ $chrome['description'] }}</div>
     @endif
 
     <div class="sfk-app-toolbar">
         @if ($kind === 'list')
             <div class="sfk-app-toolbar-start">
-                @if (count($page->getListViews()) > 0)
+                @if (count($page->allListViews()) > 0)
                     <label class="sfk-app-view">
-                        <span class="sr-only">一覧</span>
+                        <span class="fi-sr-only">一覧</span>
                         <select wire:model.live="listView" class="sfk-app-view-select">
-                            @foreach ($page->getListViews() as $key => $label)
+                            @foreach ($page->allListViews() as $key => $label)
                                 <option value="{{ $key }}">{{ $label }}</option>
                             @endforeach
                         </select>
                         <x-filament::icon :icon="Heroicon::ChevronDown" class="sfk-app-view-chevron" />
                     </label>
+                @endif
+
+                @if ($page->filterFields() !== [])
+                    <button
+                        type="button"
+                        @class(['sfk-app-tool', 'is-active' => $page->isFiltered()])
+                        x-on:click="$dispatch('sfk-app-filter-open', @js($page->appFilterState()))"
+                        title="絞り込む"
+                        aria-haspopup="dialog"
+                    >
+                        <x-filament::icon :icon="Heroicon::OutlinedFunnel" class="sfk-app-tool-icon" />
+                        <span class="fi-sr-only">絞り込む</span>
+                    </button>
+
+                    @include('core::filament.app-filter', ['page' => $page])
                 @endif
             </div>
 
@@ -49,14 +68,14 @@
                 @if ($chrome['create_url'])
                     <a href="{{ $chrome['create_url'] }}" class="sfk-app-add" title="レコードを追加する">
                         <x-filament::icon :icon="Heroicon::Plus" class="sfk-app-add-icon" />
-                        <span class="sr-only">レコードを追加する</span>
+                        <span class="fi-sr-only">レコードを追加する</span>
                     </a>
                 @endif
 
                 @if ($chrome['settings_url'])
                     <a href="{{ $chrome['settings_url'] }}" class="sfk-app-tool" title="アプリの設定">
                         <x-filament::icon :icon="Heroicon::OutlinedCog6Tooth" class="sfk-app-tool-icon" />
-                        <span class="sr-only">アプリの設定</span>
+                        <span class="fi-sr-only">アプリの設定</span>
                     </a>
                 @endif
 
@@ -66,6 +85,14 @@
 
                 @include('core::filament.app-pager', ['page' => $page, 'position' => 'top'])
             </div>
+        @elseif ($kind === 'settings')
+            {{-- アプリの設定: 一覧 here, アクセス権 = the app's permissions --}}
+            <nav class="sfk-settings-tabs" aria-label="アプリの設定">
+                <a href="{{ $page::getUrl() }}" class="sfk-settings-tab is-active" aria-current="page">一覧</a>
+                @if ($permissionsUrl = $page->appPermissionsUrl($page::getResource()::app() ?? new \Modules\Core\Models\BusinessApp))
+                    <a href="{{ $permissionsUrl }}" class="sfk-settings-tab">アクセス権</a>
+                @endif
+            </nav>
         @elseif ($kind === 'create' || $kind === 'edit')
             <div class="sfk-app-toolbar-start">
                 <x-filament::actions :actions="$actions" class="sfk-app-actions" />
@@ -81,9 +108,25 @@
                 @if ($chrome['settings_url'])
                     <a href="{{ $chrome['settings_url'] }}" class="sfk-app-tool" title="アプリの設定">
                         <x-filament::icon :icon="Heroicon::OutlinedCog6Tooth" class="sfk-app-tool-icon" />
-                        <span class="sr-only">アプリの設定</span>
+                        <span class="fi-sr-only">アプリの設定</span>
                     </a>
                 @endif
+
+                @php($neighbours = $page->recordNeighbours())
+                <nav class="sfk-app-pager" aria-label="レコードの移動">
+                    @foreach (['previous' => ['前のレコード', Heroicon::ChevronLeft], 'next' => ['次のレコード', Heroicon::ChevronRight]] as $direction => [$label, $icon])
+                        @if ($neighbours[$direction] !== null)
+                            <a href="{{ $neighbours[$direction] }}" class="sfk-app-pager-btn" title="{{ $label }}" rel="{{ $direction === 'previous' ? 'prev' : 'next' }}">
+                                <x-filament::icon :icon="$icon" class="sfk-app-pager-icon" />
+                                <span class="fi-sr-only">{{ $label }}</span>
+                            </a>
+                        @else
+                            <span class="sfk-app-pager-btn is-disabled" aria-hidden="true">
+                                <x-filament::icon :icon="$icon" class="sfk-app-pager-icon" />
+                            </span>
+                        @endif
+                    @endforeach
+                </nav>
             </div>
         @endif
     </div>

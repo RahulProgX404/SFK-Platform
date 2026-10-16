@@ -6,6 +6,7 @@ namespace Modules\Core\Filament\AppPages\Concerns;
 
 use App\Models\User;
 use Filament\Facades\Filament;
+use Filament\Support\Enums\Width;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Route;
 use LogicException;
@@ -16,7 +17,7 @@ use Modules\Core\Models\BusinessApp;
 /**
  * The frame of every app screen (list, create, edit, record), in place of Filament's page header: blue title bar
  * with the app icon, breadcrumb (home › スペース › アプリ), the app description and the page's toolbar
- * (core::filament.app-header).
+ * (core::filament.app-header). The app fills the whole content area: full width, no outer spacing, full height.
  */
 trait HasAppChrome
 {
@@ -26,6 +27,11 @@ trait HasAppChrome
     public function getHeader(): View
     {
         return view('core::filament.app-header', ['page' => $this, 'kind' => $this->appPageKind(), 'chrome' => $this->appChrome()]);
+    }
+
+    public function getMaxContentWidth(): Width
+    {
+        return Width::Full;
     }
 
     /** @return array<string> */
@@ -64,12 +70,22 @@ trait HasAppChrome
         return $resource;
     }
 
-    /** Gear button (administrators): the app's permissions in this dashboard, else アプリ設定. */
+    /** Gear button (administrators): アプリの設定 → 一覧 when the app has it, else the app's permissions. */
     private function appSettingsUrl(BusinessApp $app): ?string
     {
-        $user = auth()->user();
+        $resource = $this->appResource();
 
-        if (! $user instanceof User || ! $user->user_type->isAdministrator() || ! $app->exists) {
+        if ($resource::hasPage('views') && $this->isAppAdministrator() && $app->exists) {
+            return $resource::getUrl('views');
+        }
+
+        return $this->appPermissionsUrl($app);
+    }
+
+    /** アクセス権 of the app (administrators): its permissions in this dashboard, else アプリ設定. */
+    public function appPermissionsUrl(BusinessApp $app): ?string
+    {
+        if (! $this->isAppAdministrator() || ! $app->exists) {
             return null;
         }
 
@@ -81,5 +97,12 @@ trait HasAppChrome
         }
 
         return Route::has('filament.settings.pages.apps') ? route('filament.settings.pages.apps') : null;
+    }
+
+    private function isAppAdministrator(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && $user->user_type->isAdministrator();
     }
 }

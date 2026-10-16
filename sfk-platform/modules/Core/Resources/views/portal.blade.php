@@ -12,34 +12,26 @@
 
 <x-core::layouts.account title="ダッシュボード選択" :user="$user">
     <style>
-        /* Modern dashboard selection in the legacy palette */
+        /* Dashboard selection in the legacy vendor's flat style: hairline boxes, square icon tiles, light-blue hover */
         main { max-width: 1120px; }
-        .sp-hero { position: relative; overflow: hidden; margin: 4px 0 28px; padding: 28px 32px; border-radius: 16px; color: #fff;
-            background: linear-gradient(120deg, #2f86c8 0%, #3498db 55%, #5cb8ee 100%); box-shadow: 0 12px 32px -16px rgba(33, 125, 187, .7); }
-        .sp-hero::after { content: ""; position: absolute; right: -60px; top: -60px; width: 220px; height: 220px; border-radius: 50%; background: rgba(255, 255, 255, .12); }
-        .sp-hero::before { content: ""; position: absolute; right: 90px; bottom: -80px; width: 160px; height: 160px; border-radius: 50%; background: rgba(255, 255, 255, .08); }
-        .sp-hero h1 { position: relative; margin: 0; font-size: 22px; font-weight: 700; letter-spacing: .02em; color: #fff; }
-        .sp-hero p { position: relative; margin: 6px 0 0; font-size: 13px; opacity: .85; }
+        .sp-hero { margin: 4px 0 24px; padding: 16px 20px; background: #fff; border: 1px solid var(--kt-border); border-left: 5px solid var(--kt-blue); }
+        .sp-hero h1 { margin: 0; font-size: 20px; font-weight: 700; }
+        .sp-hero p { margin: 4px 0 0; font-size: 13px; color: var(--kt-muted); }
 
-        .sp-heading { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; font-size: 15px; font-weight: 700; }
-        .sp-heading span { padding: 1px 9px; border-radius: 9999px; background: #e8f3fc; color: #217dbb; font-size: 12px; }
+        .sp-heading { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 16px; font-weight: 700; }
+        .sp-heading span { padding: 0 8px; background: var(--kt-blue); color: #fff; font-size: 12px; font-weight: 400; }
 
-        .sp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 18px; margin: 0; padding: 0; list-style: none; }
-        .sp-card { position: relative; display: flex; flex-direction: column; gap: 18px; height: 100%; padding: 22px; border-radius: 16px;
-            background: #fff; border: 1px solid var(--kt-border); color: var(--kt-text);
-            box-shadow: 0 1px 2px rgba(15, 23, 42, .05); transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
-        .sp-card:hover { text-decoration: none; transform: translateY(-3px); border-color: #b9dcf4; box-shadow: 0 14px 30px -14px rgba(33, 125, 187, .45); }
-        .sp-card:focus-visible { outline: 3px solid rgba(52, 152, 219, .45); outline-offset: 2px; }
-        .sp-icon { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px; color: #fff; }
+        .sp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
+        .sp-card { display: flex; align-items: center; gap: 16px; height: 100%; padding: 16px; background: #fff; border: 1px solid var(--kt-border); color: var(--kt-text); }
+        .sp-card:hover { text-decoration: none; background: var(--kt-blue-soft); border-color: var(--kt-blue); }
+        .sp-card:focus-visible { outline: 1px solid var(--kt-blue); outline-offset: 1px; }
+        .sp-icon { display: grid; place-items: center; width: 56px; height: 56px; flex-shrink: 0; color: #fff; }
         .sp-icon svg { width: 30px; height: 30px; }
-        .sp-name { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 16px; font-weight: 700; }
-        .sp-arrow { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9999px; background: #f1f5f8; color: #8a99a6; transition: background .18s, color .18s, transform .18s; }
+        .sp-name { display: flex; flex: 1; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; font-size: 16px; font-weight: 700; color: var(--kt-blue); }
+        .sp-arrow { display: grid; place-items: center; width: 24px; height: 24px; flex-shrink: 0; color: var(--kt-blue); }
         .sp-arrow svg { width: 16px; height: 16px; }
-        .sp-card:hover .sp-arrow { background: var(--kt-blue); color: #fff; transform: translateX(2px); }
 
-        .sp-empty { padding: 48px 16px; border: 1px dashed #cdd6dc; border-radius: 16px; background: #fff; text-align: center; color: var(--kt-muted); }
-        .kt-alert { border-radius: 10px; }
-        @media (max-width: 640px) { .sp-hero { padding: 22px 20px; } }
+        .sp-empty { padding: 48px 16px; border: 1px solid var(--kt-border); background: #fff; text-align: center; color: var(--kt-muted); }
     </style>
 
     @if (session('status'))
@@ -62,13 +54,13 @@
                     @php($color = $iconColors[$dashboard->id] ?? '#3498db')
                     <li>
                         <a href="{{ $dashboard->url }}" class="sp-card">
-                            <span class="sp-icon" style="background: linear-gradient(140deg, {{ $color }}cc, {{ $color }})" aria-hidden="true">
+                            <span class="sp-icon" style="background: {{ $color }}" aria-hidden="true">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">{!! $icons[$dashboard->icon] ?? $icons['default'] !!}</svg>
                             </span>
                             <span class="sp-name">
                                 {{ $dashboard->label }}
                                 <span class="sp-arrow" aria-hidden="true">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
                                 </span>
                             </span>
                         </a>

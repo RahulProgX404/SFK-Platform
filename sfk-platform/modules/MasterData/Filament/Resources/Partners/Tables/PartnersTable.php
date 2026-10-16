@@ -12,26 +12,42 @@ use Filament\Support\Enums\FontWeight;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Livewire\Component;
+use Modules\Core\Application\Filters\FilterField;
+use Modules\Core\Application\Views\ListView;
 use Modules\Core\Domain\Billing\ClosingDay;
+use Modules\Core\Domain\Billing\CollectionDay;
+use Modules\Core\Domain\Billing\CollectionMonth;
+use Modules\Core\Domain\Filters\FilterCondition;
+use Modules\Core\Domain\Filters\FilterOperator;
+use Modules\Core\Domain\Money\RoundingMode;
+use Modules\Core\Domain\Tax\TaxCalculationUnit;
+use Modules\Core\Domain\Tax\TaxMode;
+use Modules\Core\Filament\AppPages\AppListRecords;
+use Modules\MasterData\Domain\Partners\CustomerClassification;
+use Modules\MasterData\Domain\Partners\CustomerStatus;
+use Modules\MasterData\Domain\Partners\DocumentIssuance;
+use Modules\MasterData\Domain\Partners\DocumentRecipient;
+use Modules\MasterData\Domain\Partners\PartnerGroup;
 use Modules\MasterData\Domain\Partners\PartnerRole;
+use Modules\MasterData\Domain\Partners\PartnerSegment;
+use Modules\MasterData\Domain\Partners\PurchaseCategory;
 use Modules\MasterData\Filament\Resources\Partners\PartnerLayout;
 use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
 
 /**
- * Record list of 01. 取引先マスタ with the legacy views (SYSTEM_BRAIN APP_01 views.md, chosen on ListPartners):
- * 「取引先一覧」 (its 14 columns, sorted by 取引先コード) and 「（すべて）」 (every field). The search box replaces the
- * 「取引先一覧(検索特化)」 plugin view.
+ * Record list of 01. 取引先マスタ. The columns shown and their order are those of the chosen 一覧 (AppListRecords::
+ * viewColumns()); the legacy view 「取引先一覧」 (SYSTEM_BRAIN APP_01 views.md: its columns, sorted by 取引先コード) is
+ * the app's default view, （すべて） shows columns() in order. The search box replaces the 「取引先一覧(検索特化)」 plugin
+ * view. filterFields() are the fields of 絞り込む and of the 一覧 settings.
  */
 final class PartnersTable
 {
     public const VIEW_LIST = 'list';
 
-    public const VIEW_ALL = 'all';
+    public const VIEW_ALL = ListView::ALL;
 
     /** Columns of the legacy view 取引先一覧, in order. */
     public const LIST_COLUMNS = [
@@ -50,8 +66,26 @@ final class PartnersTable
         'supplier_phone', 'supplier_fax', 'supplier_notes', 'created_at', 'updated_at',
     ];
 
+    /**
+     * Every column (name => label), in the order of （すべて）.
+     *
+     * @return array<string, string>
+     */
+    public static function columns(): array
+    {
+        $columns = [];
+        foreach ([...self::LIST_COLUMNS, ...self::ALL_ONLY_COLUMNS] as $name) {
+            $columns[$name] = PartnerLayout::label($name);
+        }
+
+        return $columns;
+    }
+
     public static function configure(Table $table): Table
     {
+        $livewire = $table->getLivewire();
+        $names = $livewire instanceof AppListRecords ? $livewire->viewColumns() : self::LIST_COLUMNS;
+
         return $table
             ->modifyQueryUsing(fn (Builder $query) => $query->with('staff'))
             ->columns([
@@ -61,41 +95,133 @@ final class PartnersTable
                     ->icon(Heroicon::OutlinedDocumentText)
                     ->color('primary')
                     ->width('2.5rem'),
-                ...array_map(fn (string $name): TextColumn => self::column($name, inAll: false), self::LIST_COLUMNS),
-                ...array_map(fn (string $name): TextColumn => self::column($name, inAll: true), self::ALL_ONLY_COLUMNS),
+                ...array_map(fn (string $name): TextColumn => self::column($name), $names),
             ])
             ->defaultSort('code')
-            ->filters([
-                SelectFilter::make('role')
-                    ->label('取引先カテゴリ')
-                    ->options(PartnerRole::options())
-                    ->query(fn (Builder $query, array $data): Builder => match ($data['value'] ?? null) {
-                        PartnerRole::Customer->value => $query->where('is_customer', true),
-                        PartnerRole::Supplier->value => $query->where('is_supplier', true),
-                        PartnerRole::Other->value => $query->where('is_other', true),
-                        default => $query,
-                    }),
-                SelectFilter::make('closing_day')
-                    ->label('請求締日')
-                    ->options(array_combine(
-                        array_map(fn (ClosingDay $day): string => $day->value, ClosingDay::cases()),
-                        array_map(fn (ClosingDay $day): string => $day->value, ClosingDay::cases()),
-                    )),
-            ])
             ->recordActions([
-                EditAction::make()->iconButton()->visible(fn (Partner $record): bool => PartnerResource::canEdit($record)),
-                DeleteAction::make()->iconButton()->visible(fn (Partner $record): bool => PartnerResource::canDelete($record)),
+                EditAction::make()
+                    ->label('編集する')
+                    ->icon(Heroicon::OutlinedPencil)
+                    ->iconButton()
+                    ->visible(fn (Partner $record): bool => PartnerResource::canEdit($record)),
+                DeleteAction::make()
+                    ->label('削除する')
+                    ->icon(Heroicon::XMark)
+                    ->iconButton()
+                    ->visible(fn (Partner $record): bool => PartnerResource::canDelete($record)),
             ])
             ->emptyStateIcon(Heroicon::OutlinedBuildingStorefront)
             ->emptyStateHeading('取引先がありません');
     }
 
-    private static function column(string $name, bool $inAll): TextColumn
+    /**
+     * Fields of the 絞り込む dialog, in the order of the legacy form (SYSTEM_BRAIN APP_01 fields.md).
+     *
+     * @return list<FilterField>
+     */
+    public static function filterFields(): array
+    {
+        $label = fn (string $name): string => PartnerLayout::label($name);
+        $text = fn (string $name): FilterField => FilterField::text($name, $label($name));
+        /** @param array<string, string> $options */
+        $choice = fn (string $name, array $options): FilterField => FilterField::choice($name, $label($name), $options);
+        $days = array_map(fn (ClosingDay $day): string => $day->value, ClosingDay::cases());
+        $rounding = [
+            RoundingMode::HalfUp->value => RoundingMode::HalfUp->label(),
+            RoundingMode::RoundUp->value => RoundingMode::RoundUp->label(),
+            RoundingMode::Truncate->value => RoundingMode::Truncate->label(),
+        ];
+
+        return [
+            FilterField::number('id', $label('id')),
+            $text('code'),
+            $text('legacy_customer_code'),
+            $text('parent_company'),
+            $text('name'),
+            $text('name_kana'),
+            $text('short_name'),
+            $text('registration_number'),
+            FilterField::choice('roles', $label('roles'), PartnerRole::options())->query(self::filterRoles(...)),
+            $choice('customer_status', CustomerStatus::options()),
+            $choice('customer_classification', CustomerClassification::options()),
+            $choice('partner_group', PartnerGroup::options()),
+            $choice('segment', PartnerSegment::options()),
+            $choice('purchase_category', PurchaseCategory::options()),
+            $choice('invoice_recipient', DocumentRecipient::options()),
+            $choice('delivery_note_recipient', DocumentRecipient::options()),
+            $text('contact_person'),
+            FilterField::user('staff', $label('staff'))->relationship('staff', 'id'),
+            FilterField::textarea('contact_note', $label('contact_note')),
+            $choice('tax_mode', TaxMode::options()),
+            $choice('rounding', $rounding),
+            $choice('tax_calculation_unit', TaxCalculationUnit::options()),
+            $choice('closing_day', array_combine($days, $days)),
+            $choice('invoice_issuance', DocumentIssuance::options()),
+            $choice('delivery_note_issuance', DocumentIssuance::options()),
+            $choice('collection_month', CollectionMonth::options()),
+            $choice('collection_day', CollectionDay::options()),
+            FilterField::number('bill_threshold_man', $label('bill_threshold_man')),
+            FilterField::number('bill_site_days', $label('bill_site_days')),
+            FilterField::textarea('notes', $label('notes')),
+            $text('parent_postal_code'),
+            $text('parent_address'),
+            $text('parent_phone'),
+            $text('parent_fax'),
+            $text('postal_code'),
+            $text('address'),
+            $text('phone'),
+            $text('fax'),
+            $choice('supplier_tax_mode', TaxMode::options()),
+            $choice('supplier_rounding', $rounding),
+            $choice('supplier_tax_calculation_unit', TaxCalculationUnit::options()),
+            $text('supplier_postal_code'),
+            $text('supplier_address'),
+            $text('supplier_phone'),
+            $text('supplier_fax'),
+            FilterField::textarea('supplier_notes', $label('supplier_notes').'(仕入先)'),
+            FilterField::user('created_by', $label('creator')),
+            FilterField::dateTime('created_at', $label('created_at')),
+            FilterField::user('updated_by', $label('updater')),
+            FilterField::dateTime('updated_at', $label('updated_at')),
+        ];
+    }
+
+    /**
+     * 取引先カテゴリ is stored as three flags (is_customer, is_supplier, is_other; BR-MD-02); "--" = none of them.
+     *
+     * @param  Builder<*>  $query
+     */
+    private static function filterRoles(Builder $query, FilterCondition $condition): void
+    {
+        $columns = [];
+        foreach ($condition->values as $value) {
+            $columns[] = match ($value) {
+                PartnerRole::Customer->value => 'is_customer',
+                PartnerRole::Supplier->value => 'is_supplier',
+                PartnerRole::Other->value => 'is_other',
+                default => null,
+            };
+        }
+        $blank = in_array(null, $columns, true);
+        $columns = array_values(array_filter($columns));
+
+        $any = function (Builder $q) use ($columns, $blank): void {
+            foreach ($columns as $column) {
+                $q->orWhere($column, true);
+            }
+            if ($blank) {
+                $q->orWhere(fn (Builder $none) => $none->where('is_customer', false)->where('is_supplier', false)->where('is_other', false));
+            }
+        };
+
+        $condition->operator === FilterOperator::NotIn ? $query->whereNot($any) : $query->where($any);
+    }
+
+    private static function column(string $name): TextColumn
     {
         $column = TextColumn::make($name)
             ->label(PartnerLayout::label($name))
-            ->placeholder('')
-            ->visible(fn (Component $livewire): bool => ! $inAll || ($livewire->listView ?? null) === self::VIEW_ALL);
+            ->placeholder('');
 
         return match ($name) {
             'name' => $column->weight(FontWeight::SemiBold)->searchable()->sortable(),

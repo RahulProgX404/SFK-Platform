@@ -7,6 +7,7 @@ namespace Modules\Core\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 use Modules\Core\Domain\Apps\AppStatus;
 
 /**
@@ -22,6 +23,7 @@ use Modules\Core\Domain\Apps\AppStatus;
  * @property AppStatus $status
  * @property int|null $space_id
  * @property int $sort_order
+ * @property Carbon|null $list_views_seeded_at when the code-defined 一覧 were stored (ListViewService)
  * @property-read Space|null $space
  */
 final class BusinessApp extends Model
@@ -38,6 +40,7 @@ final class BusinessApp extends Model
         return [
             'status' => AppStatus::class,
             'sort_order' => 'integer',
+            'list_views_seeded_at' => 'datetime',
         ];
     }
 
@@ -63,5 +66,11 @@ final class BusinessApp extends Model
     public function permissions(): HasMany
     {
         return $this->hasMany(AppPermission::class);
+    }
+
+    /** @return HasMany<AppListView, $this> the app's 一覧, in dropdown order */
+    public function listViews(): HasMany
+    {
+        return $this->hasMany(AppListView::class)->orderBy('sort_order')->orderBy('id');
     }
 }

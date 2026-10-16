@@ -11,10 +11,11 @@
     <style>
         :root {
             --kt-blue: #3498db;
-            --kt-blue-dark: #217dbb;
-            --kt-button: #1f78b8;
-            --kt-button-hover: #1a6699;
-            --kt-blue-soft: #ebf5fb;
+            --kt-blue-dark: #1d6fa5;
+            --kt-blue-soft: #e2f2fe;
+            --kt-normal: #f7f9fa;
+            --kt-normal-hover: #c8d6dd;
+            --kt-disabled: #d4d7d7;
             --kt-page: #f5f5f5;
             --kt-surface: #ffffff;
             --kt-header: #f7f9fa;
@@ -22,9 +23,7 @@
             --kt-text: #333333;
             --kt-muted: #888888;
             --kt-red: #e74c3c;
-            --kt-red-soft: #fdedec;
-            --kt-green: #1e8449;
-            --kt-green-soft: #eafaf1;
+            --kt-green: #91c36c;
             --kt-yellow-soft: #fef9e7;
             --kt-yellow-text: #8a6d0b;
         }
@@ -50,7 +49,7 @@
         .kt-brand { display: flex; align-items: center; gap: 10px; color: var(--kt-text); font-weight: 700; font-size: 15px; }
         .kt-brand:hover { text-decoration: none; }
         .kt-brand-mark {
-            display: grid; place-items: center; width: 28px; height: 28px; border-radius: 3px;
+            display: grid; place-items: center; width: 28px; height: 28px;
             background: var(--kt-blue); color: #fff; font-size: 11px; letter-spacing: .02em;
         }
         .kt-header-user { display: flex; align-items: center; gap: 18px; font-size: 13px; color: var(--kt-muted); }
@@ -70,23 +69,36 @@
         }
         .kt-box-body { padding: 16px; }
 
-        /* Messages */
-        .kt-alert { padding: 10px 14px; margin-bottom: 16px; font-size: 13px; border: 1px solid transparent; border-radius: 2px; }
-        .kt-alert-success { background: var(--kt-green-soft); color: var(--kt-green); border-color: #abebc6; }
+        /* Messages: solid bars with white text (success green, danger red), warnings soft yellow */
+        .kt-alert { padding: 4px 18px; margin-bottom: 16px; font-size: 14px; line-height: 1.5; border: 1px solid transparent; }
+        .kt-alert-success { background: var(--kt-green); color: #fff; }
         .kt-alert-warning { background: var(--kt-yellow-soft); color: var(--kt-yellow-text); border-color: #f7dc6f; }
-        .kt-alert-danger { background: var(--kt-red-soft); color: var(--kt-red); border-color: #f5b7b1; }
+        .kt-alert-danger { background: var(--kt-red); color: #fff; }
 
-        /* Buttons (the legacy system: filled blue for the main action, white with border for the rest) */
+        /* Buttons (legacy vendor UI parts): submit = filled blue, normal = light grey with a blue label */
         .kt-button {
             display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-            min-width: 140px; height: 44px; padding: 0 20px; border-radius: 2px;
-            border: 1px solid var(--kt-button); background: var(--kt-button); color: #fff;
-            font: inherit; font-weight: 700; cursor: pointer;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, .1);
+            min-width: 163px; max-width: 100%; height: 48px; padding: 0 16px; border-radius: 0;
+            border: 1px solid var(--kt-border); background: var(--kt-blue); color: #fff;
+            font: inherit; font-size: 16px; cursor: pointer;
         }
-        .kt-button:hover { background: var(--kt-button-hover); border-color: var(--kt-button-hover); text-decoration: none; }
-        .kt-button-normal { background: #fff; color: var(--kt-button); border-color: var(--kt-border); }
-        .kt-button-normal:hover { background: var(--kt-header); border-color: var(--kt-border); }
+        .kt-button:hover { background: var(--kt-blue-dark); text-decoration: none; }
+        .kt-button:focus-visible { outline: 1px solid var(--kt-blue); outline-offset: 1px; }
+        .kt-button:disabled { background: var(--kt-disabled); color: var(--kt-muted); cursor: not-allowed; }
+        .kt-button-normal { background: var(--kt-normal); color: var(--kt-blue); box-shadow: 1px 1px 1px #fff inset; }
+        .kt-button-normal:hover { background: var(--kt-normal-hover); }
+
+        /* Text inputs: hairline border with a soft inset shadow, blue border on focus */
+        .kt-input {
+            width: 100%; height: 40px; padding: 0 8px; border-radius: 0;
+            border: 1px solid var(--kt-border); background: #fff; color: #000; font: inherit; font-size: 14px;
+            box-shadow: 2px 2px 4px #f5f5f5 inset, -2px -2px 4px #f5f5f5 inset;
+        }
+        .kt-input:focus { outline: none; border-color: var(--kt-blue); }
+        .kt-input[aria-invalid="true"] { border-color: var(--kt-red); }
+        .kt-input:disabled { background: var(--kt-disabled); color: var(--kt-muted); box-shadow: none; }
+        /* Error under a field: red bar with white text */
+        .kt-error { margin: 0; padding: 4px 18px; background: var(--kt-red); color: #fff; font-size: 14px; line-height: 1.5; }
 
         @media (max-width: 640px) {
             .kt-header { padding: 0 16px; }
