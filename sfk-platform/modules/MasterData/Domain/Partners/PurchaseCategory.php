@@ -7,7 +7,8 @@ namespace Modules\MasterData\Domain\Partners;
 use Modules\Core\Domain\Concerns\HasOptions;
 
 /**
- * 仕入カテゴリ — accounting purchase category of a supplier (SYSTEM_BRAIN APP_01, all 41 options exactly).
+ * 仕入カテゴリ — accounting purchase category of a supplier (SYSTEM_BRAIN APP_01: the template's 41 options, plus
+ * 42.雑包装費 added later in the live legacy app).
  * 「(否インボス)」 = supplier without qualified-invoice registration.
  */
 enum PurchaseCategory: string
@@ -55,6 +56,7 @@ enum PurchaseCategory: string
     case C39 = '39.雑運送費';
     case C40 = '40.雑外注';
     case C41 = '41.雑経費';
+    case C42 = '42.雑包装費';
 
     /** Supplier without qualified-invoice (インボイス) registration. */
     public function isWithoutInvoiceRegistration(): bool

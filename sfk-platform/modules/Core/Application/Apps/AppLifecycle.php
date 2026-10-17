@@ -19,11 +19,13 @@ final class AppLifecycle
 {
     /**
      * @param  array<string, string>  $definitions  code => name, from AppDiscovery
+     * @param  array<string, array<string, bool>>  $settingDefaults  code => その他の設定 a new app starts with
+     *                                                               (AppDiscovery::settingDefaults())
      * @return array{added: list<string>, removed: list<string>}
      */
-    public function syncWithCode(array $definitions): array
+    public function syncWithCode(array $definitions, array $settingDefaults = []): array
     {
-        return DB::transaction(function () use ($definitions): array {
+        return DB::transaction(function () use ($definitions, $settingDefaults): array {
             $existing = BusinessApp::query()->get()->keyBy('code');
             $added = [];
 
@@ -36,7 +38,11 @@ final class AppLifecycle
                         'name' => $name,
                         'sort_order' => ((int) BusinessApp::query()->max('sort_order')) + 1,
                     ]);
-                    $app->forceFill(['status' => AppStatus::Developing, 'space_id' => null])->save();
+                    $app->forceFill([
+                        'status' => AppStatus::Developing,
+                        'space_id' => null,
+                        ...array_intersect_key($settingDefaults[$code] ?? [], array_flip(BusinessApp::SETTINGS)),
+                    ])->save();
                     $added[] = $code;
                 } elseif ($app->name !== $name) {
                     $app->update(['name' => $name]);

@@ -18,7 +18,10 @@ use Modules\MasterData\Domain\Partners\PartnerFields;
  */
 final class PartnerLayout
 {
-    /** Tabs above the record; 見積履歴 / 納品履歴 / 請求履歴 list the partner's documents once apps 09/10/11 exist. */
+    /**
+     * Tabs above the record; 見積履歴 / 納品履歴 / 請求履歴 list the partner's documents once apps 09/10/11 exist and stay
+     * empty (no message) while there are none.
+     */
     private const TABS = [
         'basic' => '基本情報',
         'supplier' => '仕入先情報',
@@ -70,10 +73,9 @@ final class PartnerLayout
             Section::make()->schema(self::rows(self::HEAD, $make))->extraAttributes(['class' => 'kt-record'])->columnSpanFull(),
             RecordLayout::tabPanel('basic', self::group(self::rows(self::BASIC, $make)), selected: true),
             RecordLayout::tabPanel('supplier', self::group(self::rows(self::SUPPLIER, $make))),
+            // related records: an empty tab while there are none (no message)
             ...array_map(
-                fn (string $tab): Component => RecordLayout::tabPanel($tab, self::group([
-                    Text::make('関連するレコードはありません。')->extraAttributes(['class' => 'kt-record-empty'])->columnSpanFull(),
-                ])),
+                fn (string $tab): Component => RecordLayout::tabPanel($tab, self::group([])),
                 ['quotes', 'deliveries', 'invoices'],
             ),
         ];

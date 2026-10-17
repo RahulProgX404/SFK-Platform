@@ -81,7 +81,9 @@ final class PartnerForm
                 ->maxSize(20480),
             'customer_status' => self::select($name, $label, CustomerStatus::options()),
             'customer_classification' => self::select($name, $label, CustomerClassification::options()),
-            'partner_group' => self::select($name, $label, PartnerGroup::options()),
+            // disabled legacy names stay on the records that have them, but are not offered (C-12)
+            'partner_group' => Select::make($name)->label($label)->native(false)
+                ->options(fn (mixed $state): array => PartnerGroup::activeOptions(is_string($state) ? $state : null)),
             'segment' => self::select($name, $label, PartnerSegment::options()),
             'legacy_customer_code', 'legacy_supplier_code', 'mf_partner_id' => TextInput::make($name)->label($label)->maxLength(64),
             'legacy_id' => TextInput::make($name)->label($label)->numeric()->integer()->minValue(1)->unique(ignoreRecord: true),
@@ -110,7 +112,8 @@ final class PartnerForm
                 array_map(fn (ClosingDay $day): string => $day->value, ClosingDay::cases()),
                 array_map(fn (ClosingDay $day): string => $day->value, ClosingDay::cases()),
             )),
-            'invoice_issuance', 'delivery_note_issuance' => self::select($name, $label, DocumentIssuance::options()),
+            'invoice_issuance' => self::select($name, $label, DocumentIssuance::invoiceOptions()),
+            'delivery_note_issuance' => self::select($name, $label, DocumentIssuance::deliveryNoteOptions()),
             'electronic_billing' => Checkbox::make($name)->label($label)->inline(false),
             'collection_month' => self::select($name, $label, CollectionMonth::options()),
             'collection_day' => self::select($name, $label, CollectionDay::options()),

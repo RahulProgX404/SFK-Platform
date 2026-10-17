@@ -11,7 +11,6 @@ use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Schema;
-use Filament\Support\Enums\FontWeight;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\IconColumn;
@@ -86,7 +85,6 @@ abstract class OptionListResource extends Resource
             ->columns([
                 TextColumn::make('name')
                     ->label("{$label}名")
-                    ->weight(FontWeight::SemiBold)
                     ->searchable(),
                 ...static::extraColumns(),
                 TextColumn::make('users_count')

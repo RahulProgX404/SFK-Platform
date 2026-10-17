@@ -15,7 +15,7 @@
         .sfk-panel-icon.is-app { background: #5b9bd5; }
         .sfk-panel-title { flex: 1; margin: 0; font-size: 1.25rem; font-weight: 400; color: #555; }
         .sfk-panel-tools { display: flex; align-items: center; gap: .25rem; padding-right: .75rem; }
-        .sfk-add { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 9999px; background: #f1f3f4; color: #888; }
+        .sfk-add { display: grid; place-items: center; width: 2rem; height: 2rem; background: #f1f3f4; color: #888; }
         .sfk-add:hover { background: var(--kt-blue-soft, #ebf5fb); color: var(--kt-blue, #3498db); }
         .sfk-add svg { width: 1.25rem; height: 1.25rem; }
 

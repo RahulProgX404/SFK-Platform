@@ -1,6 +1,6 @@
 {{--
     アプリの設定 → 設定 (Modules\Core\Filament\AppPages\AppSettings): アクセス権 and 高度な設定 → その他の設定
-    (「レコードの再利用」, 「変更履歴」) with 保存.
+    (インライン編集, コメント, 「レコードの再利用」, 「変更履歴」, 一括削除) with 保存.
 --}}
 @php
     use Filament\Support\Icons\Heroicon;
@@ -23,12 +23,24 @@
             <form class="sfk-filter-section sfk-settings-form" wire:submit="saveMisc">
                 <h3 class="sfk-filter-label sfk-settings-form-title">その他の設定</h3>
                 <label class="sfk-settings-check">
+                    <input type="checkbox" wire:model="inlineEditEnabled">
+                    インライン編集を有効にする
+                </label>
+                <label class="sfk-settings-check">
+                    <input type="checkbox" wire:model="commentsEnabled">
+                    コメント機能を有効にする
+                </label>
+                <label class="sfk-settings-check">
                     <input type="checkbox" wire:model="duplicateEnabled">
                     「レコードの再利用」機能を有効にする
                 </label>
                 <label class="sfk-settings-check">
                     <input type="checkbox" wire:model="historyEnabled">
                     レコードの変更履歴を記録する
+                </label>
+                <label class="sfk-settings-check">
+                    <input type="checkbox" wire:model="bulkDeleteEnabled">
+                    一括削除を有効にする
                 </label>
                 <div class="sfk-settings-form-foot">
                     <button type="submit" class="sfk-filter-btn sfk-filter-btn-submit">保存</button>

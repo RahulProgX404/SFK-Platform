@@ -14,8 +14,8 @@ use Modules\Core\Models\BusinessApp;
 
 /**
  * アプリの設定 → 設定 of an app (legacy App settings tab, administrators only; register it as the resource's
- * `settings` page): アクセス権 (the app's permissions) and 高度な設定 → その他の設定 with 「レコードの再利用」 and
- * 「変更履歴」 (both on by default). Changes apply when saved.
+ * `settings` page): アクセス権 (the app's permissions) and 高度な設定 → その他の設定 with インライン編集, コメント,
+ * 「レコードの再利用」, 「変更履歴」 and 一括削除 (all on by default). Changes apply when saved.
  */
 abstract class AppSettings extends Page
 {
@@ -23,11 +23,20 @@ abstract class AppSettings extends Page
 
     protected string $view = 'core::filament.app-settings';
 
+    /** その他の設定: インライン編集 (pencil and × on the list rows) */
+    public bool $inlineEditEnabled = true;
+
+    /** その他の設定: コメント */
+    public bool $commentsEnabled = true;
+
     /** その他の設定: レコードを再利用する */
     public bool $duplicateEnabled = true;
 
     /** その他の設定: 変更履歴を記録する */
     public bool $historyEnabled = true;
+
+    /** その他の設定: 一括削除 */
+    public bool $bulkDeleteEnabled = true;
 
     public static function canAccess(array $parameters = []): bool
     {
@@ -41,8 +50,11 @@ abstract class AppSettings extends Page
         abort_unless(static::canAccess(), 403);
 
         $app = $this->app();
+        $this->inlineEditEnabled = $app->inline_edit_enabled;
+        $this->commentsEnabled = $app->record_comments_enabled;
         $this->duplicateEnabled = $app->record_duplicate_enabled;
         $this->historyEnabled = $app->record_history_enabled;
+        $this->bulkDeleteEnabled = $app->bulk_delete_enabled;
     }
 
     public function appPageKind(): string
@@ -71,8 +83,11 @@ abstract class AppSettings extends Page
         abort_unless(static::canAccess(), 403);
 
         $this->app()->forceFill([
+            'inline_edit_enabled' => $this->inlineEditEnabled,
+            'record_comments_enabled' => $this->commentsEnabled,
             'record_duplicate_enabled' => $this->duplicateEnabled,
             'record_history_enabled' => $this->historyEnabled,
+            'bulk_delete_enabled' => $this->bulkDeleteEnabled,
         ])->save();
 
         Notification::make()->title('設定を保存しました')->success()->send();

@@ -14,7 +14,6 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Support\Enums\FontWeight;
 use Filament\Support\Exceptions\Halt;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -100,7 +99,6 @@ final class SpaceResource extends Resource
             ->columns([
                 TextColumn::make('name')
                     ->label('スペース名')
-                    ->weight(FontWeight::SemiBold)
                     ->searchable(),
                 TextColumn::make('users_count')
                     ->label('メンバー')

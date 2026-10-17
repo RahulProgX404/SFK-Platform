@@ -26,10 +26,18 @@ use Modules\Core\Domain\Apps\AppStatus;
  * @property Carbon|null $list_views_seeded_at when the code-defined 一覧 were stored (ListViewService)
  * @property bool $record_duplicate_enabled その他の設定: 「レコードの再利用」 on the record page
  * @property bool $record_history_enabled その他の設定: 「変更履歴」 of the records
+ * @property bool $inline_edit_enabled その他の設定: インライン編集 (pencil and × on the list rows)
+ * @property bool $record_comments_enabled その他の設定: コメント機能 on the record page
+ * @property bool $bulk_delete_enabled その他の設定: 一括削除 of the listed records
  * @property-read Space|null $space
  */
 final class BusinessApp extends Model
 {
+    /** その他の設定 switches (アプリの設定 → 設定). */
+    public const SETTINGS = [
+        'inline_edit_enabled', 'record_comments_enabled', 'record_duplicate_enabled', 'record_history_enabled', 'bulk_delete_enabled',
+    ];
+
     protected $fillable = ['code', 'name', 'description', 'icon_text', 'space_id', 'sort_order'];
 
     protected $attributes = [
@@ -37,6 +45,9 @@ final class BusinessApp extends Model
         'sort_order' => 0,
         'record_duplicate_enabled' => true,
         'record_history_enabled' => true,
+        'inline_edit_enabled' => true,
+        'record_comments_enabled' => true,
+        'bulk_delete_enabled' => true,
     ];
 
     protected function casts(): array
@@ -47,6 +58,9 @@ final class BusinessApp extends Model
             'list_views_seeded_at' => 'datetime',
             'record_duplicate_enabled' => 'boolean',
             'record_history_enabled' => 'boolean',
+            'inline_edit_enabled' => 'boolean',
+            'record_comments_enabled' => 'boolean',
+            'bulk_delete_enabled' => 'boolean',
         ];
     }
 

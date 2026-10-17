@@ -21,6 +21,11 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
 - Screens of an app (feature) extend `Modules\Core\Filament\AppResource` (app permissions, spaces, status) and its
   pages extend `Modules\Core\Filament\AppPages\App{List,Create,Edit,View}Record(s)` (the shared app screen design) —
   see `docs/permissions.md`.
+- Look: no rounded corners anywhere (the theme forces `border-radius: 0`; only radio buttons stay round) — never add
+  a radius. Table headers and field labels (key names on record / edit / new pages) are black (`--kt-label`), never
+  grey. No table column is bold (no `->weight()` on table columns; the theme forces normal weight in table cells —
+  only the header row is bold). App lists show the paging 「1 - 100（N件中）」 at the right end of the search row (Core render hook). On a record page every toolbar button sits on the right: 編集, 再利用, 「…」 (印刷 / 削除), gear, ‹ ›
+  (Core `app-header`, nothing per app).
 - App lists are filtered only through the shared 絞り込む dialog (legacy design, `design_ref/filter1-3.png`): return the
   app's fields from `filterFields()` on its `AppListRecords` page (`Modules\Core\Application\Filters\FilterField`:
   text / textarea / number / date / dateTime / choice / user, `relationship()` or `query()` for special storage). Do not
@@ -30,16 +35,29 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   views.md; stored once) and `filterFields()`; its table builds columns from `viewColumns()`; its 「…」 entries go in
   `optionActions()` (表示件数 is added by Core). Register a `views` page (subclass of `AppListViewSettings`, before
   `view`) for アプリの設定 → 一覧: 追加 / 編集 / 複製 / 削除 / drag order (top = default), 表形式 or カレンダー形式.
-- App lists (Core, automatic): search box on the left, one horizontal scroll with its bar at the end of the table,
+- App lists (Core, automatic): search box on the left, one horizontal scroll with its bar at the end of the table (and a synced copy fixed at the bottom of the screen while the end of the table is out of view),
   表示件数 20–300 per user, and every column sorts on a header click (昇順 ⇄ 降順). Database columns become sortable by
   themselves; give computed columns (state from relations or flags) `->sortable(query: …)`.
 - Record features (legacy app settings / record screen), for every app:
   - register a `settings` page (subclass of `AppSettings`): アプリの設定 → 設定 with アクセス権 and その他の設定
-    (「レコードの再利用」, 「変更履歴」 per app); the gear has a ▾ menu of the settings shortcuts;
+    (インライン編集, コメント, 「レコードの再利用」, 「変更履歴」, 一括削除 per app); the gear has a ▾ menu of the
+    settings shortcuts; when the legacy template switches one off (template.json info: useInlineEditAndDelete,
+    useComment, enableRecordReuse, useHistory, enableBulkDeletion), return it from `appSettingDefaults()` on the
+    resource — the registry starts the app that way;
+  - list rows end with `Modules\Core\Filament\Tables\AppRecordActions::make(<Resource>)` (pencil / ×, 保存 / キャンセル)
+    and use `AppTextColumn` for their columns; the list page returns `inlineFields()` (`Tables\InlineField`, rules like
+    the form) and overrides `inlineEditState()` / `saveInlineRecord()` for related data. 一括削除 (「…」) is Core;
+  - the model implements `Modules\Core\Application\Comments\HasRecordComments` with `Models\Concerns\RecordsComments`
+    and returns the app's comment recipients (legacy app notification, e.g. 作成者 / 更新者) from
+    `commentRecipients()`; the record page shows コメント | 変更履歴 and sends 通知 (database notifications). That
+    side panel is always collapsed when a record opens (a bar of icons, comment count on コメント; 閉じる collapses
+    it again) — keep it so in every app (Core `record-sidebar`, nothing per app);
   - the model implements `Modules\Core\Application\History\HasRecordHistory` with `Models\Concerns\RecordsHistory`
     (override for related data, e.g. users of a ユーザー選択); versions are written by the App create/edit pages;
   - the create page lists `duplicateExcludedFields()` (auto-numbered codes, attachments, legacy ids) and adds related
     data in `mutateDuplicateData()` for レコードを再利用する; the view page may give `historyLabels()`;
+  - related-record sections of a record (e.g. 見積履歴 / 納品履歴 / 請求履歴) stay empty when there are no records —
+    never a message such as 「関連するレコードはありません。」;
   - user names in lists and records use `Modules\Core\Filament\Support\UserPopup` (`->html()`, list cells
     `->disabledClick()`) for the ユーザー情報 popup; 印刷する (print view) needs nothing per app.
 - Never write the word for the old product anywhere; call it 旧システム in the UI and "legacy system" in English.

@@ -14,6 +14,7 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\View\TablesRenderHook;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -23,6 +24,7 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Modules\Core\Access\DashboardAccess;
+use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\DashboardSettings\DashboardSettingsPlugin;
 use Modules\Core\Filament\Profile\ProfilePage;
 use Modules\Core\Http\Middleware\EnsurePasswordIsChanged;
@@ -73,7 +75,11 @@ abstract class BasePanelProvider extends PanelProvider
             ->renderHook(PanelsRenderHook::HEAD_END, fn (): string => view('core::filament.theme')->render())
             // 絞り込む dialog of the app lists (core::filament.app-filter)
             ->renderHook(PanelsRenderHook::HEAD_END, fn (): string => view('core::filament.app-filter-script')->render())
+            // paging of the app lists, right of the search box
+            ->renderHook(TablesRenderHook::TOOLBAR_END, fn (): string => AppListRecords::toolbarPager())
             ->sidebarCollapsibleOnDesktop()
+            // 通知 (bell in the top bar), e.g. a コメント on a record (Modules\Core\Application\Comments\RecordComments)
+            ->databaseNotifications()
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

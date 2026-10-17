@@ -173,5 +173,8 @@ it('discovers app screens in module folders, including disabled modules', functi
     require_once $file;
 
     expect((new AppDiscovery([$root]))->definitions())->toBe(['order-entry' => '04. 受注入力'])
-        ->and((new AppDiscovery([base_path('modules')]))->definitions())->toBe(['partner-master' => '01. 取引先マスタ（得意先・仕入先）']);
+        ->and((new AppDiscovery([base_path('modules')]))->definitions())->toMatchArray([
+            'partner-master' => '01. 取引先マスタ（得意先・仕入先）',
+            'machine-master' => '03. 機械マスタ',
+        ]);
 });

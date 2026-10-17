@@ -10,7 +10,7 @@
         .sfk-settings-card:focus-visible { outline: 2px solid var(--kt-blue, #3498db); outline-offset: 2px; }
         .sfk-settings-head { display: flex; align-items: center; gap: .75rem; }
         .sfk-settings-icon {
-            display: grid; place-items: center; width: 3rem; height: 3rem; flex-shrink: 0; border-radius: 4px;
+            display: grid; place-items: center; width: 3rem; height: 3rem; flex-shrink: 0;
             background: var(--kt-blue, #3498db); color: #fff;
         }
         .sfk-settings-title { margin: 0; font-size: 1rem; font-weight: 700; color: var(--kt-blue, #3498db); }

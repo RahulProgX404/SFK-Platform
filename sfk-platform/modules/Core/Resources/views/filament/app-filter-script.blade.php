@@ -4,9 +4,91 @@
       (AppListRecords::appFilterState()); 適用 / 保存 go to applyAppFilter / saveAppFilter.
     - sfkViewEditor: the 一覧 screen of アプリの設定 (core::filament.app-list-views); 保存 goes to saveView.
     Both share the 条件 / ソート editor (filterEditor, markup core::filament.filter-editor).
+    - sfkListScrollbar: the list's horizontal scroll bar at the bottom of the screen (core::filament.app-list-scrollbar).
 --}}
 <script>
     document.addEventListener('alpine:init', () => {
+        /**
+         * Shown while the table is wider than its box and the bottom of the table (with its own bar) is below the
+         * screen; it covers the table's width at the bottom of the screen and scrolls with the table both ways.
+         */
+        Alpine.data('sfkListScrollbar', () => ({
+            visible: false,
+            left: 0,
+            width: 0,
+            scrollWidth: 0,
+            main: null,
+            queued: false,
+
+            init() {
+                this.onMainScroll = () => this.fromMain()
+                this.queue = () => {
+                    if (this.queued) return
+                    this.queued = true
+                    requestAnimationFrame(() => {
+                        this.queued = false
+                        this.update()
+                    })
+                }
+                this.resizes = new ResizeObserver(this.queue)
+                this.mutations = new MutationObserver(this.queue)
+                this.mutations.observe(this.page(), { childList: true, subtree: true })
+                window.addEventListener('scroll', this.queue, { passive: true })
+                window.addEventListener('resize', this.queue)
+                this.update()
+            },
+
+            destroy() {
+                this.resizes.disconnect()
+                this.mutations.disconnect()
+                window.removeEventListener('scroll', this.queue)
+                window.removeEventListener('resize', this.queue)
+                this.main?.removeEventListener('scroll', this.onMainScroll)
+            },
+
+            page() {
+                return this.$el.closest('.fi-page') ?? document.body
+            },
+
+            update() {
+                const main = this.page().querySelector('.fi-ta-main')
+                if (main !== this.main) {
+                    this.main?.removeEventListener('scroll', this.onMainScroll)
+                    this.resizes.disconnect()
+                    this.main = main
+                    if (main) {
+                        main.addEventListener('scroll', this.onMainScroll, { passive: true })
+                        this.resizes.observe(main)
+                        main.querySelector('table') && this.resizes.observe(main.querySelector('table'))
+                    }
+                }
+
+                if (! main) {
+                    this.visible = false
+                    return
+                }
+
+                const box = main.getBoundingClientRect()
+                this.left = box.left
+                this.width = main.clientWidth
+                this.scrollWidth = main.scrollWidth
+                this.visible = main.scrollWidth > main.clientWidth + 1
+                    && box.top < window.innerHeight
+                    && box.bottom > window.innerHeight
+                if (this.visible) this.$nextTick(() => this.fromMain())
+            },
+
+            fromMain() {
+                const bar = this.$refs.bar
+                if (bar && this.main && Math.abs(bar.scrollLeft - this.main.scrollLeft) >= 1) bar.scrollLeft = this.main.scrollLeft
+            },
+
+            fromBar() {
+                const bar = this.$refs.bar
+                if (bar && this.main && Math.abs(bar.scrollLeft - this.main.scrollLeft) >= 1) this.main.scrollLeft = bar.scrollLeft
+            },
+        }))
+
         let uid = 0
         const key = () => ++uid
         const pad = (number) => String(number).padStart(2, '0')

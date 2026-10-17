@@ -9,6 +9,9 @@
     <meta name="color-scheme" content="light">
     <title>{{ $title }} | {{ config('core.system_name') }}</title>
     <style>
+        /* No rounded corners anywhere; radio buttons stay round */
+        *, *::before, *::after { border-radius: 0 !important; }
+        input[type="radio"] { border-radius: 9999px !important; }
         :root {
             --kt-blue: #3498db;
             --kt-blue-dark: #1d6fa5;

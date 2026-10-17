@@ -17,7 +17,7 @@ final class SyncAppsCommand extends Command
 
     public function handle(AppDiscovery $discovery, AppLifecycle $lifecycle): int
     {
-        $result = $lifecycle->syncWithCode($discovery->definitions());
+        $result = $lifecycle->syncWithCode($discovery->definitions(), $discovery->settingDefaults());
 
         $this->components->info(sprintf(
             'Apps added: %s / removed: %s',

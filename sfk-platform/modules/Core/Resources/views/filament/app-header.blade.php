@@ -77,8 +77,6 @@
                 @if ($actions)
                     <x-filament::actions :actions="$actions" class="sfk-app-actions" />
                 @endif
-
-                @include('core::filament.app-pager', ['page' => $page, 'position' => 'top'])
             </div>
         @elseif ($kind === 'settings')
             {{-- アプリの設定: 一覧 (AppListViewSettings) | 設定 (AppSettings: アクセス権, その他の設定) --}}
@@ -100,13 +98,12 @@
                         x-on:click="window.close(); setTimeout(() => window.location.href = @js($page::getResource()::getUrl('view', ['record' => $page->record])), 300)">閉じる</button>
             </div>
         @else
-            <div class="sfk-app-toolbar-start">
+            {{-- record: 編集 / 再利用 / 「…」 (印刷・削除), then gear and ‹ ›, all on the right --}}
+            <div class="sfk-app-toolbar-end">
                 @if ($actions)
                     <x-filament::actions :actions="$actions" class="sfk-app-actions" />
                 @endif
-            </div>
 
-            <div class="sfk-app-toolbar-end">
                 @include('core::filament.app-settings-menu', ['chrome' => $chrome])
 
                 @php($neighbours = $page->recordNeighbours())

@@ -48,6 +48,25 @@ final class AppDiscovery
         return $definitions;
     }
 
+    /**
+     * The その他の設定 each app starts with, where it differs from the defaults (AppResource::appSettingDefaults()).
+     *
+     * @return array<string, array<string, bool>> code => setting => on
+     */
+    public function settingDefaults(): array
+    {
+        if ($this->fixed !== null) {
+            return [];
+        }
+
+        $defaults = [];
+        foreach ($this->resourceClasses() as $class) {
+            $defaults[$class::appCode()] ??= $class::appSettingDefaults();
+        }
+
+        return array_filter($defaults);
+    }
+
     /** @return list<class-string<AppResource>> */
     private function resourceClasses(): array
     {

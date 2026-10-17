@@ -10,11 +10,13 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 use Modules\Core\Application\Apps\AppDiscovery;
+use Modules\Core\Application\Comments\RecordComments;
 use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\AppStatus;
 use Modules\Core\Domain\Apps\PermissionSubject;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Models\BusinessApp;
+use Modules\Core\Models\RecordComment;
 use Modules\Core\Models\RecordVersion;
 use Modules\Core\Models\Space;
 use Modules\MasterData\Domain\Partners\DocumentRecipient;
@@ -200,7 +202,7 @@ it('shows the record like the legacy system, with the tabs above the fields and 
         ->assertSee('取引先名(ふりがな)')
         ->assertSee('住所/連絡先 その他')
         ->assertSeeInOrder(['基本情報', '仕入先情報', '見積履歴', '納品履歴', '請求履歴', '取引先コード'])
-        ->assertSee('関連するレコードはありません。')
+        ->assertDontSee('関連するレコードはありません。')
         ->assertActionVisible('edit')
         ->assertActionVisible('delete')
         ->assertSee('請求締日')
@@ -226,6 +228,22 @@ it('puts the pencil, 「…」 and ‹ › in the record toolbar, moving in 取�
     Livewire::test(ViewPartner::class, ['record' => $first->getRouteKey()])
         ->assertDontSee('前のレコード')
         ->assertSee(ViewPartnerUrl($middle), false);
+});
+
+it('puts 編集, 再利用 and 「…」 (印刷 / 削除) on the right of the record toolbar, without rounded corners', function () {
+    publishedPartnerApp();
+    $partner = makePartner();
+    $this->actingAs($this->admin);
+
+    $html = $this->get(ViewPartnerUrl($partner))->assertOk()->getContent();
+    $toolbar = (string) str($html)->after('class="sfk-app-toolbar"')->before('</header>');
+
+    expect($toolbar)->not->toContain('sfk-app-toolbar-start')
+        ->and((string) str($toolbar)->after('sfk-app-toolbar-end'))->toContain('レコードを編集する')
+        ->and(strpos($toolbar, 'レコードを編集する'))->toBeLessThan(strpos($toolbar, 'レコードを再利用する'))
+        ->and(strpos($toolbar, 'レコードを再利用する'))->toBeLessThan(strpos($toolbar, 'その他の操作'))
+        ->and(strpos($toolbar, 'その他の操作'))->toBeLessThan(strpos($toolbar, 'レコードの移動'))
+        ->and($html)->toContain('*, *::before, *::after { border-radius: 0 !important; }');
 });
 
 it('hides the pencil and 削除する from employees who may only view', function () {
@@ -348,6 +366,37 @@ it('frames the list like the legacy app: title bar, breadcrumb, description, vie
         ->assertSee('ファイルに書き出す')
         ->assertSee('取引先名(ふりがな)')
         ->assertSee('【0101】山田太郎');
+});
+
+it('puts the paging right of the search box and shows table headers and field names in black', function () {
+    publishedPartnerApp();
+    makePartner();
+    $this->actingAs($this->admin);
+
+    $html = $this->get('/erp/partners')->assertOk()->getContent();
+    $header = (string) str($html)->after('<header class="sfk-app-header">')->before('</header>');
+    $toolbar = (string) str($html)->after('class="fi-ta-header-toolbar"')->before('fi-ta-main');
+
+    expect($header)->not->toContain('sfk-app-pager')
+        ->and($toolbar)->toContain('1 - 1（1件中）')
+        ->and(strpos($toolbar, 'fi-ta-search-field'))->toBeLessThan(strpos($toolbar, 'sfk-app-pager'))
+        ->and($html)->toContain('--kt-label: #000000;')
+        ->and($html)->toContain('.fi-ta-header-cell {'."\n".'        color: var(--kt-label);')
+        ->and($html)->toContain('.kt-record .fi-in-entry-label { font-size: .75rem; font-weight: 400; color: var(--kt-label); }')
+        ->and($html)->toContain('.fi-fo-field-label-content { font-size: .8125rem; color: var(--kt-label); }');
+});
+
+it('shows no column of the list in bold, 取引先名 included', function () {
+    publishedPartnerApp();
+    makePartner(['name' => '太字にしない取引先']);
+    $this->actingAs($this->admin);
+
+    expect(Livewire::test(ListPartners::class)->instance()->getTable()->getColumn('name')->getWeight())->toBeNull();
+
+    $this->get('/erp/partners')
+        ->assertOk()
+        ->assertDontSee('fi-font-semibold', false)
+        ->assertSee('.fi-ta-table > tbody td, .fi-ta-table > tbody td * { font-weight: 400 !important; }', false);
 });
 
 it('pages through the list 100 records at a time', function () {
@@ -738,6 +787,18 @@ it('sorts by every column on a click of its header, switching between 昇順 and
         ->assertCountTableRecords(2);
 });
 
+it('keeps the horizontal scroll of the list at the bottom of the screen while the end of the table is out of view', function () {
+    publishedPartnerApp();
+    makePartner();
+    $this->actingAs($this->admin);
+
+    $this->get('/erp/partners')
+        ->assertOk()
+        ->assertSee('x-data="sfkListScrollbar"', false)
+        ->assertSee("Alpine.data('sfkListScrollbar'", false)
+        ->assertSee('.sfk-list-scroll {', false);
+});
+
 it('offers 200 and 300 件 in 表示件数', function () {
     $this->actingAs($this->admin);
 
@@ -901,4 +962,236 @@ it('opens the ユーザー情報 popup from user names, with the profile link on
     Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
         ->assertSee('ユーザー情報（佐藤 花子）')
         ->assertDontSee('プロフィールを表示');
+});
+
+it('offers インライン編集, コメント, 再利用, 変更履歴 and 一括削除 in その他の設定, like the legacy app template', function () {
+    $app = publishedPartnerApp();
+    $this->actingAs($this->admin);
+
+    $this->get(PartnerSettings::getUrl())->assertSeeInOrder([
+        'その他の設定', 'インライン編集を有効にする', 'コメント機能を有効にする', '「レコードの再利用」機能を有効にする',
+        'レコードの変更履歴を記録する', '一括削除を有効にする', '保存',
+    ]);
+
+    Livewire::test(PartnerSettings::class)
+        ->assertSet('inlineEditEnabled', true)
+        ->assertSet('commentsEnabled', true)
+        ->assertSet('bulkDeleteEnabled', true)
+        ->set('inlineEditEnabled', false)
+        ->set('commentsEnabled', false)
+        ->set('bulkDeleteEnabled', false)
+        ->call('saveMisc');
+
+    $app->refresh();
+    expect($app->inline_edit_enabled)->toBeFalse()
+        ->and($app->record_comments_enabled)->toBeFalse()
+        ->and($app->bulk_delete_enabled)->toBeFalse()
+        ->and($app->record_history_enabled)->toBeTrue();
+});
+
+it('edits a row in the list (インライン編集) with the form rules, 取引先カテゴリ, 自社担当者 and 変更履歴', function () {
+    publishedPartnerApp();
+    $other = makePartner(['name' => '別の取引先']);
+    $partner = makePartner(['name' => '旧社名']);
+    $staff = User::factory()->create(['name' => '佐藤 花子']);
+    $this->actingAs($this->admin);
+
+    $list = Livewire::test(ListPartners::class)
+        ->assertTableActionVisible('inlineEdit', $partner)
+        ->assertTableActionHidden('inlineSave', $partner)
+        ->callTableAction('inlineEdit', $partner)
+        ->assertSet('inlineRecordKey', (string) $partner->id)
+        ->assertSet('inlineData.name', '旧社名')
+        ->assertSet('inlineData.roles', ['得意先'])
+        ->assertSee('wire:model="inlineData.name"', false)
+        ->assertTableActionVisible('inlineSave', $partner)
+        ->assertTableActionHidden('inlineEdit', $partner)
+        ->assertTableActionVisible('inlineEdit', $other);
+
+    // the form's rules: 取引先名 required and unique (BR-MD-01), 取引先カテゴリ required
+    $list->set('inlineData.name', '')->set('inlineData.roles', [])->callTableAction('inlineSave', $partner)
+        ->assertHasErrors(['inlineData.name' => 'required', 'inlineData.roles' => 'required'])
+        ->set('inlineData.name', '別の取引先')->set('inlineData.roles', ['仕入先'])->callTableAction('inlineSave', $partner)
+        ->assertHasErrors(['inlineData.name' => 'unique']);
+
+    $list->set('inlineData.name', '新社名')
+        ->set('inlineData.roles', ['仕入先', 'その他'])
+        ->set('inlineData.staff', [(string) $staff->id])
+        ->set('inlineData.closing_day', '20日')
+        ->set('inlineData.electronic_billing', true)
+        ->callTableAction('inlineSave', $partner)
+        ->assertHasNoErrors()
+        ->assertSet('inlineRecordKey', null);
+
+    $partner->refresh();
+    expect($partner->name)->toBe('新社名')
+        ->and($partner->is_customer)->toBeFalse()
+        ->and($partner->is_supplier)->toBeTrue()
+        ->and($partner->is_other)->toBeTrue()
+        ->and($partner->closing_day?->value)->toBe('20日')
+        ->and($partner->getAttribute('electronic_billing'))->toBeTrue()
+        ->and($partner->staff->pluck('id')->all())->toBe([$staff->id])
+        ->and($partner->updated_by)->toBe($this->admin->id);
+
+    expect(RecordVersion::query()->where('record_id', $partner->id)->sole()->version)->toBe(1);
+
+    Livewire::test(ListPartners::class)
+        ->callTableAction('inlineEdit', $partner)
+        ->set('inlineData.phone', '03-5555-5555')
+        ->callTableAction('inlineSave', $partner);
+    expect(RecordVersion::query()->where('record_id', $partner->id)->where('version', 2)->sole()->changed)->toBe(['phone']);
+
+    Livewire::test(ListPartners::class)
+        ->callTableAction('inlineEdit', $partner)
+        ->set('inlineData.phone', '03-9999-9999')
+        ->callTableAction('inlineCancel', $partner)
+        ->assertSet('inlineRecordKey', null);
+    expect($partner->refresh()->phone)->toBe('03-5555-5555');
+});
+
+it('hides the pencil and × of the rows when インライン編集 is off, and from employees without 編集 / 削除', function () {
+    $employee = employeeWith([AppAbility::View]);
+    $app = BusinessApp::query()->where('code', 'partner-master')->sole();
+    $partner = makePartner();
+    $this->actingAs($this->admin);
+
+    Livewire::test(ListPartners::class)
+        ->assertTableActionVisible('inlineEdit', $partner)
+        ->assertTableActionVisible('delete', $partner);
+
+    $app->forceFill(['inline_edit_enabled' => false])->save();
+    Livewire::test(ListPartners::class)
+        ->assertTableActionHidden('inlineEdit', $partner)
+        ->assertTableActionHidden('delete', $partner)
+        ->call('startInlineEdit', (string) $partner->id)
+        ->assertSet('inlineRecordKey', null);
+
+    $app->forceFill(['inline_edit_enabled' => true])->save();
+    $this->actingAs($employee);
+    Livewire::test(ListPartners::class)
+        ->assertTableActionHidden('inlineEdit', $partner)
+        ->assertTableActionHidden('delete', $partner)
+        ->call('startInlineEdit', (string) $partner->id)
+        ->assertSet('inlineRecordKey', null);
+});
+
+it('deletes every listed record with 一括削除, for administrators only', function () {
+    $employee = employeeWith([AppAbility::View, AppAbility::Delete]);
+    $app = BusinessApp::query()->where('code', 'partner-master')->sole();
+    $supplier = makePartner(['name' => '仕入先A', 'roles' => ['仕入先']]);
+    makePartner(['name' => '仕入先B', 'roles' => ['仕入先']]);
+    $this->actingAs($this->admin);
+
+    Livewire::test(ViewPartner::class, ['record' => $supplier->getRouteKey()])->set('commentData.body', '消える')->call('postComment');
+    Livewire::test(EditPartner::class, ['record' => $supplier->getRouteKey()])->fillForm(['phone' => '03-1234-5678'])->call('save');
+    expect(RecordComment::query()->count())->toBe(1)->and(RecordVersion::query()->count())->toBe(1);
+
+    makePartner(['name' => '得意先A']);
+
+    $list = Livewire::test(ListPartners::class)
+        ->call('applyAppFilter', ['conditions' => [['field' => 'roles', 'operator' => 'in', 'values' => ['仕入先']]]])
+        ->assertActionVisible('bulkDelete')
+        ->mountAction('bulkDelete');
+    expect($list->instance()->getMountedAction()?->getModalHeading())->toBe('2件のレコードを削除しますか？');
+    $list->callMountedAction()->assertNotified('2件のレコードを削除しました');
+
+    expect(Partner::query()->pluck('name')->all())->toBe(['得意先A'])
+        ->and(RecordVersion::query()->count())->toBe(0)
+        ->and(RecordComment::query()->count())->toBe(0);
+
+    $app->forceFill(['bulk_delete_enabled' => false])->save();
+    Livewire::test(ListPartners::class)->assertActionHidden('bulkDelete');
+
+    $app->forceFill(['bulk_delete_enabled' => true])->save();
+    $this->actingAs($employee);
+    Livewire::test(ListPartners::class)->assertActionHidden('bulkDelete')->call('bulkDelete');
+    expect(Partner::query()->count())->toBe(1);
+});
+
+it('takes コメント with 宛先 on the record and notifies them, 作成者 and 更新者 (APP_01 app notifications)', function () {
+    publishedPartnerApp();
+    $creator = User::factory()->create(['name' => '作成 太郎']);
+    $addressee = User::factory()->admin()->create(['name' => '宛先 花子']);
+    $this->actingAs($creator);
+    $partner = makePartner(['name' => 'コメント取引先']);
+    $this->actingAs($this->admin);
+
+    Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
+        ->assertSeeInOrder(['コメント', '変更履歴'])
+        ->assertSee('書き込む')
+        ->assertSee('コメントはありません。')
+        ->call('postComment')
+        ->assertHasErrors(['commentData.body' => 'required'])
+        ->set('commentData.mentions', [(string) $addressee->id])
+        ->set('commentData.body', "納期を確認してください。\n明日まで")
+        ->call('postComment')
+        ->assertHasNoErrors()
+        ->assertSet('commentData.body', null);
+
+    Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
+        ->assertSeeInOrder(['ユーザー情報（管理者）', '@宛先 花子', '納期を確認してください。<br />', '明日まで', '返信する', '削除する'], false);
+
+    $comment = RecordComment::query()->sole();
+    expect($comment->user_id)->toBe($this->admin->id)
+        ->and($comment->mentions)->toBe([$addressee->id])
+        ->and($comment->record_id)->toBe($partner->id);
+
+    // 宛先 and 作成者 / 更新者 (the same person once), never the writer
+    $notice = $creator->notifications()->sole();
+    expect($addressee->notifications()->count())->toBe(1)
+        ->and($this->admin->notifications()->count())->toBe(0)
+        ->and($notice->data['title'])->toBe('01. 取引先マスタ（得意先・仕入先）: コメント取引先')
+        ->and($notice->data['body'])->toBe('管理者: 納期を確認してください。 明日まで');
+
+    // 返信する addresses the writer; only the writer deletes a comment
+    $this->actingAs($addressee);
+    Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
+        ->call('replyToComment', $comment->id)
+        ->assertSet('commentData.mentions', [$this->admin->id])
+        ->assertActionHidden('deleteComment', ['comment' => $comment->id]);
+    app(RecordComments::class)->delete($partner, $comment->id, $addressee);
+    expect(RecordComment::query()->count())->toBe(1);
+
+    $this->actingAs($this->admin);
+    Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
+        ->assertActionVisible('deleteComment', ['comment' => $comment->id])
+        ->callAction('deleteComment', arguments: ['comment' => $comment->id])
+        ->assertSee('コメントはありません。');
+    expect(RecordComment::query()->count())->toBe(0);
+});
+
+it('opens the record with the コメント / 変更履歴 panel collapsed to its icons', function () {
+    publishedPartnerApp();
+    $partner = makePartner();
+    $this->actingAs($this->admin);
+    Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])->set('commentData.body', '確認済み')->call('postComment');
+    Livewire::test(EditPartner::class, ['record' => $partner->getRouteKey()])->fillForm(['phone' => '03-4444-4444'])->call('save');
+
+    $this->get(ViewPartnerUrl($partner))
+        ->assertOk()
+        ->assertSee('sfk-sidebar is-collapsed', false)
+        ->assertSee('x-data="{ open: false', false)
+        ->assertSeeInOrder(['sfk-sidebar-rail', 'コメント', 'sfk-sidebar-rail-count', '1', '変更履歴', '閉じる'], false);
+
+    // while a version is shown the panel stays open
+    $this->get(PartnerResource::getUrl('view', ['record' => $partner, 'version' => 1]))
+        ->assertOk()
+        ->assertDontSee('sfk-sidebar is-collapsed', false)
+        ->assertSee('x-data="{ open: true', false);
+});
+
+it('hides コメント when it is off in その他の設定, and in the print view', function () {
+    $app = publishedPartnerApp();
+    $partner = makePartner();
+    $this->actingAs($this->admin);
+
+    $this->get(PartnerResource::getUrl('view', ['record' => $partner, 'print' => 1]))->assertOk()->assertDontSee('書き込む');
+
+    $app->forceFill(['record_comments_enabled' => false])->save();
+    Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
+        ->assertDontSee('書き込む')
+        ->assertSee('変更履歴')
+        ->set('commentData.body', '書けない')
+        ->call('postComment');
+    expect(RecordComment::query()->count())->toBe(0);
 });

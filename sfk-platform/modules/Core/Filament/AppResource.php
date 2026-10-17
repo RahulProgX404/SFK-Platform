@@ -38,6 +38,17 @@ abstract class AppResource extends Resource
         return null;
     }
 
+    /**
+     * その他の設定 the app starts with when it is added to the registry, where its legacy app differs from the defaults
+     * (all on), e.g. ['bulk_delete_enabled' => false]. Keys: BusinessApp::SETTINGS.
+     *
+     * @return array<string, bool>
+     */
+    public static function appSettingDefaults(): array
+    {
+        return [];
+    }
+
     /** URL of the screen implementing the app in the given panel, or null while it is not implemented there. */
     public static function urlForApp(string $appCode, Panel $panel): ?string
     {

@@ -144,7 +144,6 @@ final class AppSettingsResource extends Resource
             ->columns([
                 TextColumn::make('name')
                     ->label('アプリ名')
-                    ->weight(FontWeight::SemiBold)
                     ->searchable(['name', 'code']),
                 TextColumn::make('space.name')->label('スペース'),
                 TextColumn::make('status')

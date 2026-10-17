@@ -6,12 +6,8 @@ namespace Modules\MasterData\Filament\Resources\Partners\Tables;
 
 use App\Models\User;
 use BackedEnum;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\EditAction;
-use Filament\Support\Enums\FontWeight;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
@@ -27,6 +23,9 @@ use Modules\Core\Domain\Tax\TaxCalculationUnit;
 use Modules\Core\Domain\Tax\TaxMode;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\Support\UserPopup;
+use Modules\Core\Filament\Tables\AppRecordActions;
+use Modules\Core\Filament\Tables\AppTextColumn;
+use Modules\Core\Filament\Tables\InlineField;
 use Modules\MasterData\Domain\Partners\CustomerClassification;
 use Modules\MasterData\Domain\Partners\CustomerStatus;
 use Modules\MasterData\Domain\Partners\DocumentIssuance;
@@ -43,7 +42,8 @@ use Modules\MasterData\Models\Partner;
  * Record list of 01. 取引先マスタ. The columns shown and their order are those of the chosen 一覧 (AppListRecords::
  * viewColumns()); the legacy view 「取引先一覧」 (SYSTEM_BRAIN APP_01 views.md: its columns, sorted by 取引先コード) is
  * the app's default view, （すべて） shows columns() in order. The search box replaces the 「取引先一覧(検索特化)」 plugin
- * view. filterFields() are the fields of 絞り込む and of the 一覧 settings.
+ * view. filterFields() are the fields of 絞り込む and of the 一覧 settings; inlineFields() those インライン編集 changes
+ * (every field but 取引先コード, the attachments and the system fields), with the rules of PartnerForm.
  */
 final class PartnersTable
 {
@@ -97,21 +97,10 @@ final class PartnersTable
                     ->icon(Heroicon::OutlinedDocumentText)
                     ->color('primary')
                     ->width('2.5rem'),
-                ...array_map(fn (string $name): TextColumn => self::column($name), $names),
+                ...array_map(fn (string $name): AppTextColumn => self::column($name), $names),
             ])
             ->defaultSort('code')
-            ->recordActions([
-                EditAction::make()
-                    ->label('編集する')
-                    ->icon(Heroicon::OutlinedPencil)
-                    ->iconButton()
-                    ->visible(fn (Partner $record): bool => PartnerResource::canEdit($record)),
-                DeleteAction::make()
-                    ->label('削除する')
-                    ->icon(Heroicon::XMark)
-                    ->iconButton()
-                    ->visible(fn (Partner $record): bool => PartnerResource::canDelete($record)),
-            ])
+            ->recordActions(AppRecordActions::make(PartnerResource::class))
             ->emptyStateIcon(Heroicon::OutlinedBuildingStorefront)
             ->emptyStateHeading('取引先がありません');
     }
@@ -158,8 +147,8 @@ final class PartnersTable
             $choice('rounding', $rounding),
             $choice('tax_calculation_unit', TaxCalculationUnit::options()),
             $choice('closing_day', array_combine($days, $days)),
-            $choice('invoice_issuance', DocumentIssuance::options()),
-            $choice('delivery_note_issuance', DocumentIssuance::options()),
+            $choice('invoice_issuance', DocumentIssuance::invoiceOptions()),
+            $choice('delivery_note_issuance', DocumentIssuance::deliveryNoteOptions()),
             $choice('collection_month', CollectionMonth::options()),
             $choice('collection_day', CollectionDay::options()),
             FilterField::number('bill_threshold_man', $label('bill_threshold_man')),
@@ -185,6 +174,75 @@ final class PartnersTable
             FilterField::dateTime('created_at', $label('created_at')),
             FilterField::user('updated_by', $label('updater')),
             FilterField::dateTime('updated_at', $label('updated_at')),
+        ];
+    }
+
+    /**
+     * Fields of インライン編集, checked like PartnerForm (BR-MD-01: 取引先名 unique; the legacy required fields).
+     *
+     * @return list<InlineField>
+     */
+    public static function inlineFields(): array
+    {
+        $text = fn (string $name, int $length = 64): InlineField => InlineField::text($name)->maxLength($length);
+        $phone = fn (string $name): InlineField => InlineField::text($name)->maxLength(32);
+        $postalCode = fn (string $name): InlineField => InlineField::text($name)->maxLength(8)->regex('/^\d{3}-?\d{4}$/');
+        $days = array_map(fn (ClosingDay $day): string => $day->value, ClosingDay::cases());
+        $rounding = [
+            RoundingMode::HalfUp->value => RoundingMode::HalfUp->label(),
+            RoundingMode::RoundUp->value => RoundingMode::RoundUp->label(),
+            RoundingMode::Truncate->value => RoundingMode::Truncate->label(),
+        ];
+
+        return [
+            $text('legacy_customer_code'),
+            $text('name')->required()->unique('partners'),
+            $text('name_kana', 128)->required(),
+            $text('short_name')->required(),
+            $text('contact_person'),
+            InlineField::users('staff'),
+            InlineField::checkboxes('roles', PartnerRole::options())->required(),
+            InlineField::select('partner_group', PartnerGroup::options())->retiredOptions(PartnerGroup::retiredValues()),
+            InlineField::select('purchase_category', PurchaseCategory::options()),
+            InlineField::select('closing_day', array_combine($days, $days)),
+            InlineField::select('collection_month', CollectionMonth::options()),
+            InlineField::select('collection_day', CollectionDay::options()),
+            $phone('phone')->required(),
+            $phone('fax'),
+            $text('parent_company', 128),
+            InlineField::select('customer_classification', CustomerClassification::options()),
+            InlineField::select('customer_status', CustomerStatus::options()),
+            InlineField::select('invoice_recipient', DocumentRecipient::options())->required(),
+            InlineField::select('delivery_note_recipient', DocumentRecipient::options())->required(),
+            InlineField::text('registration_number')->maxLength(14)->regex('/^T\d{13}$/'),
+            InlineField::textarea('contact_note'),
+            InlineField::select('tax_mode', TaxMode::options()),
+            InlineField::select('rounding', $rounding),
+            InlineField::select('tax_calculation_unit', TaxCalculationUnit::options()),
+            InlineField::select('invoice_issuance', DocumentIssuance::invoiceOptions()),
+            InlineField::select('delivery_note_issuance', DocumentIssuance::deliveryNoteOptions()),
+            InlineField::checkbox('electronic_billing'),
+            InlineField::checkbox('collects_by_bill', '手形'),
+            InlineField::number('bill_threshold_man')->minValue(0),
+            InlineField::number('bill_site_days')->minValue(0)->maxValue(365),
+            InlineField::textarea('notes'),
+            $postalCode('parent_postal_code'),
+            $text('parent_address', 255),
+            $phone('parent_phone'),
+            $phone('parent_fax'),
+            $postalCode('postal_code')->required(),
+            $text('address', 255)->required(),
+            InlineField::select('segment', PartnerSegment::options()),
+            InlineField::checkbox('supplier_same_address'),
+            InlineField::select('supplier_tax_mode', TaxMode::options()),
+            InlineField::select('supplier_rounding', $rounding),
+            InlineField::select('supplier_tax_calculation_unit', TaxCalculationUnit::options()),
+            $text('supplier_contact_person'),
+            $postalCode('supplier_postal_code'),
+            $text('supplier_address', 255),
+            $phone('supplier_phone'),
+            $phone('supplier_fax'),
+            InlineField::textarea('supplier_notes'),
         ];
     }
 
@@ -219,14 +277,14 @@ final class PartnersTable
         $condition->operator === FilterOperator::NotIn ? $query->whereNot($any) : $query->where($any);
     }
 
-    private static function column(string $name): TextColumn
+    private static function column(string $name): AppTextColumn
     {
-        $column = TextColumn::make($name)
+        $column = AppTextColumn::make($name)
             ->label(PartnerLayout::label($name))
             ->placeholder('');
 
         return match ($name) {
-            'name' => $column->weight(FontWeight::SemiBold)->searchable()->sortable(),
+            'name' => $column->searchable()->sortable(),
             'name_kana' => $column->searchable()->sortable(),
             'code', 'short_name', 'legacy_customer_code' => $column->searchable()->sortable(),
             'id' => $column->sortable(),

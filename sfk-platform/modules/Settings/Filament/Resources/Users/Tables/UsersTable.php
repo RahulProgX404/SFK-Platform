@@ -12,7 +12,6 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Notifications\Notification;
-use Filament\Support\Enums\FontWeight;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -38,7 +37,6 @@ final class UsersTable
             ->columns([
                 TextColumn::make('name')
                     ->label('表示名')
-                    ->weight(FontWeight::SemiBold)
                     ->searchable(['name', 'last_name', 'first_name', 'last_name_kana', 'first_name_kana'])
                     ->sortable(),
                 TextColumn::make('email')

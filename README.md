@@ -222,9 +222,3 @@ Details: [sfk-platform/docs/roadmap.md](sfk-platform/docs/roadmap.md).
 | [sfk-platform/docs/adr/](sfk-platform/docs/adr/)             | Architecture decision records                                                   |
 | [sfk-platform/AGENTS.md](sfk-platform/AGENTS.md)             | Coding rules for developers and AI assistants                                   |
 | `SYSTEM_BRAIN/` (local)                                      | Old-system knowledge base; start with `00_README.md` or `18_BEGINNER_GUIDE.pdf` |
-
-I already work with MERN and TypeScript. I have these course enrolled:
-"https://www.udemy.com/course/the-ultimate-react-course/?couponCode=KEEPLEARNING",
-"https://procodrr.com/ts/",
-"https://procodrr.com/nodejs/",
-"https://appliedroots.com/diploma"

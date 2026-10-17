@@ -23,11 +23,15 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema as DatabaseSchema;
 use Livewire\Attributes\Session;
 use Livewire\Attributes\Url;
+use Livewire\Livewire;
 use Modules\Core\Application\Filters\FilterField;
 use Modules\Core\Application\Filters\RecordFilterQuery;
+use Modules\Core\Application\History\HasRecordHistory;
+use Modules\Core\Application\History\RecordHistory;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Application\Views\ListViewInvalid;
 use Modules\Core\Application\Views\ListViewSchema;
@@ -35,6 +39,7 @@ use Modules\Core\Application\Views\ListViewService;
 use Modules\Core\Domain\Filters\FilterFieldType;
 use Modules\Core\Domain\Filters\RecordFilter;
 use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
+use Modules\Core\Filament\Tables\InlineField;
 
 /**
  * Record list of an app, in the legacy layout: app frame; the 一覧 dropdown (the app's views from アプリの設定 → 一覧,
@@ -47,6 +52,11 @@ use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
  * An app supplies listColumns() (every column, the order of （すべて）), defaultListViews() (stored the first time) and
  * filterFields(). 絞り込む: 適用 filters for the session (dropped when the view changes), 保存 (administrators) stores
  * a new 一覧 with the current view's columns. 表示件数 is each user's choice and applies to every app.
+ *
+ * その他の設定: インライン編集 — the rows end with the pencil and × (Tables\AppRecordActions); the pencil turns the row's
+ * cells of inlineFields() into inputs (Tables\AppTextColumn) with 保存 / キャンセル, saved like the edit screen (rules
+ * of the fields, 変更履歴). 一括削除 — 「…」 → 一括削除 (administrators with 削除) deletes every record of the list
+ * as filtered and searched.
  */
 abstract class AppListRecords extends ListRecords
 {
@@ -71,8 +81,16 @@ abstract class AppListRecords extends ListRecords
     #[Session]
     public ?array $appFilter = null;
 
+    /** インライン編集: key of the row being edited */
+    public ?string $inlineRecordKey = null;
+
+    /** @var array<string, mixed> インライン編集: values of the row being edited, by field */
+    public array $inlineData = [];
+
     /** @var list<ListView>|null */
     private ?array $views = null;
+
+    private ?bool $rowActionsEnabled = null;
 
     /**
      * Every column the app's list can show (name => label), in the order of （すべて）.
@@ -102,6 +120,103 @@ abstract class AppListRecords extends ListRecords
     public function filterFields(): array
     {
         return [];
+    }
+
+    /**
+     * Fields インライン編集 can change, with the rules of the app's form; none = the pencil opens the edit screen.
+     *
+     * @return list<InlineField>
+     */
+    public function inlineFields(): array
+    {
+        return [];
+    }
+
+    public function inlineField(string $name): ?InlineField
+    {
+        foreach ($this->inlineFields() as $field) {
+            if ($field->name === $name) {
+                return $field;
+            }
+        }
+
+        return null;
+    }
+
+    /** その他の設定 → インライン編集: the pencil and × at the end of the rows. */
+    public function rowActionsEnabled(): bool
+    {
+        return $this->rowActionsEnabled ??= $this->appSetting('inline_edit_enabled');
+    }
+
+    public function isInlineEditing(Model $record): bool
+    {
+        return $this->inlineRecordKey !== null && $this->inlineRecordKey === (string) $record->getKey();
+    }
+
+    /** The pencil of a row: its cells become inputs. */
+    public function startInlineEdit(Model|string $record): void
+    {
+        $record = $this->inlineRecord($record instanceof Model ? (string) $record->getKey() : $record);
+        $this->resetErrorBag();
+
+        if ($record === null) {
+            $this->cancelInlineEdit();
+
+            return;
+        }
+
+        $this->inlineRecordKey = (string) $record->getKey();
+        $this->inlineData = $this->inlineEditState($record);
+    }
+
+    /** 保存 of the row being edited: checked with the fields' rules, saved and kept in the 変更履歴. */
+    public function saveInlineEdit(): void
+    {
+        $record = $this->inlineRecord($this->inlineRecordKey);
+        if ($record === null) {
+            $this->cancelInlineEdit();
+
+            return;
+        }
+
+        $rules = [];
+        $attributes = [];
+        foreach ($this->inlineFields() as $field) {
+            foreach ($field->rules($record) as $path => $fieldRules) {
+                $rules['inlineData.'.$path] = $fieldRules;
+            }
+            $attributes['inlineData.'.$field->name] = $this->listColumns()[$field->name] ?? $field->name;
+            $attributes['inlineData.'.$field->name.'.*'] = $attributes['inlineData.'.$field->name];
+        }
+
+        /** @var array<string, mixed> $data */
+        $data = $this->validate($rules, [], $attributes)['inlineData'] ?? [];
+        foreach ($this->inlineFields() as $field) {
+            $data[$field->name] = match (true) {
+                $field->isBoolean() => (bool) ($data[$field->name] ?? false),
+                $field->isMultiple() => array_values((array) ($data[$field->name] ?? [])),
+                default => blank($data[$field->name] ?? null) ? null : $data[$field->name],
+            };
+        }
+
+        DB::transaction(function () use ($record, $data): void {
+            $this->saveInlineRecord($record, $data);
+
+            if ($record instanceof HasRecordHistory && $this->appSetting('record_history_enabled')) {
+                $user = auth()->user();
+                app(RecordHistory::class)->record($record, $user instanceof User ? $user->id : null);
+            }
+        });
+
+        $this->cancelInlineEdit();
+    }
+
+    public function cancelInlineEdit(): void
+    {
+        $this->inlineRecordKey = null;
+        $this->inlineData = [];
+        $this->resetErrorBag();
     }
 
     public function listViewSchema(): ListViewSchema
@@ -160,6 +275,7 @@ abstract class AppListRecords extends ListRecords
     public function updatedListView(): void
     {
         $this->appFilter = null;
+        $this->cancelInlineEdit();
         $this->resetTable();
     }
 
@@ -206,6 +322,8 @@ abstract class AppListRecords extends ListRecords
             RenderHook::make(PanelsRenderHook::RESOURCE_PAGES_LIST_RECORDS_TABLE_BEFORE),
             ViewComponent::make('core::filament.app-calendar')->visible(fn (): bool => $this->currentView()->isCalendar()),
             EmbeddedTable::make()->visible(fn (): bool => ! $this->currentView()->isCalendar()),
+            // horizontal scroll at the bottom of the screen while the end of the table is out of view
+            ViewComponent::make('core::filament.app-list-scrollbar')->visible(fn (): bool => ! $this->currentView()->isCalendar()),
             RenderHook::make(PanelsRenderHook::RESOURCE_PAGES_LIST_RECORDS_TABLE_AFTER),
         ]);
     }
@@ -366,6 +484,17 @@ abstract class AppListRecords extends ListRecords
         $this->nextPage($this->getTablePaginationPageName());
     }
 
+    /**
+     * 「1 - 100（N件中）」 at the right end of the table toolbar, in the row of the search box (render hook of every
+     * panel, BasePanelProvider); empty outside app lists and for calendar views.
+     */
+    public static function toolbarPager(): string
+    {
+        $page = Livewire::current();
+
+        return $page instanceof self ? view('core::filament.app-pager', ['page' => $page, 'position' => 'top'])->render() : '';
+    }
+
     public function getFooter(): View
     {
         return view('core::filament.app-pager', ['page' => $this, 'position' => 'bottom']);
@@ -458,6 +587,17 @@ abstract class AppListRecords extends ListRecords
         return [
             ActionGroup::make([
                 ...$this->optionActions(),
+                Action::make('bulkDelete')
+                    ->label('一括削除')
+                    ->icon(Heroicon::OutlinedTrash)
+                    ->visible(fn (): bool => $this->canBulkDelete())
+                    ->modalIcon(Heroicon::OutlinedTrash)
+                    ->modalIconColor('danger')
+                    ->modalWidth('md')
+                    ->modalHeading(fn (): string => ($this->getFilteredTableQuery()?->count() ?? 0).'件のレコードを削除しますか？')
+                    ->modalSubmitAction(fn (Action $action): Action => $action->label('削除する')->color('danger'))
+                    ->modalCancelActionLabel('キャンセル')
+                    ->action(fn () => $this->bulkDelete()),
                 Action::make('pageSize')
                     ->label('表示件数')
                     ->icon(Heroicon::OutlinedQueueList)
@@ -486,13 +626,94 @@ abstract class AppListRecords extends ListRecords
     }
 
     /**
-     * Entries of the 「…」 menu above 表示件数.
+     * Entries of the 「…」 menu above 一括削除 and 表示件数.
      *
      * @return list<Action>
      */
     protected function optionActions(): array
     {
         return [];
+    }
+
+    /** 一括削除: on in その他の設定, for administrators who may delete the app's records. */
+    public function canBulkDelete(): bool
+    {
+        return $this->appSetting('bulk_delete_enabled') && $this->isAppAdministrator() && $this->appResource()::canDeleteAny();
+    }
+
+    /** 一括削除: deletes every record of the list as filtered and searched (one by one, so related data goes too). */
+    public function bulkDelete(): void
+    {
+        $query = $this->canBulkDelete() ? $this->getFilteredTableQuery() : null;
+        if ($query === null) {
+            return;
+        }
+
+        $model = $query->getModel();
+        $keys = $query->pluck($model->getQualifiedKeyName())->all();
+        $deleted = 0;
+
+        DB::transaction(function () use ($model, $keys, &$deleted): void {
+            foreach (array_chunk($keys, 200) as $chunk) {
+                foreach ($model->newQuery()->whereKey($chunk)->get() as $record) {
+                    if ($this->appResource()::canDelete($record)) {
+                        $record->delete();
+                        $deleted++;
+                    }
+                }
+            }
+        });
+
+        $this->cancelInlineEdit();
+        $this->resetPage($this->getTablePaginationPageName());
+
+        Notification::make()->title($deleted.'件のレコードを削除しました')->success()->send();
+    }
+
+    /**
+     * Values the inputs of インライン編集 start with; add the record's related data here (e.g. selected users).
+     *
+     * @return array<string, mixed>
+     */
+    protected function inlineEditState(Model $record): array
+    {
+        $state = [];
+        $columns = $record->getAttributes();
+        foreach ($this->inlineFields() as $field) {
+            // columns only: related data (e.g. selected users) is added by the app
+            $value = array_key_exists($field->name, $columns) ? $record->getAttribute($field->name) : null;
+            $state[$field->name] = match (true) {
+                $value instanceof BackedEnum => (string) $value->value,
+                $field->isBoolean() => (bool) $value,
+                $field->isMultiple() => array_values((array) $value),
+                default => $value,
+            };
+        }
+
+        return $state;
+    }
+
+    /**
+     * Saves the checked values of インライン編集 (inside a transaction); override for related data.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    protected function saveInlineRecord(Model $record, array $data): void
+    {
+        $record->fill($data)->save();
+    }
+
+    /** The record behind a row key, when インライン編集 is on, the app has inline fields and the user may edit it. */
+    private function inlineRecord(?string $key): ?Model
+    {
+        if ($key === null || ! $this->rowActionsEnabled() || $this->inlineFields() === []) {
+            return null;
+        }
+
+        $resource = $this->appResource();
+        $record = $resource::getEloquentQuery()->whereKey($key)->first();
+
+        return $record !== null && $resource::canEdit($record) ? $record : null;
     }
 
     /**

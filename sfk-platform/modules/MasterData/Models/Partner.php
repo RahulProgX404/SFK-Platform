@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Modules\Core\Application\Comments\HasRecordComments;
 use Modules\Core\Application\History\HasRecordHistory;
 use Modules\Core\Application\Numbering\DocumentNumberGenerator;
 use Modules\Core\Domain\Billing\ClosingDay;
@@ -16,6 +17,7 @@ use Modules\Core\Domain\Billing\CollectionMonth;
 use Modules\Core\Domain\Money\RoundingMode;
 use Modules\Core\Domain\Tax\TaxCalculationUnit;
 use Modules\Core\Domain\Tax\TaxMode;
+use Modules\Core\Models\Concerns\RecordsComments;
 use Modules\Core\Models\Concerns\RecordsHistory;
 use Modules\MasterData\Domain\Partners\CustomerClassification;
 use Modules\MasterData\Domain\Partners\CustomerStatus;
@@ -28,7 +30,8 @@ use Modules\MasterData\Domain\Partners\PurchaseCategory;
 /**
  * 取引先 (SYSTEM_BRAIN APP_01): customer, supplier and/or other in one record (BR-MD-02), with customer-side and
  * supplier-side terms. Transactions will reference `id` (not the name, unlike the legacy lookups) and snapshot
- * only what documents must freeze.
+ * only what documents must freeze. コメント notify 作成者 and 更新者 (legacy app notification on 「コメントの書き込み」,
+ * SYSTEM_BRAIN APP_01 permissions.md).
  *
  * @property int $id
  * @property int|null $legacy_id
@@ -49,8 +52,9 @@ use Modules\MasterData\Domain\Partners\PurchaseCategory;
  * @property int|null $created_by
  * @property int|null $updated_by
  */
-final class Partner extends Model implements HasRecordHistory
+final class Partner extends Model implements HasRecordComments, HasRecordHistory
 {
+    use RecordsComments;
     use RecordsHistory {
         historySnapshot as private columnSnapshot;
         historyPreview as private columnPreview;
@@ -249,6 +253,12 @@ final class Partner extends Model implements HasRecordHistory
         $this->restoreColumns($snapshot);
         $this->staff()->sync(User::query()->whereIn('id', (array) ($snapshot['staff'] ?? []))->pluck('id')->all());
         $this->unsetRelation('staff');
+    }
+
+    /** @return list<User|null> 作成者 and 更新者 */
+    public function commentRecipients(): iterable
+    {
+        return [$this->creator, $this->updater];
     }
 
     /**

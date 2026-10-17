@@ -110,6 +110,14 @@ trait HasAppChrome
         return $tabs;
     }
 
+    /** その他の設定 of the app (enabled while the app is not registered). */
+    protected function appSetting(string $setting): bool
+    {
+        $app = $this->appResource()::app();
+
+        return $app === null || (bool) $app->getAttribute($setting);
+    }
+
     /** @return class-string<AppResource> */
     protected function appResource(): string
     {

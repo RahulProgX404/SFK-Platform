@@ -49,7 +49,7 @@ final class AppsSettings extends Page
     /** The board always reflects the code: apps built since the last visit appear, deleted ones go. */
     public function mount(): void
     {
-        app(AppLifecycle::class)->syncWithCode(app(AppDiscovery::class)->definitions());
+        app(AppLifecycle::class)->syncWithCode(app(AppDiscovery::class)->definitions(), app(AppDiscovery::class)->settingDefaults());
     }
 
     /** @return array<string, mixed> */

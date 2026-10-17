@@ -9,6 +9,8 @@ use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Infolists\Components\Entry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
@@ -22,18 +24,25 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Url;
+use Modules\Core\Application\Comments\HasRecordComments;
+use Modules\Core\Application\Comments\RecordComments;
 use Modules\Core\Application\History\HasRecordHistory;
 use Modules\Core\Application\History\RecordHistory;
+use Modules\Core\Domain\People\EmploymentStatus;
 use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
+use Modules\Core\Models\RecordComment;
 use Modules\Core\Models\RecordVersion;
 
 /**
  * A record of an app, in the legacy layout: app frame; toolbar with the pencil (レコードを編集する), 再利用
  * (レコードを再利用する, その他の設定) and the 「…」 menu (印刷する, 削除する) on the left, gear and ‹ › to the previous /
- * next record (in the app's list order, recordNavigationColumn()) on the right; the 変更履歴 panel on the right of the
- * record (records implementing HasRecordHistory, その他の設定): versions newest first with 更新内容を表示 (changed
- * fields in green) / このバージョンに戻す, and 最新の内容を表示. 印刷する opens the print view (?print=1): the record
- * without header, menus and history, with 印刷 / 閉じる.
+ * next record (in the app's list order, recordNavigationColumn()) on the right; the panel on the right of the record
+ * (collapsed to a bar of icons when the record opens) with the tabs コメント (records implementing HasRecordComments, その他の設定): 宛先 + text → 書き込む, comments newest
+ * first with 返信する / 削除する (own comments); and 変更履歴 (records implementing HasRecordHistory, その他の設定):
+ * versions newest first with 更新内容を表示 (changed fields in green) / このバージョンに戻す, and 最新の内容を表示.
+ * 印刷する opens the print view (?print=1): the record without header, menus, comments and history, with 印刷 / 閉じる.
+ *
+ * @property-read Schema $commentForm
  */
 abstract class AppViewRecord extends ViewRecord
 {
@@ -47,9 +56,19 @@ abstract class AppViewRecord extends ViewRecord
     #[Url(as: 'version')]
     public ?int $historyVersion = null;
 
+    /** @var array<string, mixed>|null コメント being written: body, mentions (宛先) */
+    public ?array $commentData = [];
+
     private ?Model $versionPreview = null;
 
     private ?RecordVersion $shownVersion = null;
+
+    public function mount(int|string $record): void
+    {
+        parent::mount($record);
+
+        $this->commentForm->fill();
+    }
 
     public function appPageKind(): string
     {
@@ -78,8 +97,8 @@ abstract class AppViewRecord extends ViewRecord
         return $schema->components([
             Flex::make([
                 Group::make([EmbeddedSchema::make('infolist')])->grow(),
-                ViewComponent::make('core::filament.record-history')
-                    ->visible(fn (): bool => $this->showsHistory())
+                ViewComponent::make('core::filament.record-sidebar')
+                    ->visible(fn (): bool => $this->showsComments() || $this->showsHistory())
                     ->grow(false),
             ])->from('lg'),
             $this->getRelationManagersContentComponent(),
@@ -106,6 +125,117 @@ abstract class AppViewRecord extends ViewRecord
     public function showsHistory(): bool
     {
         return ! $this->printMode && $this->record instanceof HasRecordHistory && $this->appSetting('record_history_enabled');
+    }
+
+    public function showsComments(): bool
+    {
+        return ! $this->printMode && $this->record instanceof HasRecordComments && $this->appSetting('record_comments_enabled');
+    }
+
+    /** Tab of the side panel shown first: 変更履歴 while a version is shown or without comments, else コメント. */
+    public function sidebarTab(): string
+    {
+        return ! $this->showsComments() || ($this->historyVersion !== null && $this->showsHistory()) ? 'history' : 'comments';
+    }
+
+    /** The side panel opens collapsed; only a shown version (変更履歴) keeps it open. */
+    public function sidebarStartsOpen(): bool
+    {
+        return $this->historyVersion !== null && $this->showsHistory();
+    }
+
+    /** 宛先 + コメント → 書き込む */
+    public function commentForm(Schema $schema): Schema
+    {
+        return $schema
+            ->statePath('commentData')
+            ->components([
+                Select::make('mentions')
+                    ->label('宛先')
+                    ->multiple()
+                    ->searchable()
+                    ->options(fn (): array => User::query()
+                        ->whereIn('employment_status', array_map(
+                            fn (EmploymentStatus $status): string => $status->value,
+                            array_filter(EmploymentStatus::cases(), fn (EmploymentStatus $status): bool => $status->canSignIn()),
+                        ))
+                        ->orderBy('name')
+                        ->pluck('name', 'id')
+                        ->all()),
+                Textarea::make('body')
+                    ->label('コメント')
+                    ->hiddenLabel()
+                    ->required()
+                    ->maxLength(RecordComments::MAX_LENGTH)
+                    ->rows(3)
+                    ->autosize()
+                    ->extraInputAttributes(['data-sfk-comment-body' => true]),
+            ]);
+    }
+
+    /** @return Collection<int, RecordComment> newest first */
+    public function recordComments(): Collection
+    {
+        return $this->showsComments() ? app(RecordComments::class)->comments($this->record) : new Collection;
+    }
+
+    public function postComment(): void
+    {
+        $user = auth()->user();
+        if (! $user instanceof User || ! $this->showsComments() || ! $this->record instanceof HasRecordComments) {
+            return;
+        }
+
+        $data = $this->commentForm->getState();
+        app(RecordComments::class)->post(
+            $this->record,
+            $user,
+            trim((string) $data['body']),
+            array_map('intval', (array) ($data['mentions'] ?? [])),
+            $this->appResource()::appName().': '.$this->getRecordTitle(),
+            static::getResource()::getUrl('view', ['record' => $this->record]),
+        );
+
+        $this->commentForm->fill();
+    }
+
+    /** 返信する: addresses the comment being written to the writer of the given one. */
+    public function replyToComment(int $commentId): void
+    {
+        $comment = $this->recordComments()->firstWhere('id', $commentId);
+        if ($comment === null) {
+            return;
+        }
+
+        $mentions = array_map('intval', (array) ($this->commentData['mentions'] ?? []));
+        if ($comment->user_id !== null && $comment->user_id !== auth()->id()) {
+            $mentions = [$comment->user_id];
+        }
+
+        $this->commentForm->fill(['body' => $this->commentData['body'] ?? '', 'mentions' => $mentions]);
+        $this->dispatch('sfk-comment-reply');
+    }
+
+    public function deleteCommentAction(): Action
+    {
+        return Action::make('deleteComment')
+            ->label('削除する')
+            ->link()
+            ->color('gray')
+            ->visible(fn (array $arguments): bool => $this->showsComments()
+                && $this->recordComments()->firstWhere('id', (int) ($arguments['comment'] ?? 0))?->user_id === auth()->id())
+            ->modalIcon(Heroicon::OutlinedTrash)
+            ->modalIconColor('danger')
+            ->modalWidth('md')
+            ->modalHeading('コメントを削除しますか？')
+            ->modalSubmitAction(fn (Action $action): Action => $action->label('削除する')->color('danger'))
+            ->modalCancelActionLabel('キャンセル')
+            ->action(function (array $arguments): void {
+                $user = auth()->user();
+                if ($user instanceof User) {
+                    app(RecordComments::class)->delete($this->record, (int) ($arguments['comment'] ?? 0), $user);
+                }
+            });
     }
 
     /** @return Collection<int, RecordVersion> */
@@ -265,14 +395,6 @@ abstract class AppViewRecord extends ViewRecord
         }
 
         return $urls;
-    }
-
-    /** その他の設定 of the app (enabled while the app is not registered). */
-    protected function appSetting(string $setting): bool
-    {
-        $app = $this->appResource()::app();
-
-        return $app === null || (bool) $app->getAttribute($setting);
     }
 
     private function neighbour(bool $forward): ?Model

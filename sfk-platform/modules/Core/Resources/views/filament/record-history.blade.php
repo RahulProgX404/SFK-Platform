@@ -1,10 +1,9 @@
 {{--
-    変更履歴 panel on the right of an app record (Modules\Core\Filament\AppPages\AppViewRecord), legacy layout: the
-    versions newest first (バージョン, date, who with the ユーザー情報 popup, what changed) with 更新内容を表示 /
-    このバージョンに戻す (初版を表示 / 初版に戻す for the first one) and, while a version is shown, 最新の内容を表示.
+    変更履歴 tab of the record panel (core::filament.record-sidebar), legacy layout: the versions newest first
+    (バージョン, date, who with the ユーザー情報 popup, what changed) with 更新内容を表示 / このバージョンに戻す
+    (初版を表示 / 初版に戻す for the first one) and, while a version is shown, 最新の内容を表示.
 --}}
 @php
-    use Filament\Support\Icons\Heroicon;
     use Modules\Core\Filament\Support\UserPopup;
     use Modules\Core\Models\RecordVersion;
 
@@ -14,13 +13,7 @@
     $shown = $page->shownVersion();
 @endphp
 
-<aside class="sfk-history" aria-labelledby="sfk-history-title">
-    <header class="sfk-history-head">
-        <span class="sfk-history-tab" aria-hidden="true">
-            <x-filament::icon :icon="Heroicon::OutlinedClock" class="sfk-history-tab-icon" />
-        </span>
-        <h2 id="sfk-history-title" class="sfk-history-title">変更履歴</h2>
-    </header>
+<div class="sfk-history-panel">
 
     @if ($shown !== null)
         <div class="sfk-history-shown">
@@ -74,4 +67,4 @@
             @endforeach
         </ol>
     @endif
-</aside>
+</div>
