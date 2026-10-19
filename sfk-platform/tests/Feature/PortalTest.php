@@ -32,7 +32,7 @@ beforeEach(function () {
     $this->factory = Space::query()->create(['panel_id' => 'erp', 'name' => '製造スペース']);
     $this->sales->users()->attach($this->employee);
 
-    $this->orders = portal_app('order-entry', '04. 受注入力', $this->sales, iconText: '受注');
+    $this->orders = portal_app('sales-entry', '06. 売上入力', $this->sales, iconText: '売上');
     $this->orders->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true]);
     $this->daily = portal_app('daily-report', '08. 日報入力', $this->factory);
     $this->daily->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true]);
@@ -56,8 +56,8 @@ it('lists the joined spaces and the apps the employee may view', function () {
     Livewire::test(PortalPage::class)
         ->assertSee('営業スペース')
         ->assertDontSee('製造スペース')
-        ->assertSee('04. 受注入力')
-        ->assertSee('受注')
+        ->assertSee('06. 売上入力')
+        ->assertSee('売上')
         ->assertDontSee('08. 日報入力') // not a member of 製造スペース
         ->assertDontSee('09. 見積書管理') // 開発中
         ->assertSee('画面準備中');
@@ -70,10 +70,10 @@ it('shows every space to administrators and filters apps by space', function () 
         ->assertSet('spaceScope', 'all')
         ->assertSee('製造スペース')
         ->assertSee('08. 日報入力')
-        ->assertSee('04. 受注入力')
+        ->assertSee('06. 売上入力')
         ->call('showSpace', $this->factory->id)
         ->assertSee('08. 日報入力')
-        ->assertDontSee('04. 受注入力')
+        ->assertDontSee('06. 売上入力')
         ->set('spaceScope', 'joined')
         ->assertSee('参加中のスペースはありません。');
 });
@@ -144,7 +144,7 @@ it('lets administrators choose アプリショートカット, shown only when t
     $this->actingAs($this->employee);
     Livewire::test(PortalPage::class)
         ->assertSee('アプリショートカット')
-        ->assertSee('受注入力')
+        ->assertSee('売上入力')
         ->assertDontSee('日報入力')
         ->assertActionHidden('editShortcuts');
 });
@@ -181,7 +181,7 @@ it('shows apps in every stage to super admins only, dimmed while not 公開中',
 
     $this->actingAs($this->admin);
     Livewire::test(PortalPage::class)
-        ->assertSee('04. 受注入力')
+        ->assertSee('06. 売上入力')
         ->assertDontSee('05. 納品(仕入)入力')
         ->assertDontSee('09. 見積書管理')
         ->assertDontSeeHtml('class="sfk-row sfk-unpublished"');

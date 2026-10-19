@@ -31,6 +31,10 @@ final class InlineField
 
     private const USERS = 'users';
 
+    private const DATE = 'date';
+
+    private const TIME = 'time';
+
     private bool $required = false;
 
     private ?int $maxLength = null;
@@ -38,6 +42,8 @@ final class InlineField
     private ?int $minValue = null;
 
     private ?int $maxValue = null;
+
+    private ?int $greaterThan = null;
 
     private int $decimals = 0;
 
@@ -74,6 +80,18 @@ final class InlineField
         $field->decimals = $decimals;
 
         return $field;
+    }
+
+    /** A date (Y-m-d). */
+    public static function date(string $name): self
+    {
+        return new self($name, self::DATE);
+    }
+
+    /** A time of day (H:i). */
+    public static function time(string $name): self
+    {
+        return new self($name, self::TIME);
     }
 
     /** @param  array<int|string, string>  $options  drop-down (with 「-----」 for blank unless required) or radio buttons */
@@ -124,6 +142,14 @@ final class InlineField
     public function maxValue(int $value): self
     {
         $this->maxValue = $value;
+
+        return $this;
+    }
+
+    /** The number must be more than the value (e.g. 0 for a quantity). */
+    public function greaterThan(int $value): self
+    {
+        $this->greaterThan = $value;
 
         return $this;
     }
@@ -191,7 +217,10 @@ final class InlineField
                 ...($this->decimals > 0 ? ['numeric', 'decimal:0,'.$this->decimals] : ['integer']),
                 $this->minValue !== null ? 'min:'.$this->minValue : null,
                 $this->maxValue !== null ? 'max:'.$this->maxValue : null,
+                $this->greaterThan !== null ? 'gt:'.$this->greaterThan : null,
             ]))],
+            self::DATE => [$this->name => [$presence, 'date_format:Y-m-d']],
+            self::TIME => [$this->name => [$presence, 'regex:/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/']],
             default => [$this->name => array_values(array_filter([
                 $presence,
                 'string',
@@ -224,6 +253,8 @@ final class InlineField
                     fn (int|string $value): bool => ! in_array((string) $value, $this->retired, true) || (string) $value === (string) $state,
                     ARRAY_FILTER_USE_KEY,
                 )).'</select>',
+            self::DATE => '<input type="date" class="sfk-inline-input" wire:model="'.$model.'" '.$keys.' '.$aria.'>',
+            self::TIME => '<input type="time" class="sfk-inline-input" wire:model="'.$model.'" '.$keys.' '.$aria.'>',
             self::USERS => '<select class="sfk-inline-input sfk-inline-users" multiple size="4" wire:model="'.$model.'" '.$aria.'>'
                 .self::optionsHtml(self::userOptions(array_map('intval', (array) $state))).'</select>',
             self::CHECKBOXES => '<div class="sfk-inline-checks" role="group" '.$aria.'>'.implode('', array_map(

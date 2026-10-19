@@ -26,6 +26,15 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   grey. No table column is bold (no `->weight()` on table columns; the theme forces normal weight in table cells —
   only the header row is bold). App lists show the paging 「1 - 100（N件中）」 at the right end of the search row (Core render hook). On a record page every toolbar button sits on the right: 編集, 再利用, 「…」 (印刷 / 削除), gear, ‹ ›
   (Core `app-header`, nothing per app).
+- The new-record page resembles the legacy create page: legacy field order and widths, legacy labels, drop-downs
+  showing 「-----」 when blank, lookups listing their choices when opened. Table fields (サブテーブル) are built with
+  `Modules\Core\Filament\Records\RecordTable::form()` / `entry()`: legacy column widths, the first row always shown,
+  ⊕ / ⊖ at the end of each row, empty rows not saved; drop-downs inside a table are native selects (a custom
+  drop-down is cut off by the table's scroll box).
+- On record forms every field is either typeable or visibly not: inputs that cannot be changed are `->disabled()`,
+  and calculated values / lookup copies are shown with an entry (`TextEntry`, state from the form) — the Core theme
+  draws both as a grey disabled input with the not-allowed cursor. Never show a non-editable value that looks like
+  an input, and never leave an editable field looking disabled.
 - App lists are filtered only through the shared 絞り込む dialog (legacy design, `design_ref/filter1-3.png`): return the
   app's fields from `filterFields()` on its `AppListRecords` page (`Modules\Core\Application\Filters\FilterField`:
   text / textarea / number / date / dateTime / choice / user, `relationship()` or `query()` for special storage). Do not

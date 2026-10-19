@@ -1,0 +1,13 @@
+{
+    "name": "Orders",
+    "slug": "orders",
+    "type": "business",
+    "description": "Orders: 04 受注入力 (jobs / 注番, estimate, actual costs)",
+    "version": "0.1.0",
+    "provider": "Modules\\Orders\\Providers\\OrdersServiceProvider",
+    "filament_plugin": "Modules\\Orders\\Filament\\OrdersPlugin",
+    "panel": "erp",
+    "depends_on": ["core", "erp", "master-data"],
+    "enabled": true,
+    "order": 200
+}

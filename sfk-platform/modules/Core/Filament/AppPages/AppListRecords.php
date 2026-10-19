@@ -7,6 +7,7 @@ namespace Modules\Core\Filament\AppPages;
 use App\Models\User;
 use BackedEnum;
 use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\Radio;
@@ -684,6 +685,7 @@ abstract class AppListRecords extends ListRecords
             $value = array_key_exists($field->name, $columns) ? $record->getAttribute($field->name) : null;
             $state[$field->name] = match (true) {
                 $value instanceof BackedEnum => (string) $value->value,
+                $value instanceof DateTimeInterface => $value->format('Y-m-d'),
                 $field->isBoolean() => (bool) $value,
                 $field->isMultiple() => array_values((array) $value),
                 default => $value,
