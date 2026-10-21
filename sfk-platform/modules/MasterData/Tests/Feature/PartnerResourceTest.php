@@ -114,6 +114,12 @@ it('creates a partner like the legacy form and shows the saved record', function
         ->and($partner->updated_by)->toBe($this->admin->id);
 });
 
+/** CSS of a page without whitespace, so rules are found however the theme is formatted. */
+function compactCss(string $css): string
+{
+    return (string) preg_replace('/\s+/', '', $css);
+}
+
 function ViewPartnerUrl(Partner $partner): string
 {
     return PartnerResource::getUrl('view', ['record' => $partner]);
@@ -243,7 +249,7 @@ it('puts 編集, 再利用 and 「…」 (印刷 / 削除) on the right of the r
         ->and(strpos($toolbar, 'レコードを編集する'))->toBeLessThan(strpos($toolbar, 'レコードを再利用する'))
         ->and(strpos($toolbar, 'レコードを再利用する'))->toBeLessThan(strpos($toolbar, 'その他の操作'))
         ->and(strpos($toolbar, 'その他の操作'))->toBeLessThan(strpos($toolbar, 'レコードの移動'))
-        ->and($html)->toContain('*, *::before, *::after { border-radius: 0 !important; }');
+        ->and(compactCss($html))->toContain(compactCss('*, *::before, *::after { border-radius: 0 !important; }'));
 });
 
 it('hides the pencil and 削除する from employees who may only view', function () {
@@ -382,8 +388,8 @@ it('puts the paging right of the search box and shows table headers and field na
         ->and(strpos($toolbar, 'fi-ta-search-field'))->toBeLessThan(strpos($toolbar, 'sfk-app-pager'))
         ->and($html)->toContain('--kt-label: #000000;')
         ->and($html)->toContain('.fi-ta-header-cell {'."\n".'        color: var(--kt-label);')
-        ->and($html)->toContain('.kt-record .fi-in-entry-label { font-size: .75rem; font-weight: 400; color: var(--kt-label); }')
-        ->and($html)->toContain('.fi-fo-field-label-content { font-size: .8125rem; color: var(--kt-label); }');
+        ->and(compactCss($html))->toContain(compactCss('.kt-record .fi-in-entry-label { font-size: .75rem; font-weight: 400; color: var(--kt-label); }'))
+        ->and(compactCss($html))->toContain(compactCss('.fi-fo-field-label-content { font-size: .8125rem; color: var(--kt-label); }'));
 });
 
 it('shows no column of the list in bold, 取引先名 included', function () {
@@ -393,10 +399,8 @@ it('shows no column of the list in bold, 取引先名 included', function () {
 
     expect(Livewire::test(ListPartners::class)->instance()->getTable()->getColumn('name')->getWeight())->toBeNull();
 
-    $this->get('/erp/partners')
-        ->assertOk()
-        ->assertDontSee('fi-font-semibold', false)
-        ->assertSee('.fi-ta-table > tbody td, .fi-ta-table > tbody td * { font-weight: 400 !important; }', false);
+    $html = $this->get('/erp/partners')->assertOk()->assertDontSee('fi-font-semibold', false)->getContent();
+    expect(compactCss($html))->toContain(compactCss('.fi-ta-table>tbody td, .fi-ta-table>tbody td * { font-weight: 400 !important; }'));
 });
 
 it('pages through the list 100 records at a time', function () {
@@ -812,10 +816,9 @@ it('offers 200 and 300 件 in 表示件数', function () {
 it('puts the search box on the left and one horizontal scroll at the end of the list', function () {
     $this->actingAs($this->admin);
 
-    $this->get('/erp/partners')
-        ->assertOk()
-        ->assertSee('.sfk-app-page-list .fi-ta-header-toolbar > :not(.fi-ta-actions) { order: -1; margin-inline-start: 0; }', escape: false)
-        ->assertSee('.sfk-app-page-list .fi-ta-main { overflow-x: auto; }', escape: false);
+    $html = compactCss($this->get('/erp/partners')->assertOk()->getContent());
+    expect($html)->toContain(compactCss('.sfk-app-page-list .fi-ta-header-toolbar>:not(.fi-ta-actions) { order: -1; margin-inline-start: 0; }'))
+        ->and($html)->toContain(compactCss('.sfk-app-page-list .fi-ta-main { overflow-x: auto; }'));
 });
 
 /*

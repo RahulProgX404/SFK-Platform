@@ -20,6 +20,7 @@ use Modules\Core\Domain\Views\ListViewType;
  * @property list<string>|null $columns 表形式: the columns, in order
  * @property string|null $date_field カレンダー形式: 日付
  * @property string|null $title_field カレンダー形式: タイトル
+ * @property string|null $custom_view カスタマイズ形式: the app's screen (AppListRecords::customListViews())
  * @property array<string, mixed> $filter Modules\Core\Domain\Filters\RecordFilter::toArray()
  * @property int $sort_order
  * @property int|null $created_by
@@ -27,7 +28,7 @@ use Modules\Core\Domain\Views\ListViewType;
  */
 final class AppListView extends Model
 {
-    protected $fillable = ['business_app_id', 'name', 'type', 'columns', 'date_field', 'title_field', 'filter', 'sort_order', 'created_by'];
+    protected $fillable = ['business_app_id', 'name', 'type', 'columns', 'date_field', 'title_field', 'custom_view', 'filter', 'sort_order', 'created_by'];
 
     protected $attributes = [
         'type' => 'table',

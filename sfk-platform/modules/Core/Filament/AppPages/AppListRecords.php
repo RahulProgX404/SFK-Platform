@@ -48,7 +48,8 @@ use Modules\Core\Filament\Tables\InlineField;
  * core::filament.app-filter); ＋ / gear (アプリの設定) / 「…」 (optionActions() and 表示件数); 「1 - 100（N件中）」 paging.
  * Every database column sorts by a click on its header (昇順 ⇄ 降順); the search box sits on the left.
  * A 表形式 view shows its columns in its order (viewColumns(), read by the app's table), a カレンダー形式 view a month
- * calendar of the records by its 日付 field (core::filament.app-calendar).
+ * calendar of the records by its 日付 field (core::filament.app-calendar), a カスタマイズ形式 view the app's screen of
+ * customListViews() over the records of the view (core::filament.app-custom-view; e.g. a Gantt chart).
  *
  * An app supplies listColumns() (every column, the order of （すべて）), defaultListViews() (stored the first time) and
  * filterFields(). 絞り込む: 適用 filters for the session (dropped when the view changes), 保存 (administrators) stores
@@ -121,6 +122,25 @@ abstract class AppListRecords extends ListRecords
     public function filterFields(): array
     {
         return [];
+    }
+
+    /**
+     * The app's カスタマイズ形式 screens: key (stored on the view, ListView::custom()) => Blade view, drawn with `$page`
+     * (this page; e.g. getFilteredTableQuery() gives the records of the view).
+     *
+     * @return array<string, string>
+     */
+    public function customListViews(): array
+    {
+        return [];
+    }
+
+    /** The Blade view of the current カスタマイズ形式 view (null when the app no longer has it). */
+    public function customViewTemplate(): ?string
+    {
+        $view = $this->currentView();
+
+        return $view->isCustom() ? ($this->customListViews()[(string) $view->customView] ?? null) : null;
     }
 
     /**
@@ -322,9 +342,10 @@ abstract class AppListRecords extends ListRecords
         return $schema->components([
             RenderHook::make(PanelsRenderHook::RESOURCE_PAGES_LIST_RECORDS_TABLE_BEFORE),
             ViewComponent::make('core::filament.app-calendar')->visible(fn (): bool => $this->currentView()->isCalendar()),
-            EmbeddedTable::make()->visible(fn (): bool => ! $this->currentView()->isCalendar()),
+            ViewComponent::make('core::filament.app-custom-view')->visible(fn (): bool => $this->currentView()->isCustom()),
+            EmbeddedTable::make()->visible(fn (): bool => $this->currentView()->isTable()),
             // horizontal scroll at the bottom of the screen while the end of the table is out of view
-            ViewComponent::make('core::filament.app-list-scrollbar')->visible(fn (): bool => ! $this->currentView()->isCalendar()),
+            ViewComponent::make('core::filament.app-list-scrollbar')->visible(fn (): bool => $this->currentView()->isTable()),
             RenderHook::make(PanelsRenderHook::RESOURCE_PAGES_LIST_RECORDS_TABLE_AFTER),
         ]);
     }
@@ -456,7 +477,7 @@ abstract class AppListRecords extends ListRecords
     /** @return array{from: int, to: int, total: int, previous: bool, next: bool}|null */
     public function appPager(): ?array
     {
-        if ($this->currentView()->isCalendar()) {
+        if (! $this->currentView()->isTable()) {
             return null;
         }
 
@@ -602,7 +623,7 @@ abstract class AppListRecords extends ListRecords
                 Action::make('pageSize')
                     ->label('表示件数')
                     ->icon(Heroicon::OutlinedQueueList)
-                    ->hidden(fn (): bool => $this->currentView()->isCalendar())
+                    ->hidden(fn (): bool => ! $this->currentView()->isTable())
                     ->modalHeading('表示件数')
                     ->modalWidth('md')
                     ->modalSubmitActionLabel('保存')

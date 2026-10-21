@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
 use Modules\Core\Domain\Money\RoundingMode;
 use Modules\Core\Filament\Records\RecordTable;
+use Modules\Core\Filament\Records\RelatedLists;
 use Modules\Core\Filament\Support\UserPopup;
 use Modules\MasterData\Models\Partner;
 use Modules\Orders\Domain\Orders\JobCosting;
@@ -100,8 +101,8 @@ final class OrderInfolist
             str_starts_with($name, 'work_sheet_') => $entry
                 ->state(fn (Order $record): array => array_map('basename', (array) $record->getAttribute($name)))
                 ->listWithLineBreaks(),
-            // related records: empty while there are none (no message)
-            $name === 'daily_reports', $name === 'purchase_history' => $entry->state(null)->placeholder(''),
+            // related records of other apps: empty while there are none (no message)
+            $name === 'daily_reports', $name === 'purchase_history' => RelatedLists::entry('orders.'.$name, OrderLayout::label($name)),
             default => $entry,
         };
     }

@@ -44,6 +44,16 @@
         .sfk-unpublished { opacity: .45; }
         .sfk-unpublished:hover { opacity: .8; }
 
+        /* アプリの並び替え (⚙ of アプリ, administrators) */
+        .sfk-app-order { margin: 0; padding: 0; list-style: none; }
+        .sfk-app-order-row { display: flex; align-items: center; gap: .625rem; min-height: 3rem; padding: 0 .75rem 0 .25rem; margin-top: -1px; background: #fff; border: 1px solid var(--kt-border, #e3e7e8); font-size: .875rem; }
+        .sfk-app-order-row:hover { background: var(--kt-blue-soft, #ebf5fb); }
+        .sfk-app-order-row.fi-sortable-ghost { opacity: .4; }
+        .sfk-app-order-handle { display: inline-flex; align-items: center; justify-content: center; width: 1.75rem; height: 2.25rem; color: #bbb; cursor: grab; }
+        .sfk-app-order-handle:hover { color: var(--kt-blue, #3498db); }
+        .sfk-app-order-handle-icon { width: 1.125rem; height: 1.125rem; }
+        .sfk-app-order-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
         .sfk-notice-body { padding: 1.25rem 1.5rem; }
         .sfk-notice-content { font-size: .9375rem; line-height: 1.8; }
         .sfk-notice-content h2 { font-size: 1.5rem; font-weight: 700; margin: .25rem 0 .75rem; }
@@ -168,11 +178,14 @@
                     <header class="sfk-panel-head">
                         <span class="sfk-panel-icon is-app" aria-hidden="true"><x-filament::icon icon="heroicon-o-list-bullet" /></span>
                         <h2 id="sfk-app-title" class="sfk-panel-title">アプリ</h2>
-                        @if ($appsSettingsUrl !== null)
+                        @if ($appsSettingsUrl !== null || $isAdministrator)
                             <div class="sfk-panel-tools">
-                                <a href="{{ $appsSettingsUrl }}" class="sfk-add" title="アプリ設定" aria-label="アプリ設定">
-                                    <x-filament::icon icon="heroicon-m-plus" />
-                                </a>
+                                @if ($appsSettingsUrl !== null)
+                                    <a href="{{ $appsSettingsUrl }}" class="sfk-add" title="アプリ設定" aria-label="アプリ設定">
+                                        <x-filament::icon icon="heroicon-m-plus" />
+                                    </a>
+                                @endif
+                                {{ $this->reorderAppsAction }}
                             </div>
                         @endif
                     </header>

@@ -31,6 +31,7 @@ final readonly class ListView
         public ?string $dateField = null,
         public ?string $titleField = null,
         public ?int $id = null,
+        public ?string $customView = null,
     ) {}
 
     /**
@@ -55,6 +56,17 @@ final readonly class ListView
         return new self($key, $name, ListViewType::Calendar, [], ['match' => 'and', 'conditions' => $conditions, 'sorts' => []], $dateField, $titleField);
     }
 
+    /**
+     * A カスタマイズ形式 default view of an app: the app's screen `$customView` (AppListRecords::customListViews()) over the
+     * records of the view's conditions.
+     *
+     * @param  list<array<string, mixed>>  $conditions
+     */
+    public static function custom(string $key, string $name, string $customView, array $conditions = []): self
+    {
+        return new self($key, $name, ListViewType::Custom, [], ['match' => 'and', 'conditions' => $conditions, 'sorts' => []], customView: $customView);
+    }
+
     /** @param  list<string>  $columns  every column of the app */
     public static function all(array $columns): self
     {
@@ -72,6 +84,7 @@ final readonly class ListView
             $view->date_field,
             $view->title_field,
             $view->id,
+            $view->custom_view,
         );
     }
 
@@ -85,7 +98,18 @@ final readonly class ListView
         return $this->type === ListViewType::Calendar;
     }
 
-    /** @return array{key: string, id: int|null, name: string, type: string, columns: list<string>, filter: array<string, mixed>, dateField: string|null, titleField: string|null} */
+    public function isCustom(): bool
+    {
+        return $this->type === ListViewType::Custom;
+    }
+
+    /** 表形式: the records as table rows. */
+    public function isTable(): bool
+    {
+        return $this->type === ListViewType::Table;
+    }
+
+    /** @return array{key: string, id: int|null, name: string, type: string, columns: list<string>, filter: array<string, mixed>, dateField: string|null, titleField: string|null, customView: string|null} */
     public function toArray(): array
     {
         return [
@@ -97,6 +121,7 @@ final readonly class ListView
             'filter' => $this->filter,
             'dateField' => $this->dateField,
             'titleField' => $this->titleField,
+            'customView' => $this->customView,
         ];
     }
 }

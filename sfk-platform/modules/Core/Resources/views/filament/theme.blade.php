@@ -2709,7 +2709,7 @@
         color: var(--kt-label);
     }
 
-    /* Dashboard name with switcher (core::filament.dashboard-switcher) replaces the panel brand */
+    /* Dashboard name (core::filament.dashboard-switcher, a link to the ポータル) replaces the panel brand */
     .fi-sidebar-header-logo-ctn,
     .fi-topbar-start>a:has(> .fi-logo) {
         display: none !important;
@@ -2733,7 +2733,7 @@
     }
 
     .sfk-dashboard-switcher-btn:hover {
-        background: var(--kt-blue-soft);
+        background: transparent;
         color: var(--kt-blue);
     }
 

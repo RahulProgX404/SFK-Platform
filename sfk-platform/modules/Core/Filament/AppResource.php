@@ -62,6 +62,23 @@ abstract class AppResource extends Resource
     }
 
     /**
+     * URL of the new-record page of an app in the given panel (e.g. a legacy app action starting a record of another app),
+     * or null while the app is not there or the user may not add records to it.
+     *
+     * @param  array<string, mixed>  $parameters  query of the page
+     */
+    public static function createUrlForApp(string $appCode, Panel $panel, array $parameters = []): ?string
+    {
+        foreach ($panel->getResources() as $resource) {
+            if (is_subclass_of($resource, self::class) && $resource::appCode() === $appCode) {
+                return $resource::hasPage('create') && $resource::canCreate() ? $resource::getUrl('create', $parameters, panel: $panel->getId()) : null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Codes of the apps whose screens live in the given panel (dashboard).
      *
      * @return list<string>

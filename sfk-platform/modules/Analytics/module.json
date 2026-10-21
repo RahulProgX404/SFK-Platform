@@ -1,0 +1,13 @@
+{
+    "name": "Analytics",
+    "slug": "analytics",
+    "type": "business",
+    "description": "Analytics: 22 過去の売上データ (past sales per salesperson and fiscal year, with charts), 25 販売先別売上計画 (sales plan vs actual per customer)",
+    "version": "0.1.0",
+    "provider": "Modules\\Analytics\\Providers\\AnalyticsServiceProvider",
+    "filament_plugin": "Modules\\Analytics\\Filament\\AnalyticsPlugin",
+    "panel": "erp",
+    "depends_on": ["core", "erp", "master-data", "sales"],
+    "enabled": true,
+    "order": 600
+}

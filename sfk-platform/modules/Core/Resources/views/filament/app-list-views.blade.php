@@ -3,7 +3,8 @@
     - 作成済みの一覧: ＋ 一覧を追加する; rows with ドラッグして並び替え, the 表示形式 icon, 一覧名 and 編集 / 複製 / 削除;
       （すべて） last without handle or actions.
     - 一覧 screen: 一覧名, レコード一覧の表示形式, the columns of 表形式 (field list with search and すべて追加 on the left,
-      the columns as a header row on the right: drag to reorder, ⚙ → 左へ移動 / 右へ移動 / 削除, すべてクリア), 日付 / タイトル of カレンダー形式,
+      the columns as a header row on the right: drag to reorder, ⚙ → 左へ移動 / 右へ移動 / 削除, すべてクリア), 日付 / タイトル of カレンダー形式
+      (カスタマイズ形式 — an app's screen — only on the views that have it),
       絞り込み and ソート (core::filament.filter-editor), キャンセル / 保存. Behaviour: sfkViewEditor
       (core::filament.app-filter-script).
 --}}
@@ -37,7 +38,7 @@
                             <span class="fi-sr-only">ドラッグして並び替え</span>
                         </button>
                         <x-filament::icon
-                            :icon="$view->type === ListViewType::Calendar ? Heroicon::OutlinedCalendarDays : Heroicon::OutlinedTableCells"
+                            :icon="match ($view->type) { ListViewType::Calendar => Heroicon::OutlinedCalendarDays, ListViewType::Custom => Heroicon::OutlinedChartBar, default => Heroicon::OutlinedTableCells }"
                             class="sfk-views-type"
                             :title="$view->type->label()"
                         />
@@ -83,6 +84,14 @@
                         <x-filament::icon :icon="Heroicon::OutlinedCalendarDays" class="sfk-view-type-icon" />
                         カレンダー形式
                     </label>
+                    {{-- カスタマイズ形式 comes from the app: only a view that has it can keep it --}}
+                    @if ($this->editedView()?->type === ListViewType::Custom)
+                        <label class="sfk-view-type" :class="{ 'is-active': type === 'custom' }">
+                            <input type="radio" value="custom" x-model="type" class="fi-sr-only">
+                            <x-filament::icon :icon="Heroicon::OutlinedChartBar" class="sfk-view-type-icon" />
+                            カスタマイズ形式
+                        </label>
+                    @endif
                 </div>
 
                 {{-- 表形式: field list → columns --}}

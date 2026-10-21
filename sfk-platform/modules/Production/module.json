@@ -1,0 +1,13 @@
+{
+    "name": "Production",
+    "slug": "production",
+    "type": "business",
+    "description": "Production: 08 日報入力 (daily reports per task, job costing, box usage), 12 製袋予定管理 (machine schedule with Gantt charts), 14 事故報告管理 (incidents)",
+    "version": "0.1.0",
+    "provider": "Modules\\Production\\Providers\\ProductionServiceProvider",
+    "filament_plugin": "Modules\\Production\\Filament\\ProductionPlugin",
+    "panel": "erp",
+    "depends_on": ["core", "erp", "master-data", "orders"],
+    "enabled": true,
+    "order": 400
+}

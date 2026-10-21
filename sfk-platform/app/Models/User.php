@@ -17,8 +17,10 @@ use Illuminate\Support\Facades\DB;
 use Modules\Core\Access\DashboardAccess;
 use Modules\Core\Access\EmployeeDataAccess;
 use Modules\Core\Access\UserType;
+use Modules\Core\Application\Comments\HasRecordComments;
 use Modules\Core\Domain\People\EmploymentStatus;
 use Modules\Core\Domain\People\Gender;
+use Modules\Core\Models\Concerns\RecordsComments;
 use Modules\Core\Models\EmployeeCategory;
 use Modules\Core\Models\Position;
 use Modules\Core\Models\Space;
@@ -31,7 +33,8 @@ use Modules\Core\Models\Space;
  * the authorization checks. The employee profile (氏名, 在籍状況, 役職 …)
  * lives on the same record (SYSTEM_BRAIN APP_02 "Employee ↔ system user link"). The employee-master
  * codes, category and hourly rates are administrator-only; the rates are confidential and hidden from
- * serialization — see {@see EmployeeDataAccess}.
+ * serialization — see {@see EmployeeDataAccess}. The user is also the record of the app 02. 従業員マスタ and takes its
+ * コメント (only the 宛先 are notified: users have no 作成者 / 更新者).
  *
  * @property int $id
  * @property string $name
@@ -63,10 +66,12 @@ use Modules\Core\Models\Space;
     'emergency_contact_name', 'emergency_contact_phone', 'notes',
 ])]
 #[Hidden(['password', 'remember_token', 'work_rate', 'overtime_rate'])]
-class User extends Authenticatable implements FilamentUser
+class User extends Authenticatable implements FilamentUser, HasRecordComments
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
+
+    use RecordsComments;
 
     /** @var array<string, mixed> */
     protected $attributes = [

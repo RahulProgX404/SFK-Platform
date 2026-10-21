@@ -1,0 +1,13 @@
+{
+    "name": "Sales",
+    "slug": "sales",
+    "type": "business",
+    "description": "Sales & receivables: 06 売上入力, 10 納品書管理, 11 請求書管理, 21 売入金管理, 23 売掛管理, 23-2 売掛管理(締日別)",
+    "version": "0.1.0",
+    "provider": "Modules\\Sales\\Providers\\SalesServiceProvider",
+    "filament_plugin": "Modules\\Sales\\Filament\\SalesPlugin",
+    "panel": "erp",
+    "depends_on": ["core", "erp", "master-data", "orders"],
+    "enabled": true,
+    "order": 300
+}

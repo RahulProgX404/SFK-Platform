@@ -81,4 +81,33 @@ final class AppLifecycle
 
         return $app;
     }
+
+    /**
+     * Puts the given apps in this order (アプリ list of a dashboard's ポータル, administrators). Other apps — e.g. those
+     * of other dashboards or hidden from the actor — keep their places; the whole registry is then numbered 1, 2, …
+     *
+     * @param  list<int>  $ids
+     */
+    public function reorder(array $ids, User $actor): void
+    {
+        if (! $actor->user_type->isAdministrator()) {
+            throw new AppActionNotAllowed('アプリの並び順を変更する権限がありません。');
+        }
+
+        DB::transaction(function () use ($ids): void {
+            $all = array_map('intval', BusinessApp::query()->orderBy('sort_order')->orderBy('id')->lockForUpdate()->pluck('id')->all());
+            $moved = array_values(array_unique(array_intersect($ids, $all)));
+
+            // the slots of the moved apps, in registry order, are filled with them in the new order
+            $order = [];
+            $next = 0;
+            foreach ($all as $id) {
+                $order[] = in_array($id, $moved, true) ? $moved[$next++] : $id;
+            }
+
+            foreach ($order as $index => $id) {
+                BusinessApp::query()->whereKey($id)->where('sort_order', '!=', $index + 1)->update(['sort_order' => $index + 1]);
+            }
+        });
+    }
 }

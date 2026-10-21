@@ -65,6 +65,7 @@ final class ListViewService
                         'columns' => $default->columns,
                         'date_field' => $default->dateField,
                         'title_field' => $default->titleField,
+                        'custom_view' => $default->customView,
                         'filter' => $default->filter,
                         'sort_order' => $index + 1,
                     ]);
@@ -98,6 +99,10 @@ final class ListViewService
         }
 
         $type = ListViewType::tryFrom(is_string($input['type'] ?? null) ? $input['type'] : '') ?? ListViewType::Table;
+        // カスタマイズ形式 comes from the app: a view keeps it, nothing else becomes one
+        if ($type === ListViewType::Custom && $view?->type !== ListViewType::Custom) {
+            $type = ListViewType::Table;
+        }
         $columns = [];
         $dateField = null;
         $titleField = null;
@@ -108,7 +113,7 @@ final class ListViewService
             if ($columns === []) {
                 $errors['columns'] = '表示するフィールドを1つ以上配置してください。';
             }
-        } else {
+        } elseif ($type === ListViewType::Calendar) {
             $dateField = is_string($input['dateField'] ?? null) && array_key_exists($input['dateField'], $schema->dateFields()) ? $input['dateField'] : null;
             $titleField = is_string($input['titleField'] ?? null) && array_key_exists($input['titleField'], $schema->titleFields()) ? $input['titleField'] : null;
             if ($dateField === null) {
@@ -129,6 +134,7 @@ final class ListViewService
             'columns' => $type === ListViewType::Table ? $columns : null,
             'date_field' => $dateField,
             'title_field' => $titleField,
+            'custom_view' => $type === ListViewType::Custom ? $view->custom_view : null,
             'filter' => RecordFilter::fromArray($input['filter'] ?? [], $schema->filterTypes(), $schema->sortableFields())->toArray(),
         ];
 
@@ -160,6 +166,7 @@ final class ListViewService
             'columns' => $view->columns,
             'date_field' => $view->date_field,
             'title_field' => $view->title_field,
+            'custom_view' => $view->custom_view,
             'filter' => $view->filter,
             'sort_order' => $this->nextSortOrder($app),
             'created_by' => $userId,

@@ -2,7 +2,7 @@
     "name": "MasterData",
     "slug": "master-data",
     "type": "business",
-    "description": "Masters: 01 取引先マスタ (partners), 03 機械マスタ (machines); later employees, consumables.",
+    "description": "Masters: 01 取引先マスタ (partners), 02 従業員マスタ (employees = users, maintained in ユーザー管理), 03 機械マスタ (machines), 19 消耗品マスタ (consumables with a stock ledger).",
     "version": "0.1.0",
     "provider": "Modules\\MasterData\\Providers\\MasterDataServiceProvider",
     "filament_plugin": "Modules\\MasterData\\Filament\\MasterDataPlugin",

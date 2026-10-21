@@ -1,0 +1,13 @@
+{
+    "name": "Purchasing",
+    "slug": "purchasing",
+    "type": "business",
+    "description": "Purchasing & payables: 05 納品(仕入)入力, 07 支払入力, 15 運送請求データ取込, 20 消耗品発注, 23 買掛管理",
+    "version": "0.1.0",
+    "provider": "Modules\\Purchasing\\Providers\\PurchasingServiceProvider",
+    "filament_plugin": "Modules\\Purchasing\\Filament\\PurchasingPlugin",
+    "panel": "erp",
+    "depends_on": ["core", "erp", "master-data", "orders"],
+    "enabled": true,
+    "order": 310
+}

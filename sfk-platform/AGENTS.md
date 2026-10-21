@@ -44,6 +44,9 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   views.md; stored once) and `filterFields()`; its table builds columns from `viewColumns()`; its 「…」 entries go in
   `optionActions()` (表示件数 is added by Core). Register a `views` page (subclass of `AppListViewSettings`, before
   `view`) for アプリの設定 → 一覧: 追加 / 編集 / 複製 / 削除 / drag order (top = default), 表形式 or カレンダー形式.
+  A legacy CUSTOM view (e.g. Gantt chart, graph) is a カスタマイズ形式 view: `ListView::custom($key, $name, $screen)` in
+  `defaultListViews()` and `customListViews()` (screen => Blade view, drawn with `$page`; read the view's records with
+  `$page->getFilteredTableQuery()`); it cannot be created in the 一覧 editor, only renamed / filtered / copied / deleted.
 - App lists (Core, automatic): search box on the left, one horizontal scroll with its bar at the end of the table (and a synced copy fixed at the bottom of the screen while the end of the table is out of view),
   表示件数 20–300 per user, and every column sorts on a header click (昇順 ⇄ 降順). Database columns become sortable by
   themselves; give computed columns (state from relations or flags) `->sortable(query: …)`.

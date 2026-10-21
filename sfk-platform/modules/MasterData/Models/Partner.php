@@ -49,6 +49,8 @@ use Modules\MasterData\Domain\Partners\PurchaseCategory;
  * @property RoundingMode|null $rounding
  * @property RoundingMode|null $supplier_rounding
  * @property ClosingDay|null $closing_day
+ * @property PurchaseCategory|null $purchase_category
+ * @property TaxMode|null $supplier_tax_mode
  * @property int|null $created_by
  * @property int|null $updated_by
  */

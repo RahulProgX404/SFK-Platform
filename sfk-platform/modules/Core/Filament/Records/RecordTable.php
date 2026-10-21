@@ -18,7 +18,8 @@ use Illuminate\Database\Eloquent\Model;
  * table scrolls sideways inside the record instead of squeezing the inputs), the form always shows at least one row
  * — the first row is there on a new record — and every row ends with ⊕ (行を追加する: a new row below it) and ⊖
  * (行を削除する, not on the last remaining row), like the legacy form. Rows left completely empty are not saved
- * (an existing row emptied is deleted). Drop-downs inside a table must be native selects so their list is not cut
+ * (an existing row emptied is deleted) — a column's default value alone (`$defaults`, e.g. a 税率 preset to 10%)
+ * does not count as filled in. Drop-downs inside a table must be native selects so their list is not cut
  * off by the table's scroll box.
  */
 final class RecordTable
@@ -28,8 +29,9 @@ final class RecordTable
 
     /**
      * @param  list<array{0: string, 1: int}>  $columns  [label, width px] in the order of the repeater's schema
+     * @param  array<string, mixed>  $defaults  column => default value of the row inputs
      */
-    public static function form(Repeater $repeater, array $columns): Repeater
+    public static function form(Repeater $repeater, array $columns, array $defaults = []): Repeater
     {
         return $repeater
             ->table(array_map(fn (array $column): TableColumn => TableColumn::make($column[0])->width($column[1].'px'), $columns))
@@ -45,9 +47,9 @@ final class RecordTable
                 ->size(Size::Large)
                 ->visible(fn (Repeater $component): bool => count($component->getRawState() ?? []) > 1))
             ->afterStateHydrated(fn (Repeater $component) => self::ensureRow($component))
-            ->mutateRelationshipDataBeforeCreateUsing(fn (array $data): ?array => self::isBlank($data) ? null : $data)
-            ->mutateRelationshipDataBeforeSaveUsing(function (array $data, Model $record): ?array {
-                if (self::isBlank($data)) {
+            ->mutateRelationshipDataBeforeCreateUsing(fn (array $data): ?array => self::isBlank($data, $defaults) ? null : $data)
+            ->mutateRelationshipDataBeforeSaveUsing(function (array $data, Model $record) use ($defaults): ?array {
+                if (self::isBlank($data, $defaults)) {
                     $record->delete();
 
                     return null;
@@ -70,14 +72,16 @@ final class RecordTable
     }
 
     /**
-     * A row with nothing filled in (the order column and unchecked boxes do not count).
+     * A row with nothing filled in (the order column, unchecked boxes and untouched defaults do not count).
      *
      * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $defaults
      */
-    public static function isBlank(array $data): bool
+    public static function isBlank(array $data, array $defaults = []): bool
     {
         foreach ($data as $key => $value) {
-            if ($key === 'sort' || $value === null || $value === '' || $value === false || $value === []) {
+            if ($key === 'sort' || $value === null || $value === '' || $value === false || $value === []
+                || (array_key_exists($key, $defaults) && $value === $defaults[$key])) {
                 continue;
             }
 

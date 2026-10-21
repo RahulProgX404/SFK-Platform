@@ -16,9 +16,11 @@ use Filament\Pages\Dashboard;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Route;
 use Modules\Core\Access\AppAccess;
+use Modules\Core\Application\Apps\AppLifecycle;
 use Modules\Core\Filament\AppResource;
 use Modules\Core\Filament\DashboardSettings\Resources\Spaces\SpaceResource;
 use Modules\Core\Models\BusinessApp;
@@ -27,8 +29,9 @@ use Modules\Core\Models\Space;
 
 /**
  * ポータル: the home page of a dashboard, laid out like the legacy portal — a greeting, the お知らせ with the
- * アプリショートカット (both edited by administrators), and on the right the スペース and アプリ lists. Everything is
- * scoped to the current dashboard and to what the user may open (spaces they belong to, apps they may view).
+ * アプリショートカット (both edited by administrators), and on the right the スペース and アプリ lists; the ⚙ of アプリ
+ * (administrators) changes the order of the apps by drag and drop. Everything is scoped to the current dashboard and to
+ * what the user may open (spaces they belong to, apps they may view).
  */
 final class PortalPage extends Dashboard
 {
@@ -37,6 +40,9 @@ final class PortalPage extends Dashboard
     protected static ?string $navigationLabel = 'ポータル';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedHome;
+
+    /** The dashboard name in the sidebar header leads here; the menu starts with ダッシュボード切替 instead. */
+    protected static bool $shouldRegisterNavigation = false;
 
     protected string $view = 'core::filament.portal';
 
@@ -162,6 +168,37 @@ final class PortalPage extends Dashboard
             });
     }
 
+    public function reorderAppsAction(): Action
+    {
+        return Action::make('reorderApps')
+            ->label('アプリの並び替え')
+            ->icon(Heroicon::OutlinedCog6Tooth)
+            ->iconButton()
+            ->color('gray')
+            ->visible(fn (): bool => self::isAdministrator())
+            ->modalHeading('アプリの並び替え')
+            ->modalWidth('lg')
+            ->modalContent(fn (): View => view('core::filament.portal-app-order', ['apps' => $this->visibleApps()]))
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel('閉じる');
+    }
+
+    /**
+     * Drop in アプリの並び替え: the apps of this dashboard the administrator sees, in their new order (applies at once).
+     *
+     * @param  list<int|string>  $ids
+     */
+    public function saveAppOrder(array $ids): void
+    {
+        $user = self::actor();
+        abort_unless($user !== null && self::isAdministrator(), 403);
+
+        $visible = $this->visibleApps()->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
+        $ids = array_values(array_intersect(array_map('intval', $ids), $visible));
+
+        app(AppLifecycle::class)->reorder($ids, $user);
+    }
+
     /**
      * Apps placed in this dashboard that the user may view (AppAccess), in registry order.
      *
@@ -184,6 +221,7 @@ final class PortalPage extends Dashboard
                 ->whereHas('space', fn ($query) => $query->where('panel_id', self::panelId()))
                 ->when($user->isSuperAdmin(), fn ($query) => $query->orWhereIn('code', $builtHere)))
             ->orderBy('sort_order')
+            ->orderBy('id')
             ->get()
             ->filter(fn (BusinessApp $app): bool => AppAccess::listsOnDashboard($user, $app))
             ->values();

@@ -1,0 +1,13 @@
+{
+    "name": "HumanResources",
+    "slug": "hr",
+    "type": "business",
+    "description": "HR & safety: 16 申請管理 (attendance requests with approval), 17 安全衛生チェック (safety checklists), 18 アルコールチェック (drivers' alcohol checks)",
+    "version": "0.1.0",
+    "provider": "Modules\\HumanResources\\Providers\\HumanResourcesServiceProvider",
+    "filament_plugin": "Modules\\HumanResources\\Filament\\HumanResourcesPlugin",
+    "panel": "erp",
+    "depends_on": ["core", "erp"],
+    "enabled": true,
+    "order": 500
+}

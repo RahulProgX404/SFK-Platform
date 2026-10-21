@@ -175,6 +175,7 @@ it('discovers app screens in module folders, including disabled modules', functi
     expect((new AppDiscovery([$root]))->definitions())->toBe(['order-entry' => '04. 受注入力'])
         ->and((new AppDiscovery([base_path('modules')]))->definitions())->toMatchArray([
             'partner-master' => '01. 取引先マスタ（得意先・仕入先）',
+            'employee-master' => '02. 従業員マスタ',
             'machine-master' => '03. 機械マスタ',
         ]);
 });

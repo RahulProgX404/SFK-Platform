@@ -2,7 +2,7 @@
     "name": "Orders",
     "slug": "orders",
     "type": "business",
-    "description": "Orders: 04 受注入力 (jobs / 注番, estimate, actual costs)",
+    "description": "Orders: 04 受注入力 (jobs / 注番, estimate, actual costs), 09 見積書管理 (quotations with quantity tiers)",
     "version": "0.1.0",
     "provider": "Modules\\Orders\\Providers\\OrdersServiceProvider",
     "filament_plugin": "Modules\\Orders\\Filament\\OrdersPlugin",

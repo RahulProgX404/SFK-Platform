@@ -86,28 +86,29 @@ it('sets the dashboards on the 従業員カテゴリ screen, without 共通管�
         ->and(EmployeeCategory::query()->where('name', '派遣')->value('dashboards'))->toBe(['erp']);
 });
 
-it('switches dashboards from the dashboard name instead of the user menu', function () {
+it('switches dashboards from the menu group ダッシュボード切替, the dashboard name leading to its ポータル', function () {
     $admin = grantDashboards(User::factory()->admin()->create(), 'erp');
 
     $this->actingAs($admin)->get('/erp')
         ->assertOk()
-        ->assertSee('ダッシュボードを切り替え（現在：白石封筒）')
-        ->assertSee('href="'.url('/settings').'"', escape: false)
+        ->assertSeeInOrder(['sfk-dashboard-switcher', 'href="'.url('/erp').'"', '白石封筒', 'data-group-label="ダッシュボード切替"', 'fi-active',
+            'href="'.url('/erp').'"', 'aria-current="page"', '白石封筒', 'href="'.url('/settings').'"', '共通管理'], escape: false)
+        ->assertDontSee('fi-sidebar-item-label">ポータル', escape: false)
         ->assertDontSee('に切り替え');
 
     $this->actingAs($admin)->get('/settings')
         ->assertOk()
-        ->assertSee('ダッシュボードを切り替え（現在：共通管理）')
-        ->assertSee('href="'.url('/erp').'"', escape: false);
+        ->assertSeeInOrder(['data-group-label="ダッシュボード切替"', 'href="'.url('/erp').'"', '白石封筒', 'fi-active', 'href="'.url('/settings').'"',
+            'aria-current="page"', '共通管理'], escape: false);
 });
 
-it('shows a single dashboard as a plain name without a dropdown', function () {
+it('lists a single dashboard in ダッシュボード切替 too', function () {
     $employee = grantDashboards(User::factory()->create(), 'erp');
 
     $this->actingAs($employee)->get('/erp')
         ->assertOk()
-        ->assertSee('白石封筒')
-        ->assertDontSee('ダッシュボードを切り替え');
+        ->assertSeeInOrder(['data-group-label="ダッシュボード切替"', 'href="'.url('/erp').'"', '白石封筒'], escape: false)
+        ->assertDontSee('href="'.url('/settings').'"', escape: false);
 });
 
 it('grants dashboards chosen on the user form on top of the category', function () {

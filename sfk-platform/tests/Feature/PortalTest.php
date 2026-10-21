@@ -34,7 +34,7 @@ beforeEach(function () {
 
     $this->orders = portal_app('sales-entry', '06. 売上入力', $this->sales, iconText: '売上');
     $this->orders->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true]);
-    $this->daily = portal_app('daily-report', '08. 日報入力', $this->factory);
+    $this->daily = portal_app('daily-report-legacy', '08. 日報入力', $this->factory);
     $this->daily->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true]);
     $this->draft = portal_app('quotation', '09. 見積書管理', $this->sales, AppStatus::Developing);
 
@@ -60,7 +60,7 @@ it('lists the joined spaces and the apps the employee may view', function () {
         ->assertSee('売上')
         ->assertDontSee('08. 日報入力') // not a member of 製造スペース
         ->assertDontSee('09. 見積書管理') // 開発中
-        ->assertSee('画面準備中');
+        ->assertDontSee('画面準備中'); // 06 has its screens
 });
 
 it('shows every space to administrators and filters apps by space', function () {
@@ -73,6 +73,7 @@ it('shows every space to administrators and filters apps by space', function () 
         ->assertSee('06. 売上入力')
         ->call('showSpace', $this->factory->id)
         ->assertSee('08. 日報入力')
+        ->assertSee('画面準備中') // published, screens not built yet
         ->assertDontSee('06. 売上入力')
         ->set('spaceScope', 'joined')
         ->assertSee('参加中のスペースはありません。');
@@ -201,4 +202,39 @@ it('lists apps built for this dashboard but not placed in a space for super admi
 
     $this->actingAs($this->admin);
     Livewire::test(PortalPage::class)->assertDontSee('01. 取引先マスタ（得意先・仕入先）');
+});
+
+it('lets administrators change the order of the アプリ with the ⚙ (drag and drop)', function () {
+    $this->actingAs($this->admin);
+
+    Livewire::test(PortalPage::class)
+        ->assertActionVisible('reorderApps')
+        ->mountAction('reorderApps')
+        ->assertMountedActionModalSee(['アプリの並び替え', 'ドラッグして並び替え', '06. 売上入力', '08. 日報入力'])
+        ->assertMountedActionModalDontSee('09. 見積書管理')
+        // 09. 見積書管理 (開発中) is not in the admin's list: it is ignored and keeps its place
+        ->call('saveAppOrder', [$this->draft->id, $this->daily->id, $this->orders->id]);
+
+    expect(BusinessApp::query()->orderBy('sort_order')->pluck('code')->all())->toBe(['daily-report-legacy', 'sales-entry', 'quotation']);
+    Livewire::test(PortalPage::class)->assertSeeInOrder(['08. 日報入力', '06. 売上入力']);
+
+    $this->actingAs($this->employee);
+    Livewire::test(PortalPage::class)
+        ->assertActionHidden('reorderApps')
+        ->call('saveAppOrder', [$this->orders->id, $this->daily->id])
+        ->assertForbidden();
+    expect(BusinessApp::query()->orderBy('sort_order')->pluck('code')->first())->toBe('daily-report-legacy');
+});
+
+it('keeps the place of the apps an administrator does not see when reordering', function () {
+    $super = User::factory()->superAdmin()->create();
+    $this->actingAs($super);
+
+    Livewire::test(PortalPage::class)->call('saveAppOrder', [$this->draft->id, $this->daily->id, $this->orders->id]);
+    expect(BusinessApp::query()->orderBy('sort_order')->pluck('code')->all())->toBe(['quotation', 'daily-report-legacy', 'sales-entry']);
+
+    $this->actingAs($this->admin);
+    Livewire::test(PortalPage::class)->call('saveAppOrder', [$this->orders->id, $this->daily->id]);
+    expect(BusinessApp::query()->orderBy('sort_order')->pluck('code')->all())->toBe(['quotation', 'sales-entry', 'daily-report-legacy'])
+        ->and(BusinessApp::query()->orderBy('sort_order')->pluck('sort_order')->all())->toBe([1, 2, 3]);
 });
