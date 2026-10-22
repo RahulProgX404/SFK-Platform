@@ -8,6 +8,7 @@ use App\Modules\ModuleServiceProvider;
 use Filament\Support\Facades\FilamentView;
 use Filament\Tables\View\TablesRenderHook;
 use Modules\Sales\Application\SalesObserver;
+use Modules\Sales\Filament\Resources\Receivables\Pages\ListReceivableMonths;
 use Modules\Sales\Filament\Resources\Sales\Pages\ListSales;
 use Modules\Sales\Models\DeliveryNoteLine;
 use Modules\Sales\Models\InvoiceLine;
@@ -34,5 +35,8 @@ final class SalesServiceProvider extends ModuleServiceProvider
 
         // 集計サマリー under the search row of the 06. 売上入力 list
         FilamentView::registerRenderHook(TablesRenderHook::TOOLBAR_AFTER, fn (): string => ListSales::summaryBar());
+
+        // 合計 under the search row of the 23. 売掛管理 / 23-2. 売掛管理(締日別) lists
+        FilamentView::registerRenderHook(TablesRenderHook::TOOLBAR_AFTER, fn (): string => ListReceivableMonths::totalsBar());
     }
 }

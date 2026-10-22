@@ -6,7 +6,6 @@ namespace Modules\Sales\Filament\Resources\Receivables\Pages;
 
 use App\Models\User;
 use Filament\Actions\Action;
-use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
@@ -23,7 +22,7 @@ use Modules\Sales\Models\Invoice;
 use Modules\Sales\Models\ReceivableMonth;
 
 /**
- * A month of 23. 売掛管理 / 23-2. 売掛管理(締日別). 「…」 has 再集計 (legacy detail button: the customer's months
+ * A month of 23. 売掛管理 / 23-2. 売掛管理(締日別) with the legacy record buttons: 再集計 (legacy detail button: the customer's months
  * recalculated now, e.g. after its 端数区分 changed) and, on 23-2 for administrators, 請求書更新 (legacy detail button,
  * Customine 23-2 page 9): the balances go into the chosen invoice of the 月度 (InvoiceBalances).
  *
@@ -36,15 +35,10 @@ abstract class ViewReceivableMonth extends AppViewRecord
         return ReceivableMonthResource::titleOf($this->record);
     }
 
-    protected function getHeaderActions(): array
+    /** The legacy record buttons (Customine 23 page 2, 23-2 pages 1 / 9). */
+    protected function menuActions(): array
     {
-        return array_map(function (Action|ActionGroup $action): Action|ActionGroup {
-            if ($action instanceof ActionGroup) {
-                $action->actions([$this->recalculateAction(), $this->updateInvoiceAction(), ...$action->getActions()]);
-            }
-
-            return $action;
-        }, parent::getHeaderActions());
+        return [$this->recalculateAction(), $this->updateInvoiceAction()];
     }
 
     /** @return array<string, string> 変更履歴 labels: the legacy field names */
@@ -57,8 +51,8 @@ abstract class ViewReceivableMonth extends AppViewRecord
     {
         return Action::make('recalculate')
             ->label('再集計')
-            ->icon(Heroicon::OutlinedArrowPath)
-            ->visible(fn (): bool => $this->historyVersion === null && static::getResource()::canEdit($this->record))
+            ->icon(Heroicon::OutlinedCalculator)
+            ->visible(fn (): bool => static::getResource()::canEdit($this->record))
             ->action(function (): void {
                 app(ReceivableLedger::class)->refresh($this->record->customer_id);
                 Notification::make()->success()->title('再集計しました')->send();
@@ -73,7 +67,7 @@ abstract class ViewReceivableMonth extends AppViewRecord
         return Action::make('updateInvoice')
             ->label('請求書更新')
             ->icon(Heroicon::OutlinedDocumentCurrencyYen)
-            ->visible(fn (): bool => $this->historyVersion === null && $this->record->basis === ReceivableBasis::Cycle
+            ->visible(fn (): bool => $this->record->basis === ReceivableBasis::Cycle
                 && auth()->user() instanceof User && auth()->user()->user_type->isAdministrator())
             ->modalHeading('請求書を更新しますか？')
             ->modalSubmitActionLabel('更新する')

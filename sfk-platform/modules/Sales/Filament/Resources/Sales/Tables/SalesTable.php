@@ -5,17 +5,12 @@ declare(strict_types=1);
 namespace Modules\Sales\Filament\Resources\Sales\Tables;
 
 use App\Models\User;
-use Carbon\CarbonImmutable;
-use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
-use Filament\Forms\Components\DatePicker;
-use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\HtmlString;
 use Modules\Core\Application\Filters\FilterField;
 use Modules\Core\Application\Views\ListView;
@@ -30,9 +25,6 @@ use Modules\Core\Filament\Tables\AppTextColumn;
 use Modules\Core\Filament\Tables\InlineField;
 use Modules\MasterData\Models\Partner;
 use Modules\Orders\Models\Order;
-use Modules\Sales\Application\Documents\DeliveryNoteIssuer;
-use Modules\Sales\Application\Documents\InvoiceIssuer;
-use Modules\Sales\Application\SalesActionNotAllowed;
 use Modules\Sales\Domain\Sales\SaleChoices;
 use Modules\Sales\Filament\Resources\Sales\SaleLayout;
 use Modules\Sales\Filament\Resources\Sales\SaleResource;
@@ -48,9 +40,8 @@ use Modules\Sales\Models\Sale;
  * fields of the legacy app are left out). The search box replaces 売上一覧(検索特化); 得意先別売上 (krewDashboard) is
  * not rebuilt.
  *
- * Administrators select rows and use (legacy Customine 06 pages 6 / 9 / 13 / 18, 【新】buttons and 削除 of
- * 06_SalesEntry.bundle.js): 選択して納品書を作成, 選択して請求書を作成 (optional 請求日付), 選択して随時請求の請求書を作成,
- * 編集を不可にする / 可にする, 選択した売上を削除 (their rows leave the delivery notes and invoices).
+ * Administrators check rows for the legacy list buttons (ListSales::menuActions()) and 選択した売上を削除 (削除 of
+ * 06_SalesEntry.bundle.js; their rows leave the delivery notes and invoices).
  * インライン編集 changes only fields without checks or copies: 納品予定日, 単位, 摘要.
  */
 final class SalesTable
@@ -131,6 +122,8 @@ final class SalesTable
             ])
             ->defaultSort('id', 'desc')
             ->recordActions(AppRecordActions::make(SaleResource::class))
+            // check boxes for the legacy buttons working on the checked rows (ListSales::menuActions())
+            ->selectable(fn (): bool => SaleForm::isAdministrator())
             ->toolbarActions([self::bulkActions()])
             ->emptyStateIcon(Heroicon::OutlinedBanknotes)
             ->emptyStateHeading('売上がありません');
@@ -202,65 +195,7 @@ final class SalesTable
 
     private static function bulkActions(): BulkActionGroup
     {
-        $admin = fn (): bool => SaleForm::isAdministrator();
-        $run = function (callable $create, string $title): void {
-            try {
-                $documents = $create();
-                Notification::make()->success()->title($title.'（'.count($documents).'件）')->send();
-            } catch (SalesActionNotAllowed $exception) {
-                Notification::make()->danger()->title($exception->getMessage())->persistent()->send();
-            }
-        };
-
         return BulkActionGroup::make([
-            BulkAction::make('createDeliveryNotes')
-                ->label('選択して納品書を作成')
-                ->icon(Heroicon::OutlinedDocumentText)
-                ->visible($admin)
-                ->requiresConfirmation()
-                ->modalHeading('選択した売上から得意先ごとに納品書を作成しますか？')
-                ->modalSubmitActionLabel('作成する')
-                ->action(fn (Collection $records) => $run(fn (): array => app(DeliveryNoteIssuer::class)->issue($records->whereInstanceOf(Sale::class)), '納品書を作成しました'))
-                ->deselectRecordsAfterCompletion(),
-            BulkAction::make('createInvoices')
-                ->label('選択して請求書を作成')
-                ->icon(Heroicon::OutlinedDocumentCurrencyYen)
-                ->visible($admin)
-                ->modalHeading('選択した売上から得意先ごとに請求書を作成')
-                ->modalSubmitActionLabel('作成する')
-                ->schema([DatePicker::make('invoiced_on')->label('請求日付')])
-                ->action(fn (Collection $records, array $data) => $run(
-                    fn (): array => app(InvoiceIssuer::class)->issue($records->whereInstanceOf(Sale::class), filled($data['invoiced_on'] ?? null) ? CarbonImmutable::parse($data['invoiced_on']) : null),
-                    '請求書を作成しました',
-                ))
-                ->deselectRecordsAfterCompletion(),
-            BulkAction::make('createAdHocInvoices')
-                ->label('選択して随時請求の請求書を作成')
-                ->icon(Heroicon::OutlinedDocumentCurrencyYen)
-                ->visible($admin)
-                ->requiresConfirmation()
-                ->modalHeading('選択した随時請求の売上から得意先ごとに請求書を作成しますか？')
-                ->modalSubmitActionLabel('作成する')
-                ->action(fn (Collection $records) => $run(fn (): array => app(InvoiceIssuer::class)->issueAdHoc($records->whereInstanceOf(Sale::class)), '請求書を作成しました'))
-                ->deselectRecordsAfterCompletion(),
-            BulkAction::make('lock')
-                ->label('編集を不可にする')
-                ->icon(Heroicon::OutlinedLockClosed)
-                ->visible($admin)
-                ->action(function (Collection $records): void {
-                    Sale::query()->whereKey($records->modelKeys())->update(['locked' => true]);
-                    Notification::make()->success()->title('編集を不可にしました')->send();
-                })
-                ->deselectRecordsAfterCompletion(),
-            BulkAction::make('unlock')
-                ->label('編集を可にする')
-                ->icon(Heroicon::OutlinedLockOpen)
-                ->visible($admin)
-                ->action(function (Collection $records): void {
-                    Sale::query()->whereKey($records->modelKeys())->update(['locked' => false]);
-                    Notification::make()->success()->title('編集を可にしました')->send();
-                })
-                ->deselectRecordsAfterCompletion(),
             DeleteBulkAction::make()
                 ->label('選択した売上を削除')
                 ->modalHeading('選択した売上を削除しますか？')

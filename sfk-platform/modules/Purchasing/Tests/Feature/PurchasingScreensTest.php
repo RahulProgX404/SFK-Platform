@@ -127,6 +127,7 @@ it('enters a purchase: 金額 from 数量 × 単価, numbered, totalled, its job
 
     // 1,234 × 1.5 = 1,851 (四捨五入 of the supplier)
     $component = Livewire::test(CreatePurchase::class)
+        ->assertSee('マスタ登録と異なる仕入カテゴリの場合は選択してください。') // 吹き出し (Customine 05 page 3)
         ->fillForm(['supplier_id' => $this->supplier->id])
         ->fillForm(['purchased_on' => '2026-11-05', 'order_id' => $job->id, 'product_name' => 'クラフト紙', 'quantity' => '1234', 'unit_price' => '1.5'])
         ->assertSchemaStateSet(['amount' => 1851])
@@ -339,6 +340,16 @@ it('shows the payables, takes only 消費税端数調整 by hand and sums the li
     Livewire::test(ListPayables::class)->callAction('refreshPayables')->assertNotified('買掛を更新しました（1仕入先）');
     expect($october->fresh()->month_total)->toBe(10000);
     Livewire::test(ViewPayable::class, ['record' => $october->getRouteKey()])->callAction(TestAction::make('recalculate'))->assertNotified('再集計しました');
+
+    // 当月未作成一括作成 (Customine 23買掛 page 9): a month nothing was saved in is created again
+    PayableMonth::query()->whereKey($november->id)->delete();
+    Livewire::test(ListPayables::class)->callAction('createCurrentMonth')->assertNotified('処理が完了しました（2026年11月：1件作成）');
+    expect(PayableMonth::query()->where('supplier_id', $this->supplier->id)->where('year_month', '2026-11')->sole()->previous_balance)->toBe(10000);
+    Livewire::test(ListPayables::class)->callAction('createPreviousMonth')->assertNotified('処理が完了しました（2026年10月：0件作成）');
+
+    // 吹き出し of 消費税額 / 消費税端数調整 (page 2)
+    Livewire::test(EditPayable::class, ['record' => $october->getRouteKey()])
+        ->assertSee(['誤差の調整に利用するフィールド。', '仕入額に対して、「消費税区分」と「端数区分」によって計算されます。']);
 });
 
 it('puts the delivered quantity of a consumable order into the stock of 19 once', function () {
@@ -379,4 +390,29 @@ it('lets employees use the purchasing apps as the app permissions allow', functi
     $this->get(PurchaseResource::getUrl('create'))->assertForbidden();
     Livewire::test(ListPurchases::class)->assertActionHidden('importCsv');
     $this->get(PaymentResource::getUrl('index'))->assertForbidden();
+});
+
+it('has the legacy list buttons of 05 for administrators (Customine 05 pages 6 / 8 / 10 / 11)', function () {
+    $job = screenJob();
+    $purchase = Purchase::query()->create(['supplier_id' => $this->supplier->id, 'purchased_on' => '2026-10-05', 'order_id' => $job->id, 'product_name' => 'クラフト紙', 'amount' => 10000]);
+    Purchase::query()->whereKey($purchase->id)->update(['purchase_number' => null]);
+    $this->actingAs($this->admin);
+
+    Livewire::test(ListPurchases::class)
+        ->assertSeeInOrder(['納品(仕入)入力No発番', '受注レコード更新', '買掛レコード更新', 'ボタンの説明', '納品(仕入)入力No発番', 'csv一括読み込み後、採番されていないレコードに対して一括で採番します。'])
+        ->callAction('numberPurchases')
+        ->assertNotified('納品(仕入)入力Noの発番が完了しました。（1件）')
+        ->callAction('numberPurchases')
+        ->assertNotified('発番可能なレコードがありません。')
+        ->callAction('refreshOrders')
+        ->assertNotified('受注レコードに仕入金額を連携しました。（1件）')
+        ->callAction('refreshPayables')
+        ->assertNotified('買掛レコードに仕入金額を連携しました。（1仕入先）');
+    expect($purchase->fresh()->purchase_number)->not->toBeNull();
+
+    $employee = grantDashboards(User::factory()->create(), 'erp');
+    BusinessApp::query()->where('code', 'purchase-entry')->sole()->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true]);
+    BusinessApp::query()->where('code', 'purchase-entry')->sole()->space?->users()->attach($employee);
+    $this->actingAs($employee);
+    Livewire::test(ListPurchases::class)->assertActionHidden('numberPurchases')->assertDontSee('csv一括読み込み後');
 });

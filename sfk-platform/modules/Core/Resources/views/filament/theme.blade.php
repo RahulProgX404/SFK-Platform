@@ -705,6 +705,191 @@
         white-space: pre-line;
     }
 
+    /*
+     * The app's legacy buttons (core::filament.app-menu, MenuButtons): segmented groups of icon + label buttons in the
+     * look of the toolbar tools (40px, --kt-normal, inset highlight), the buttons on the checked rows tinted once rows
+     * are checked.
+     */
+    .sfk-app-menu-divider {
+        align-self: stretch;
+        width: 1px;
+        margin: .25rem .125rem;
+        background: var(--kt-border);
+    }
+
+    .sfk-app-menu {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: .5rem;
+    }
+
+    .sfk-app-menu-group {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: stretch;
+        column-gap: 6px;
+    }
+
+    .sfk-app-menu-group>*+* {
+        margin-inline-start: -1px;
+    }
+
+    .sfk-app-toolbar .sfk-menu-btn.fi-btn {
+        position: relative;
+        height: 2.5rem;
+        gap: .375rem;
+        padding: 0 .875rem;
+        background: var(--kt-normal);
+        border: 1px solid var(--kt-border);
+        box-shadow: 1px 1px 1px #ffffff inset;
+        color: var(--kt-blue-dark);
+        font-size: .8125rem;
+        font-weight: 400;
+        white-space: nowrap;
+    }
+
+    .sfk-app-toolbar .sfk-menu-btn.fi-btn .fi-icon {
+        width: 1.125rem;
+        height: 1.125rem;
+        color: var(--kt-blue);
+    }
+
+    .sfk-app-toolbar .sfk-menu-btn.fi-btn:hover {
+        z-index: 1;
+        background: var(--kt-normal-hover);
+        color: var(--kt-blue-dark);
+    }
+
+    .sfk-app-toolbar .sfk-menu-btn.fi-btn:focus-visible {
+        z-index: 2;
+        outline: 2px solid var(--kt-blue);
+        outline-offset: 1px;
+    }
+
+    /* 「N件」 badge of the checked rows on the corner of a button (MenuButtons::withCheckedCount()); red once rows are checked */
+    .sfk-menu-btn-counted {
+        position: relative;
+        display: inline-flex;
+    }
+
+    .sfk-menu-badge {
+        position: absolute;
+        top: -.5rem;
+        right: -.375rem;
+        z-index: 3;
+        min-width: 1.25rem;
+        padding: .0625rem .3125rem;
+        background: var(--kt-muted);
+        border: 2px solid #ffffff;
+        color: #ffffff;
+        font-size: .6875rem;
+        font-weight: 700;
+        line-height: 1rem;
+        text-align: center;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+        pointer-events: none;
+    }
+
+    .sfk-app-menu-rows.has-checked .sfk-menu-badge {
+        background: #e41e3f;
+    }
+
+    .sfk-app-menu-rows.has-checked .sfk-menu-btn.fi-btn {
+        background: var(--kt-blue-soft);
+    }
+
+    .sfk-app-menu-rows.has-checked .sfk-menu-btn.fi-btn:hover {
+        background: var(--kt-normal-hover);
+    }
+
+    /* ボタンの説明 (core::filament.app-menu-help): the legacy menu text as a collapsible list under the toolbar */
+    .sfk-app-help {
+        margin: 0 .875rem .625rem;
+        background: #ffffff;
+        border: 1px solid var(--kt-border);
+        border-left: 3px solid var(--kt-blue);
+    }
+
+    .sfk-app-help-bar {
+        display: flex;
+        align-items: center;
+        gap: .375rem;
+        width: 100%;
+        padding: .375rem .75rem;
+        font-size: .8125rem;
+        color: var(--kt-blue-dark);
+        text-align: left;
+    }
+
+    .sfk-app-help-bar:hover {
+        background: var(--kt-normal);
+    }
+
+    .sfk-app-help-bar:focus-visible {
+        outline: 2px solid var(--kt-blue);
+        outline-offset: -2px;
+    }
+
+    .sfk-app-help-icon {
+        width: 1rem;
+        height: 1rem;
+        color: var(--kt-blue);
+    }
+
+    .sfk-app-help-title {
+        flex: 1;
+    }
+
+    .sfk-app-help-chevron {
+        width: 1rem;
+        height: 1rem;
+        color: var(--kt-muted);
+        transition: transform .15s ease;
+    }
+
+    .sfk-app-help-chevron.is-open {
+        transform: rotate(180deg);
+    }
+
+    .sfk-app-help-list {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        column-gap: 1rem;
+        margin: 0;
+        padding: .25rem .75rem .625rem;
+        border-top: 1px solid var(--kt-border);
+        font-size: .8125rem;
+        line-height: 1.6;
+    }
+
+    .sfk-app-help-item {
+        display: contents;
+    }
+
+    .sfk-app-help-item dt {
+        padding-top: .375rem;
+        color: var(--kt-label);
+        white-space: nowrap;
+    }
+
+    .sfk-app-help-item dd {
+        margin: 0;
+        padding-top: .375rem;
+        color: var(--kt-text);
+    }
+
+    @media (max-width: 640px) {
+        .sfk-app-help-list {
+            grid-template-columns: 1fr;
+        }
+
+        .sfk-app-help-item dd {
+            padding-top: 0;
+        }
+    }
+
     .sfk-app-toolbar {
         display: flex;
         flex-wrap: wrap;

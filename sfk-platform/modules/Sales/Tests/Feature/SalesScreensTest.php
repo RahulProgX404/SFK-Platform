@@ -160,12 +160,24 @@ it('enters a sale and makes its delivery note and invoice from the 06 list', fun
 
     Livewire::test(ViewSale::class, ['record' => $sale->getRouteKey()])->assertSee([$sale->sales_number, '株式会社得意先', '¥12,500']);
 
+    // the legacy list buttons (Customine 06 pages 6 / 9) on the checked rows, with their 機能説明 (page 22)
     Livewire::test(ListSales::class)
         ->assertCanSeeTableRecords([$sale])
-        ->callTableBulkAction('createDeliveryNotes', [$sale])
-        ->assertNotified('納品書を作成しました（1件）')
-        ->callTableBulkAction('createInvoices', [$sale], data: ['invoiced_on' => '2026-10-20'])
-        ->assertNotified('請求書を作成しました（1件）');
+        ->assertSeeInOrder(['期間指定から納品レコード作成', '選択して納品書レコード作成', 'sfk-menu-badge', '件', '選択して請求書レコード作成', 'sfk-menu-badge', '件', '随時請求書レコード作成', '編集制限',
+            'ボタンの説明', '売上日付を指定した上で任意の売上レコードを取引先別に'], false)
+        ->assertDontSee('sfk-app-menu-count', false)
+        ->callAction('createDeliveryNotes')
+        ->assertNotified('レコードを選択してください。')
+        ->set('selectedTableRecords', [(string) $sale->id])
+        ->callAction('createDeliveryNotes')
+        ->assertNotified('納品書レコードの作成が完了しました（1件）')
+        ->set('selectedTableRecords', [(string) $sale->id])
+        ->callAction('createInvoices', data: ['invoiced_on' => '2026-10-20'])
+        ->assertNotified('請求書レコードの作成が完了しました（1件）')
+        ->set('selectedTableRecords', [(string) $sale->id])
+        ->callAction('restrictEditing', data: ['operation' => '編集不可にする'])
+        ->assertNotified('編集を不可にしました');
+    expect($sale->fresh()->locked)->toBeTrue();
 
     $invoice = Invoice::query()->sole();
     expect(DeliveryNote::query()->sole()->subtotal)->toBe(12500)
@@ -347,4 +359,94 @@ it('lets employees see the receivables as the app permissions allow, without 請
     $this->get(CycleReceivableResource::getUrl('index'))->assertOk()->assertSee('株式会社得意先');
     $this->get(CycleReceivableResource::getUrl('view', ['record' => $cycle]))->assertOk()->assertSee('再集計')->assertDontSee('請求書更新');
     $this->get(CycleReceivableResource::getUrl('edit', ['record' => $cycle]))->assertOk();
+});
+
+it('rewrites the delivery note and invoice row of a sale from its record (Customine 06 pages 14 / 15) and prints its note (page 5)', function () {
+    $invoice = screenInvoice($this->customer);
+    $sale = Sale::query()->sole();
+    $note = DeliveryNote::query()->sole();
+    $other = screenSale($this->customer, ['amount' => 3000]);
+    $this->actingAs($this->admin);
+
+    // a changed sale does not change its documents until the buttons are pressed (BR-SA-15)
+    $sale->forceFill(['quantity' => '1200', 'amount' => 12000])->save();
+    expect($note->fresh()->subtotal)->toBe(10000);
+
+    Livewire::test(ViewSale::class, ['record' => $sale->getRouteKey()])
+        ->callAction(TestAction::make('refreshDeliveryNote')->arguments([]))
+        ->assertNotified('納品書番号：'.$note->number.' を更新しました。')
+        ->callAction(TestAction::make('refreshInvoice'))
+        ->assertNotified('請求書番号：'.$invoice->number.' を更新しました。');
+    expect($note->fresh()->subtotal)->toBe(12000)
+        ->and($invoice->fresh()->subtotal)->toBe(12000)
+        ->and(Receipt::query()->where('invoice_id', $invoice->id)->sole()->billed_amount)->toBe(13200);
+
+    // without documents: refused; the note is made and printed
+    Livewire::test(ViewSale::class, ['record' => $other->getRouteKey()])
+        ->callAction(TestAction::make('refreshInvoice'))
+        ->assertNotified('この売上データの請求レコードが作成されていません。先に請求レコードの作成を行ってください。')
+        ->callAction(TestAction::make('issueDeliveryNote'))
+        ->assertNotified('納品書レコード未作成だったため新規作成しました。');
+    expect($other->fresh()->delivery_note_id)->not->toBeNull();
+
+    // a row taken off its note: the sale goes back to 未作成
+    $note->lines()->where('sale_id', $sale->id)->sole()->delete();
+    $sale->forceFill(['delivery_note_id' => $note->id])->saveQuietly();
+    Livewire::test(ViewSale::class, ['record' => $sale->getRouteKey()])
+        ->callAction(TestAction::make('refreshDeliveryNote'))
+        ->assertNotified('納品書番号：'.$note->number.' が見つかりません。');
+    expect($sale->fresh()->delivery_note_id)->toBeNull();
+});
+
+it('warns while a sale is filled in and needs 売上先 before 注番 (Customine 06 pages 2 / 21)', function () {
+    $order = Order::query()->create(['customer_id' => $this->customer->id, 'product_name' => '角2封筒', 'quantity' => '1000', 'sales_amount' => 20000]);
+    $this->actingAs($this->admin);
+
+    Livewire::test(CreateSale::class)
+        ->assertFormFieldIsDisabled('order_id')
+        ->assertSee(['売上先を入力しないと注番の選択はできません。', '管理者のみ編集可能となっています。', '初期値は10%です。'])
+        ->fillForm(['customer_id' => $this->customer->id])
+        ->assertFormFieldIsEnabled('order_id')
+        ->fillForm(['order_id' => $order->id, 'unit_price' => '25'])
+        ->fillForm(['quantity' => '1200'])
+        ->assertNotified('受注数よりも多い数量で売上を作成できません。');
+});
+
+it('sums the receivables list and creates the missing months from 「…」 (Customine 23 pages 1 / 4 / 6, 23-2 pages 3 / 6 / 8)', function () {
+    screenInvoice($this->customer);
+    $this->actingAs($this->admin);
+
+    Livewire::test(ListReceivables::class)
+        ->set('listView', salesView('receivable', '売掛一覧'))
+        ->assertSee(['合計', '対象件数: 2 件', '前月売掛残', '当月売掛残', '¥11,000'])
+        ->callAction('refreshReceivables')
+        ->assertNotified('売掛を更新しました（1得意先）');
+
+    ReceivableMonth::query()->ofBasis(ReceivableBasis::Calendar)->where('year_month', '2026-11')->delete();
+    Livewire::test(ListReceivables::class)->callAction('createCurrentMonth')->assertNotified('処理が完了しました（2026年11月：1件作成）');
+    expect(ReceivableMonth::query()->ofBasis(ReceivableBasis::Calendar)->where('year_month', '2026-11')->sole()->previous_balance)->toBe(11000);
+
+    ReceivableMonth::query()->ofBasis(ReceivableBasis::Cycle)->where('year_month', '2026-11')->delete();
+    Livewire::test(ListCycleReceivables::class)
+        ->callAction('createCurrentMonth', data: ['closing_day' => '5日'])
+        ->assertNotified('処理が完了しました（2026年11月：0件作成）')
+        ->callAction('createCurrentMonth', data: ['closing_day' => '20日'])
+        ->assertNotified('処理が完了しました（2026年11月：1件作成）');
+});
+
+it('makes the delivery notes of a period from 期間指定から納品レコード作成 (Customine 06 page 1)', function () {
+    $sale = screenSale($this->customer);
+    screenSale(screenCustomer('株式会社別締日', ['closing_day' => '末日']));
+    $this->actingAs($this->admin);
+
+    Livewire::test(ListSales::class)
+        ->callAction('issueDeliveryNotesForPeriod', data: ['from' => '2026-10-01', 'to' => '2026-10-31', 'closing_day' => '20日'])
+        ->assertNotified('納品書レコードの作成が完了しました（1件）')
+        ->callAction('issueDeliveryNotesForPeriod', data: ['from' => '2026-10-01', 'to' => '2026-10-31', 'closing_day' => '指定なし'])
+        ->assertNotified('納品書レコードの作成が完了しました（1件）');
+    expect($sale->fresh()->delivery_note_id)->not->toBeNull()->and(DeliveryNote::query()->count())->toBe(2);
+
+    // the record buttons are buttons of the record page
+    Livewire::test(ViewSale::class, ['record' => $sale->getRouteKey()])
+        ->assertSeeInOrder(['納品書発行あり', '納品レコード更新', '請求レコード更新', 'ボタンの説明', '納品書発行あり', 'このレコードのみの納品書を発行します。']);
 });

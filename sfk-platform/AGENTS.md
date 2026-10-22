@@ -47,6 +47,13 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   A legacy CUSTOM view (e.g. Gantt chart, graph) is a カスタマイズ形式 view: `ListView::custom($key, $name, $screen)` in
   `defaultListViews()` and `customListViews()` (screen => Blade view, drawn with `$page`; read the view's records with
   `$page->getFilteredTableQuery()`); it cannot be created in the 一覧 editor, only renamed / filtered / copied / deleted.
+- Legacy Customine / JS buttons keep their legacy label and place: 「一覧画面メニューの右側」 → `menuActions()` of the list page
+  (buttons right of 一覧 / 絞り込む; a button on the checked rows wraps its action in `onCheckedRows()` and the table is
+  `->selectable()`), 「レコード詳細メニューの上側」 → `menuActions()` of the record page (buttons before 編集). A legacy
+  「メニュー位置に文字を表示する」 text goes in `menuHelp()` as button label => explanation (the collapsible 「ボタンの説明」
+  panel, shown to the users the legacy text was shown to). Core draws the buttons as the app's button bar (MenuButtons,
+  core::filament.app-menu: icon + label, checked-row buttons behind 「N件選択」); give each one an icon. Do not hide
+  legacy buttons in 「…」 or in bulk actions.
 - App lists (Core, automatic): search box on the left, one horizontal scroll with its bar at the end of the table (and a synced copy fixed at the bottom of the screen while the end of the table is out of view),
   表示件数 20–300 per user, and every column sorts on a header click (昇順 ⇄ 降順). Database columns become sortable by
   themselves; give computed columns (state from relations or flags) `->sortable(query: …)`.

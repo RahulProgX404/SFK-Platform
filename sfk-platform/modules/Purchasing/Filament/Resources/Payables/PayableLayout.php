@@ -14,6 +14,7 @@ use Illuminate\Support\HtmlString;
 use Modules\Core\Domain\Calendar\YearMonth;
 use Modules\Core\Filament\Records\RecordSections;
 use Modules\Core\Filament\Support\AppFormat;
+use Modules\Core\Filament\Support\FieldTip;
 use Modules\Core\Filament\Support\UserPopup;
 use Modules\Purchasing\Domain\Payables\PayableCategories;
 use Modules\Purchasing\Domain\PurchasingFields;
@@ -68,8 +69,10 @@ final class PayableLayout
     {
         return $schema->columns(1)->components(self::components(
             fn (string $name): ?Component => match ($name) {
-                'tax_adjustment' => TextInput::make($name)->label(self::label($name))->numeric()->integer()->minValue(-99999999999)->maxValue(99999999999)
-                    ->prefix('¥')->required(),
+                // 吹き出し of the legacy form (Customine 23買掛 page 2)
+                'tax_adjustment' => FieldTip::add(TextInput::make($name)->label(self::label($name))->numeric()->integer()->minValue(-99999999999)
+                    ->maxValue(99999999999)->prefix('¥')->required(), '誤差の調整に利用するフィールド。「1」や「-1」の入力を行うことで消費税額の調整が可能です。'),
+                'tax_amount' => FieldTip::add(self::entry($name), '仕入額に対して、「消費税区分」と「端数区分」によって計算されます。※「計算区分」は消費税額の計算式に含まれていません。'),
                 'other_months', 'month_purchases', 'month_payments' => null,
                 default => self::entry($name),
             },

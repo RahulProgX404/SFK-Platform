@@ -17,6 +17,7 @@ use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\RenderHook;
 use Filament\Schemas\Components\View as ViewComponent;
 use Filament\Schemas\Schema;
+use Filament\Support\Exceptions\Cancel;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Filament\View\PanelsRenderHook;
@@ -40,6 +41,7 @@ use Modules\Core\Application\Views\ListViewService;
 use Modules\Core\Domain\Filters\FilterFieldType;
 use Modules\Core\Domain\Filters\RecordFilter;
 use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
+use Modules\Core\Filament\Support\MenuButtons;
 use Modules\Core\Filament\Tables\InlineField;
 
 /**
@@ -607,6 +609,7 @@ abstract class AppListRecords extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            ...array_map(MenuButtons::mark(...), $this->menuActions()),
             ActionGroup::make([
                 ...$this->optionActions(),
                 Action::make('bulkDelete')
@@ -653,6 +656,53 @@ abstract class AppListRecords extends ListRecords
      * @return list<Action>
      */
     protected function optionActions(): array
+    {
+        return [];
+    }
+
+    /**
+     * The app's legacy list buttons (「ボタンをメニュー位置に配置する」 一覧画面メニューの右側), drawn as buttons right of 一覧 /
+     * 絞り込む (core::filament.app-header). A button working on the checked rows goes through onCheckedRows().
+     *
+     * @return list<Action>
+     */
+    protected function menuActions(): array
+    {
+        return [];
+    }
+
+    /**
+     * A menu button working on the rows checked in the list (legacy 「一覧で選択されたレコードを取得する」): its action gets
+     * them as `$records`. The app's table shows the check boxes (`Table::selectable()`) for whoever sees such a button.
+     */
+    protected static function onCheckedRows(Action $action): Action
+    {
+        $name = $action->getName();
+
+        // the checked rows live in the table's Alpine component: mount the action through it so they are sent along
+        return $action->accessSelectedRecords()
+            ->alpineClickHandler(
+                "(t => t ? Alpine.\$data(t).mountAction('{$name}') : \$wire.mountAction('{$name}'))(\$wire.\$el.querySelector('[x-data^=filamentTable]'))",
+            )
+            // nothing checked: the legacy warning instead of the dialog
+            ->mountUsing(function (Action $action, ?Schema $schema): void {
+                if ($action->getSelectedRecords()->isEmpty()) {
+                    Notification::make()->warning()->title('レコードを選択してください。')->send();
+
+                    throw new Cancel;
+                }
+
+                $schema?->fill();
+            });
+    }
+
+    /**
+     * The legacy text under the list menu (「メニュー位置に文字を表示する」 一覧画面メニューの下側) as button label =>
+     * explanation, shown in the collapsible 「ボタンの説明」 panel; empty for none.
+     *
+     * @return array<string, string>
+     */
+    public function menuHelp(): array
     {
         return [];
     }

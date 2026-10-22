@@ -86,11 +86,7 @@ final class Purchase extends Model implements HasRecordComments, HasRecordHistor
     {
         self::creating(function (self $purchase): void {
             if (blank($purchase->purchase_number)) {
-                $numbers = app(DocumentNumberGenerator::class);
-                do {
-                    $number = $numbers->next(self::NUMBER_SEQUENCE);
-                } while (self::query()->where('purchase_number', $number)->exists());
-                $purchase->purchase_number = $number;
+                $purchase->assignNumber();
             }
         });
 
@@ -103,6 +99,16 @@ final class Purchase extends Model implements HasRecordComments, HasRecordHistor
     }
 
     /** 仕入カテゴリ判定 (BR-PU-04) */
+    /** 納品(仕入)入力No: the next number of the purchase sequence, numbers already used skipped (BR-PU-01). */
+    public function assignNumber(): void
+    {
+        $numbers = app(DocumentNumberGenerator::class);
+        do {
+            $number = $numbers->next(self::NUMBER_SEQUENCE);
+        } while (self::query()->where('purchase_number', $number)->exists());
+        $this->purchase_number = $number;
+    }
+
     public function effectiveCategory(): ?PurchaseCategory
     {
         return $this->category ?? $this->supplier->purchase_category;

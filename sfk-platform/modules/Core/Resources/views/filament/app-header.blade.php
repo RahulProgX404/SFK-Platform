@@ -2,7 +2,13 @@
 @php
     use Filament\Support\Icons\Heroicon;
 
+    use Modules\Core\Filament\Support\MenuButtons;
+
     $actions = $page->getCachedHeaderActions();
+    // the app's legacy buttons (menuActions()): right of 一覧 / 絞り込む on a list, before 編集 on a record
+    $menuActions = array_values(array_filter($actions, fn ($action): bool => MenuButtons::isMenuButton($action) && $action->isVisible()));
+    $endActions = array_values(array_filter($actions, fn ($action): bool => ! MenuButtons::isMenuButton($action)));
+    $menuHelp = in_array($kind, ['list', 'view'], true) && method_exists($page, 'menuHelp') && ! ($page->printMode ?? false) ? $page->menuHelp() : [];
 @endphp
 
 <header class="sfk-app-header">
@@ -62,6 +68,11 @@
 
                     @include('core::filament.app-filter', ['page' => $page])
                 @endif
+
+                @if ($menuActions)
+                    <span class="sfk-app-menu-divider" aria-hidden="true"></span>
+                    @include('core::filament.app-menu', ['actions' => $menuActions])
+                @endif
             </div>
 
             <div class="sfk-app-toolbar-end">
@@ -74,8 +85,8 @@
 
                 @include('core::filament.app-settings-menu', ['chrome' => $chrome])
 
-                @if ($actions)
-                    <x-filament::actions :actions="$actions" class="sfk-app-actions" />
+                @if ($endActions)
+                    <x-filament::actions :actions="$endActions" class="sfk-app-actions" />
                 @endif
             </div>
         @elseif ($kind === 'settings')
@@ -100,8 +111,13 @@
         @else
             {{-- record: 編集 / 再利用 / 「…」 (印刷・削除), then gear and ‹ ›, all on the right --}}
             <div class="sfk-app-toolbar-end">
-                @if ($actions)
-                    <x-filament::actions :actions="$actions" class="sfk-app-actions" />
+                @if ($menuActions)
+                    @include('core::filament.app-menu', ['actions' => $menuActions])
+                    <span class="sfk-app-menu-divider" aria-hidden="true"></span>
+                @endif
+
+                @if ($endActions)
+                    <x-filament::actions :actions="$endActions" class="sfk-app-actions" />
                 @endif
 
                 @include('core::filament.app-settings-menu', ['chrome' => $chrome])
@@ -124,4 +140,8 @@
             </div>
         @endif
     </div>
+
+    @if ($menuHelp)
+        @include('core::filament.app-menu-help', ['help' => $menuHelp, 'key' => 'sfk-app-help:'.$page::class])
+    @endif
 </header>

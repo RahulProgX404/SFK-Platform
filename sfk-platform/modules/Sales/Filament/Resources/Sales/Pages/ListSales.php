@@ -11,21 +11,26 @@ use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Livewire\Livewire;
 use Modules\Core\Domain\Billing\ClosingDay;
 use Modules\Core\Filament\AppPages\AppListRecords;
+use Modules\Core\Filament\Support\MenuButtons;
 use Modules\Orders\Models\Order;
 use Modules\Sales\Application\Documents\DeliveryNoteIssuer;
+use Modules\Sales\Application\Documents\InvoiceIssuer;
 use Modules\Sales\Application\SalesActionNotAllowed;
 use Modules\Sales\Filament\Resources\Sales\SaleResource;
 use Modules\Sales\Filament\Resources\Sales\Schemas\SaleForm;
 use Modules\Sales\Filament\Resources\Sales\Tables\SalesTable;
+use Modules\Sales\Models\Sale;
 
 /**
  * List of 06. 売上入力 with 集計サマリー on top of the table (legacy 「📊 集計サマリー」 of 06_SalesEntry.bundle.js) over every
  * sale of the list as filtered and searched: 売上金額（税抜）, 見積原価合計, 見積利益 (= 売上金額 − 見積原価合計), 消費税,
  * 売上金額（税込）, 実原価合計 of the sales' jobs, 粗利 (= 税込 − 実原価合計) and 粗利率 (粗利 / 税込), with 対象件数, 売上数量
- * and 売上残数量 (of the jobs). 「…」 has 期間を指定して納品書を作成 for administrators (Customine 06 page 1).
+ * and 売上残数量 (of the jobs). Administrators have the legacy list buttons and their 機能説明 (menuActions(), menuHelp()).
  */
 final class ListSales extends AppListRecords
 {
@@ -104,37 +109,145 @@ final class ListSales extends AppListRecords
         ];
     }
 
-    protected function optionActions(): array
+    /**
+     * The legacy list buttons, for administrators (Customine 06 pages 1 / 6 / 9 / 13 / 18): 期間指定から納品レコード作成 and,
+     * on the checked rows, 選択して納品書レコード作成, 選択して請求書レコード作成 (optional 請求日), 随時請求書レコード作成 and
+     * 編集制限 (編集不可にする / 編集可能にする). The issuers refuse what the legacy flow refused (rows already on a
+     * document, 随時請求 rows on a closing-day invoice, rows without a delivery note).
+     */
+    protected function menuActions(): array
     {
         return [
             Action::make('issueDeliveryNotesForPeriod')
-                ->label('期間を指定して納品書を作成')
-                ->icon(Heroicon::OutlinedDocumentText)
+                ->label('期間指定から納品レコード作成')
+                ->icon(Heroicon::OutlinedCalendarDays)
                 ->visible(fn (): bool => SaleForm::isAdministrator())
-                ->modalHeading('期間を指定して納品書を作成')
+                ->modalHeading('期間指定から納品レコード作成')
                 ->modalWidth('md')
                 ->modalSubmitActionLabel('作成する')
                 ->modalCancelActionLabel('キャンセル')
                 ->schema([
                     DatePicker::make('from')->label('開始日')->required(),
                     DatePicker::make('to')->label('終了日')->required()->afterOrEqual('from'),
-                    Select::make('closing_day')->label('締日')->placeholder('指定なし')->native(false)->options(array_combine(
-                        array_map(fn (ClosingDay $day): string => $day->value, ClosingDay::cases()),
-                        array_map(fn (ClosingDay $day): string => $day->value, ClosingDay::cases()),
-                    )),
+                    Select::make('closing_day')->label('締め日')->placeholder('-----')->native(false)->required()
+                        ->options([...self::closingDayOptions(), self::ANY_CLOSING_DAY => self::ANY_CLOSING_DAY]),
                 ])
-                ->action(function (array $data): void {
-                    try {
-                        $notes = app(DeliveryNoteIssuer::class)->issueForPeriod(
-                            CarbonImmutable::parse((string) $data['from']),
-                            CarbonImmutable::parse((string) $data['to']),
-                            ClosingDay::tryFrom((string) ($data['closing_day'] ?? '')),
-                        );
-                        Notification::make()->success()->title('納品書を作成しました（'.count($notes).'件）')->send();
-                    } catch (SalesActionNotAllowed $exception) {
-                        Notification::make()->danger()->title($exception->getMessage())->send();
+                ->action(fn (array $data) => self::run('納品書レコードの作成が完了しました', fn (): array => app(DeliveryNoteIssuer::class)->issueForPeriod(
+                    CarbonImmutable::parse((string) $data['from']),
+                    CarbonImmutable::parse((string) $data['to']),
+                    ClosingDay::tryFrom((string) ($data['closing_day'] ?? '')),
+                ))),
+            MenuButtons::withCheckedCount(self::onCheckedRows(Action::make('createDeliveryNotes')))
+                ->label('選択して納品書レコード作成')
+                ->icon(Heroicon::OutlinedDocumentText)
+                ->visible(fn (): bool => SaleForm::isAdministrator())
+                ->requiresConfirmation()
+                ->modalHeading('選択された売上レコードから得意先別に納品書レコードを作成しますか？')
+                ->modalSubmitActionLabel('作成する')
+                ->action(fn (Collection $records) => self::onRecords($records, '納品書レコードの作成が完了しました',
+                    fn (Collection $sales): array => app(DeliveryNoteIssuer::class)->issue($sales)))
+                ->deselectRecordsAfterCompletion(),
+            MenuButtons::withCheckedCount(self::onCheckedRows(Action::make('createInvoices')))
+                ->label('選択して請求書レコード作成')
+                ->icon(Heroicon::OutlinedDocumentCurrencyYen)
+                ->visible(fn (): bool => SaleForm::isAdministrator())
+                ->modalHeading('選択された売上レコードから得意先別に請求書レコードを作成しますか？')
+                ->modalWidth('md')
+                ->modalSubmitActionLabel('作成する')
+                ->schema([DatePicker::make('invoiced_on')->label('請求日')])
+                ->action(fn (Collection $records, array $data) => self::onRecords($records, '請求書レコードの作成が完了しました',
+                    fn (Collection $sales): array => app(InvoiceIssuer::class)->issue($sales, filled($data['invoiced_on'] ?? null) ? CarbonImmutable::parse((string) $data['invoiced_on']) : null)))
+                ->deselectRecordsAfterCompletion(),
+            self::onCheckedRows(Action::make('createAdHocInvoices'))
+                ->label('随時請求書レコード作成')
+                ->icon(Heroicon::OutlinedBolt)
+                ->visible(fn (): bool => SaleForm::isAdministrator())
+                ->requiresConfirmation()
+                ->modalHeading('選択された売上レコードから随時請求に該当するレコードのみ得意先別に請求書レコードを作成しますか？')
+                ->modalSubmitActionLabel('作成する')
+                ->action(fn (Collection $records) => self::onRecords($records, '請求書レコードの作成が完了しました',
+                    fn (Collection $sales): array => app(InvoiceIssuer::class)->issueAdHoc($sales)))
+                ->deselectRecordsAfterCompletion(),
+            self::onCheckedRows(Action::make('restrictEditing'))
+                ->label('編集制限')
+                ->icon(Heroicon::OutlinedLockClosed)
+                ->visible(fn (): bool => SaleForm::isAdministrator())
+                ->modalHeading('選択されたレコードに対して編集制限操作します。')
+                ->modalWidth('md')
+                ->modalSubmitActionLabel('OK')
+                ->modalCancelActionLabel('キャンセル')
+                ->schema([
+                    Select::make('operation')->hiddenLabel()->placeholder('-----')->native(false)->required()
+                        ->options([self::LOCK => self::LOCK, self::UNLOCK => self::UNLOCK]),
+                ])
+                ->action(function (Collection $records, array $data): void {
+                    if ($records->isEmpty()) {
+                        Notification::make()->warning()->title('レコードを選択してください。')->send();
+
+                        return;
                     }
-                }),
+
+                    Sale::query()->whereKey($records->modelKeys())->update(['locked' => $data['operation'] === self::LOCK]);
+                    Notification::make()->success()->title($data['operation'] === self::LOCK ? '編集を不可にしました' : '編集を可能にしました')->send();
+                })
+                ->deselectRecordsAfterCompletion(),
         ];
+    }
+
+    /**
+     * 機能説明 of the buttons, for administrators (Customine 06 page 22).
+     *
+     * @return array<string, string>
+     */
+    public function menuHelp(): array
+    {
+        return SaleForm::isAdministrator() ? [
+            '期間指定から納品レコード作成' => '売上日付を指定した上で任意の売上レコードを取引先別に納品レコードに変換します。',
+            '選択して納品書レコード作成' => 'チェックボックスで選択したレコードを取引先別に納品レコードに変換します。',
+            '選択して請求書レコード作成' => 'チェックボックスで選択したレコードを取引先別に請求レコードに変換します。（納品レコードが作成されてない場合実行不可）',
+            '編集制限' => '任意のタイミングで任意のレコードに対して編集制限をかけることができます。（解除も可能）',
+        ] : [];
+    }
+
+    private const ANY_CLOSING_DAY = '指定なし';
+
+    private const LOCK = '編集不可にする';
+
+    private const UNLOCK = '編集可能にする';
+
+    /** @return array<string, string> 締め日 of the legacy dialog: the fixed closing days and 末日 */
+    private static function closingDayOptions(): array
+    {
+        $days = array_filter(ClosingDay::cases(), fn (ClosingDay $day): bool => $day !== ClosingDay::AdHoc);
+
+        return array_combine(array_map(fn (ClosingDay $day): string => $day->value, $days), array_map(fn (ClosingDay $day): string => $day->value, $days));
+    }
+
+    /**
+     * Runs a document creation on the checked sales; nothing checked → 「レコードを選択してください。」.
+     *
+     * @param  Collection<int, Model>  $records
+     * @param  callable(Collection<int, Sale>): array<mixed>  $create
+     */
+    private static function onRecords(Collection $records, string $done, callable $create): void
+    {
+        if ($records->isEmpty()) {
+            Notification::make()->warning()->title('レコードを選択してください。')->send();
+
+            return;
+        }
+
+        self::run($done, fn (): array => $create($records->whereInstanceOf(Sale::class)->values()));
+    }
+
+    /** @param  callable(): array<mixed>  $create */
+    private static function run(string $done, callable $create): void
+    {
+        try {
+            $documents = $create();
+            Notification::make()->success()->title($done.'（'.count($documents).'件）')->send();
+        } catch (SalesActionNotAllowed $exception) {
+            Notification::make()->danger()->title($exception->getMessage())->persistent()->send();
+        }
     }
 }

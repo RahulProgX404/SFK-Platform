@@ -31,10 +31,22 @@ final class EditSale extends AppEditRecord
         return array_map(fn (Action $action): Action => $action->getName() === 'saveRecord'
             ? $action
                 ->requiresConfirmation(fn (): bool => $this->changesIssuedAmounts())
-                ->modalHeading('納品書・請求書が作成済みの売上です。金額を変更して保存しますか？')
+                ->modalHeading(fn (): string => $this->issuedDocumentsHeading())
                 ->modalSubmitActionLabel('保存する')
                 ->modalCancelActionLabel('キャンセル')
             : $action, parent::getHeaderActions());
+    }
+
+    /** 「既に納品/請求レコードが作成されています。(納品書番号：…)…」 (legacy dialog of page 16). */
+    private function issuedDocumentsHeading(): string
+    {
+        $note = $this->record->deliveryNote?->number;
+        $invoice = $this->record->invoice?->number;
+        $numbers = array_filter([$note === null ? null : '納品書番号：'.$note, $invoice === null ? null : '請求書番号：'.$invoice]);
+        $documents = $invoice === null ? '納品' : ($note === null ? '請求' : '納品/請求');
+
+        return '既に'.$documents.'レコードが作成されています（'.implode('、', $numbers).'）。売上データを変更してよろしいですか？'
+            .'売上データを更新しても'.$documents.'レコードは更新されません。';
     }
 
     /** 売上数量 / 売上単価 / 売上金額 changed on a sale with a delivery note or invoice. */

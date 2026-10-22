@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Production\Filament\Resources\BagSchedules\Pages;
 
+use Carbon\CarbonImmutable;
 use DateTimeImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\Url;
@@ -76,7 +77,7 @@ final class ListBagSchedules extends AppListRecords
     {
         $day = DateTimeImmutable::createFromFormat('!Y-m-d', $this->ganttDate);
 
-        return $day !== false ? $day : new DateTimeImmutable('today');
+        return $day !== false ? $day : CarbonImmutable::today();
     }
 
     public function shiftGantt(int $steps): void

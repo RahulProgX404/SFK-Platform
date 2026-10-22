@@ -232,6 +232,7 @@ it('shows the daily reports in 日報一覧 and on the job, without the costs fo
 });
 
 it('draws the schedule as Gantt charts by machine and lists it for the print', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-10-21 10:00')); // the lists open on today
     $job = productionJob();
     $second = Machine::query()->create(['name' => '窓貼り機', 'code' => 'M02']);
     $this->actingAs($this->admin);

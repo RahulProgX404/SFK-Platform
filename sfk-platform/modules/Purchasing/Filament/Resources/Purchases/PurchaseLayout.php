@@ -21,6 +21,7 @@ use Modules\Core\Domain\Money\RoundingMode;
 use Modules\Core\Domain\Money\Yen;
 use Modules\Core\Filament\Records\RecordSections;
 use Modules\Core\Filament\Support\AppFormat;
+use Modules\Core\Filament\Support\FieldTip;
 use Modules\Core\Filament\Support\UserPopup;
 use Modules\MasterData\Domain\Partners\PurchaseCategory;
 use Modules\MasterData\Models\Partner;
@@ -107,7 +108,9 @@ final class PurchaseLayout
                 ->live(),
             'tax_mode' => $text(fn (Get $get): ?string => AppFormat::text($supplier($get)?->getAttribute('supplier_tax_mode'))),
             'master_category' => $text(fn (Get $get): ?string => AppFormat::text($supplier($get)?->purchase_category)),
-            'category' => Select::make($name)->label($label)->placeholder('-----')->options(self::categoryOptions())->native(false)->searchable(),
+            // 吹き出し of the legacy form (Customine 05 page 3)
+            'category' => FieldTip::add(Select::make($name)->label($label)->placeholder('-----')->options(self::categoryOptions())->native(false)->searchable(),
+                'マスタ登録と異なる仕入カテゴリの場合は選択してください。'),
             'purchase_number' => TextInput::make($name)->label($label)->disabled()->dehydrated(false),
             'order_id' => Select::make($name)
                 ->label($label)

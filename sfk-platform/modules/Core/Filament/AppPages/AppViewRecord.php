@@ -30,6 +30,7 @@ use Modules\Core\Application\History\HasRecordHistory;
 use Modules\Core\Application\History\RecordHistory;
 use Modules\Core\Domain\People\EmploymentStatus;
 use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
+use Modules\Core\Filament\Support\MenuButtons;
 use Modules\Core\Models\RecordComment;
 use Modules\Core\Models\RecordVersion;
 
@@ -332,6 +333,8 @@ abstract class AppViewRecord extends ViewRecord
         $resource = static::getResource();
 
         return [
+            // the app's legacy record buttons, not on an old version of the record
+            ...array_map(fn (Action $action): Action => MenuButtons::mark($action)->hidden(fn (): bool => $this->historyVersion !== null), $this->menuActions()),
             EditAction::make()
                 ->label('レコードを編集する')
                 ->icon(Heroicon::OutlinedPencil)
@@ -362,6 +365,28 @@ abstract class AppViewRecord extends ViewRecord
                 ->color('gray')
                 ->iconButton(),
         ];
+    }
+
+    /**
+     * The app's legacy record buttons (「ボタンをメニュー位置に配置する」 レコード詳細メニューの上側), drawn as buttons before
+     * 編集 / 再利用 / 「…」.
+     *
+     * @return list<Action>
+     */
+    protected function menuActions(): array
+    {
+        return [];
+    }
+
+    /**
+     * The legacy text of the record menu (「メニュー位置に文字を表示する」 レコード詳細メニューの上側) as button label =>
+     * explanation, shown in the collapsible 「ボタンの説明」 panel; empty for none.
+     *
+     * @return array<string, string>
+     */
+    public function menuHelp(): array
+    {
+        return [];
     }
 
     /**
