@@ -6,20 +6,24 @@ namespace Modules\MasterData\Filament\Resources\Consumables;
 
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Section;
-use Modules\Core\Filament\Records\RecordLayout;
+use Modules\Core\Filament\Records\RecordSections;
 use Modules\MasterData\Domain\Consumables\ConsumableFields;
 
 /**
- * The legacy form of 19. 消耗品マスタ, row by row with the field widths of the app template (SYSTEM_BRAIN APP_19
- * fields.md; widths from the template ZIP). The form and the record page both build from it.
+ * The form of 19. 消耗品マスタ (fields of SYSTEM_BRAIN APP_19 fields.md), grouped on a 12-column grid of the 1,500 px
+ * canvas: 基本情報 (名称, カテゴリ, 区分, 仕入先), 単価・在庫 and その他. The form and the record page both build from it.
  */
 final class ConsumableLayout
 {
     /** Rows: [attribute, width px]. */
     private const ROWS = [
-        [['name', 579], ['box_type', 196], ['kind', 196], ['reorder_point', 193]],
-        [['amount', 193], ['unit_price', 193], ['unit', 193], ['stock', 193], ['lot_size', 193], ['supplier_id', 501]],
-        [['notes', 579]],
+        '基本情報',
+        [['name', 750], ['box_type', 375], ['kind', 375]],
+        [['supplier_id', 750]],
+        '単価・在庫',
+        [['unit_price', 250], ['unit', 250], ['amount', 250], ['stock', 250], ['reorder_point', 250], ['lot_size', 250]],
+        'その他',
+        [['notes', 1500]],
     ];
 
     private const FOOTER = [[['id', 120], ['creator', 136], ['created_at', 196], ['updater', 136], ['updated_at', 196]]];
@@ -44,7 +48,7 @@ final class ConsumableLayout
         if ($withDeveloperFields) {
             $components[] = Section::make('開発者用フィールド')
                 ->collapsed()
-                ->schema(self::rows(self::DEVELOPER, $make))
+                ->schema(RecordSections::rows(self::DEVELOPER, $make))
                 ->extraAttributes(['class' => 'kt-record'])
                 ->columnSpanFull();
         }
@@ -58,24 +62,11 @@ final class ConsumableLayout
     }
 
     /**
-     * @param  list<list<array{0: string, 1: int}>>  $rows
-     * @param  callable(string): Component  $make
+     * @param  list<list<array{0: string|null, 1: int}>|string>  $rows  rows, a string row is a group label
+     * @param  callable(string): ?Component  $make
      */
     private static function section(array $rows, callable $make): Section
     {
-        return Section::make()->schema(self::rows($rows, $make))->extraAttributes(['class' => 'kt-record'])->columnSpanFull();
-    }
-
-    /**
-     * @param  list<list<array{0: string, 1: int}>>  $rows
-     * @param  callable(string): Component  $make
-     * @return list<Component>
-     */
-    private static function rows(array $rows, callable $make): array
-    {
-        return array_map(
-            fn (array $row): Component => RecordLayout::row(array_map(fn (array $cell): array => [$make($cell[0]), $cell[1]], $row)),
-            $rows,
-        );
+        return Section::make()->schema(RecordSections::rows($rows, $make))->extraAttributes(['class' => 'kt-record'])->columnSpanFull();
     }
 }

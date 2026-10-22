@@ -55,7 +55,7 @@ it('keeps past sales with 年間合計 and draws the legacy graphs', function ()
     expect($sale->total)->toBe(1750000)->and($sale->flag)->toBe('正常');
 
     Livewire::test(ViewPastSale::class, ['record' => $sale->getRouteKey()])
-        ->assertSeeInOrder(['担当者', '営業 一郎', '異常値フラグ', '正常', '決算年度', '2024年', '小計', '¥1,750,000', '年間合計', '¥1,750,000', '5月', '¥1,000,000']);
+        ->assertSeeInOrder(['担当者', '営業 一郎', '決算年度', '2024年', '異常値フラグ', '正常', '年間合計', '¥1,750,000', '小計', '¥1,750,000', '5月', '¥1,000,000']);
 
     Livewire::test(ListPastSales::class)->assertSee('売上一覧')->assertCanSeeTableRecords([$sale]);
     // the app is not in the registry here: its code-defined views are used as they are
@@ -88,6 +88,6 @@ it('takes the actuals of a sales plan from the sales of its business year', func
         ->and($plan->progress())->toBe('76.7');
 
     Livewire::test(ViewSalesPlan::class, ['record' => $plan->getRouteKey()])
-        ->assertSeeInOrder(['得意先コード', 'C900', '得意先名', '株式会社計画先', 'グループ名', 'DNP', '年', '2026年05月', '計画値', '¥30,000', '年間合計', '¥23,000',
+        ->assertSeeInOrder(['得意先名', '株式会社計画先', '得意先コード', 'C900', 'グループ名', 'DNP', '年', '2026年05月', '計画値', '¥30,000', '年間合計', '¥23,000',
             '計画比進捗率', '76.7%', '▼ 計画値', '¥10,000', '▼ 実績', '¥15,000']);
 });

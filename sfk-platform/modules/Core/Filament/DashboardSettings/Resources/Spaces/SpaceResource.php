@@ -120,7 +120,7 @@ final class SpaceResource extends Resource
                     ->mutateRecordDataUsing(fn (array $data, Space $record): array => [
                         ...$data,
                         'user_ids' => $record->users()->pluck('users.id')->all(),
-                        'app_ids' => $record->apps()->pluck('id')->all(),
+                        'app_ids' => $record->apps()->pluck('business_apps.id')->all(),
                     ])
                     ->using(fn (Space $record, array $data): Space => self::save($record, $data)),
                 DeleteAction::make()

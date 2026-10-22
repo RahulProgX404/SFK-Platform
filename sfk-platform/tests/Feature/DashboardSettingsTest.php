@@ -9,7 +9,6 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Livewire\Livewire;
 use Modules\Core\Access\AppAccess;
-use Modules\Core\Application\Apps\AppActionNotAllowed;
 use Modules\Core\Application\Apps\SpaceService;
 use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\AppStatus;
@@ -23,8 +22,11 @@ use Modules\Core\Models\Space;
 
 function placed_app(string $code, AppStatus $status = AppStatus::Published, ?Space $space = null): BusinessApp
 {
-    $app = new BusinessApp(['code' => $code, 'name' => $code, 'space_id' => $space?->id]);
+    $app = new BusinessApp(['code' => $code, 'name' => $code]);
     $app->forceFill(['status' => $status])->save();
+    if ($space !== null) {
+        $app->spaces()->attach($space);
+    }
 
     return $app;
 }
@@ -70,25 +72,26 @@ it('creates a space with member employees and apps', function () {
         ->and($space->apps()->pluck('code')->sort()->values()->all())->toBe(['order-entry', 'partner-master']);
 });
 
-it('keeps an app in one space only and frees it when its space is deleted', function () {
+it('places an app in several spaces and keeps the others when one of them is deleted', function () {
     $this->actingAs($this->admin);
     $sales = Space::query()->create(['panel_id' => 'erp', 'name' => '営業']);
     $app = placed_app('partner-master', space: $sales);
     $factory = Space::query()->create(['panel_id' => 'erp', 'name' => '製造']);
+    $factoryWorker = grantDashboards(User::factory()->create(), 'erp');
+    $app->permissions()->create(['subject_type' => 'everyone', 'can_view' => true]);
 
-    // The dropdown does not even offer it…
-    $component = Livewire::test(ManageSpaces::class)
-        ->callTableAction('edit', $factory, data: ['name' => '製造', 'app_ids' => [$app->id]]);
-    expect(collect($component->errors()->keys())->contains(fn (string $key): bool => str_contains($key, 'app_ids')))->toBeTrue()
-        ->and($app->fresh()->space_id)->toBe($sales->id);
+    // the app placed in 営業 is offered for 製造 too and joins it
+    Livewire::test(ManageSpaces::class)
+        ->callTableAction('edit', $factory, data: ['name' => '製造', 'user_ids' => [$factoryWorker->id], 'app_ids' => [$app->id]])
+        ->assertHasNoTableActionErrors();
+    expect(SpaceService::placeableApps($factory))->toHaveKey($app->id)
+        ->and($app->fresh()->spaces->pluck('name')->all())->toBe(['営業', '製造'])
+        ->and(AppAccess::abilitiesFor($factoryWorker, $app->fresh()))->toBe([AppAbility::View]);
 
-    // …and the service refuses it too.
-    expect(fn () => app(SpaceService::class)->save($factory, 'erp', ['name' => '製造', 'app_ids' => [$app->id]], $this->admin))
-        ->toThrow(AppActionNotAllowed::class, '他のスペースに配置済みのアプリは追加できません：partner-master');
-    expect($app->fresh()->space_id)->toBe($sales->id);
-
+    // deleting 営業 keeps the app in 製造
     Livewire::test(ManageSpaces::class)->callTableAction('delete', $sales);
-    expect($app->fresh()->space_id)->toBeNull();
+    expect($app->fresh()->spaces->pluck('name')->all())->toBe(['製造'])
+        ->and(AppAccess::abilitiesFor($factoryWorker, $app->fresh()))->toBe([AppAbility::View]);
 });
 
 it('accepts only employees as space members', function () {

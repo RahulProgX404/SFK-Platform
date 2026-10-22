@@ -13,9 +13,9 @@
             display: grid; place-items: center; width: 3rem; height: 3rem; flex-shrink: 0;
             background: var(--kt-blue, #3498db); color: #fff;
         }
-        .sfk-settings-title { margin: 0; font-size: 1rem; font-weight: 700; color: var(--kt-blue, #3498db); }
+        .sfk-settings-title { margin: 0; font-size: 1.125rem; font-weight: 700; color: var(--kt-blue, #3498db); }
         .sfk-settings-card:hover .sfk-settings-title { text-decoration: underline; }
-        .sfk-settings-metric { margin: 0; font-size: .75rem; color: var(--kt-muted, #888); }
+        .sfk-settings-metric { margin: 0; font-size: .875rem; color: var(--kt-muted, #888); }
     </style>
 
     <x-filament::section heading="設定メニュー">

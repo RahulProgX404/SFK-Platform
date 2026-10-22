@@ -60,7 +60,10 @@ function publishProductionApps(): void
     app(AppLifecycle::class)->syncWithCode($codes, $defaults);
     $space = Space::query()->firstOrCreate(['panel_id' => 'erp', 'name' => '製造スペース']);
     BusinessApp::query()->whereIn('code', array_keys($codes))->get()
-        ->each(fn (BusinessApp $app) => $app->forceFill(['status' => AppStatus::Published, 'space_id' => $space->id])->save());
+        ->each(function (BusinessApp $app) use ($space): void {
+            $app->forceFill(['status' => AppStatus::Published])->save();
+            $app->spaces()->syncWithoutDetaching([$space->id]);
+        });
 }
 
 function productionView(string $code, string $name): string
@@ -148,9 +151,9 @@ it('enters a daily report per task: costs it with the overtime and keeps the job
         ->and($this->box->stock())->toBe('90.0000'); // 使用数 10 (BR-PR-07)
 
     Livewire::test(ViewDailyReport::class, ['record' => $first->getRouteKey()])
-        ->assertSeeInOrder(['作業日', '2026-10-20', '作業者', '製造 太郎', '注番情報', $job->order_number, '長3封筒', '使用機械情報', '製袋機1号', '使用ダンボール情報',
-            '段ボール A式', '90', '10', 'その他作業情報', '08:00', '17:00', '01:00', '3,000', '1,500', '平日', '17:30', '19:00', '前、中、後', '着用', '8時間',
-            '¥36,000', '1.5時間']);
+        ->assertSeeInOrder(['作業日', '2026-10-20', '作業者', '製造 太郎', '製袋機1号', '平日', '注番情報', $job->order_number, '長3封筒', '作業時間・出来高',
+            '08:00', '17:00', '01:00', '3,000', '1,500', '17:30', '19:00', '使用資材', '段ボール A式', '90', '10', '品質・ステータス', '前、中、後', '着用',
+            '8時間', '¥36,000', '1.5時間']);
 
     // saved again with the task moved to another job: nothing is counted twice, the old job is recalculated
     Livewire::test(EditDailyReport::class, ['record' => $first->getRouteKey()])
@@ -223,7 +226,7 @@ it('shows the daily reports in 日報一覧 and on the job, without the costs fo
     $app = BusinessApp::query()->where('code', 'daily-report')->sole();
     $app->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true, AppAbility::Create->column() => true]);
     $employee = grantDashboards($this->worker, 'erp');
-    $app->space?->users()->attach($employee);
+    $app->spaces->first()?->users()->attach($employee);
     $this->actingAs($employee);
 
     $this->get(DailyReportResource::getUrl('view', ['record' => $report]))->assertOk()->assertSee(['製袋機1号', '作業時間'])->assertDontSee('社内原価')

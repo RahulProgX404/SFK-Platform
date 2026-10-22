@@ -74,7 +74,10 @@ function publishSalesApps(): void
     app(AppLifecycle::class)->syncWithCode($codes, $defaults);
     $space = Space::query()->firstOrCreate(['panel_id' => 'erp', 'name' => '売上スペース']);
     BusinessApp::query()->whereIn('code', array_keys($codes))->get()
-        ->each(fn (BusinessApp $app) => $app->forceFill(['status' => AppStatus::Published, 'space_id' => $space->id])->save());
+        ->each(function (BusinessApp $app) use ($space): void {
+            $app->forceFill(['status' => AppStatus::Published])->save();
+            $app->spaces()->syncWithoutDetaching([$space->id]);
+        });
 }
 
 /** The id of a stored list view of an app (stored when its list is first shown). */
@@ -214,7 +217,7 @@ it('shows and edits a delivery note, an untouched table row is not saved', funct
         ->assertCanNotSeeTableRecords([$note]);
 
     Livewire::test(ViewDeliveryNote::class, ['record' => $note->getRouteKey()])
-        ->assertSeeInOrder(['納品書番号', $note->number, '得意先名', '株式会社得意先', '納品書発行区分', '郵送', '納品金額合計(税抜)', '¥10,000',
+        ->assertSeeInOrder(['納品書番号', $note->number, '得意先名', '株式会社得意先', '納品金額合計(税抜)', '¥10,000', '納品書発行区分', '郵送',
             '納品内容詳細', '長3封筒', '10%対象小計', '¥10,000', '10%対象消費税', '¥1,000']);
 
     Livewire::test(EditDeliveryNote::class, ['record' => $note->getRouteKey()])->fillForm(['send_status' => '済'])->call('save')->assertHasNoFormErrors();
@@ -354,7 +357,7 @@ it('lets employees see the receivables as the app permissions allow, without 請
     $app = BusinessApp::query()->where('code', 'receivable-cycle')->sole();
     $app->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true, AppAbility::Update->column() => true]);
     $employee = grantDashboards(User::factory()->create(), 'erp');
-    $app->space?->users()->attach($employee);
+    $app->spaces->first()?->users()->attach($employee);
     $this->actingAs($employee);
 
     $this->get(CycleReceivableResource::getUrl('index'))->assertOk()->assertSee('株式会社得意先');
@@ -526,7 +529,7 @@ it('deletes the checked sales after two confirmations with 削除 of 06_SalesEnt
     $app = BusinessApp::query()->where('code', 'sales-entry')->sole();
     $app->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true, AppAbility::Delete->column() => true]);
     $employee = grantDashboards(User::factory()->create(), 'erp');
-    $app->space?->users()->attach($employee);
+    $app->spaces->first()?->users()->attach($employee);
     $this->actingAs($employee);
     Livewire::test(ListSales::class)->assertActionHidden('deleteSales')->assertActionHidden('appendDeliveryNotes')->assertActionHidden('appendInvoices');
 });

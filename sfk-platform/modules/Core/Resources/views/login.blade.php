@@ -1,10 +1,10 @@
 <x-core::layouts.account title="ログイン">
     <style>
         .kt-login { max-width: 420px; margin: 40px auto 0; }
-        .kt-login h1 { text-align: center; font-size: 22px; margin-bottom: 24px; }
+        .kt-login h1 { text-align: center; font-size: 25px; margin-bottom: 24px; }
         .kt-field { margin-bottom: 18px; }
-        .kt-field label { display: block; padding: 4px 0 8px; font-size: 14px; }
-        .kt-remember { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 20px; }
+        .kt-field label { display: block; padding: 4px 0 8px; font-size: 16px; }
+        .kt-remember { display: flex; align-items: center; gap: 8px; font-size: 15px; margin-bottom: 20px; }
         .kt-login .kt-button { width: 100%; }
     </style>
 
@@ -36,7 +36,7 @@
                     </div>
 
                     <label class="kt-remember">
-                        <input type="checkbox" name="remember" value="1" @checked(old('remember'))>
+                        <input type="checkbox" class="sfk-ui-check" name="remember" value="1" @checked(old('remember'))>
                         ログインしたままにする
                     </label>
 

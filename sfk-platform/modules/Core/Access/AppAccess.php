@@ -10,6 +10,7 @@ use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\PermissionSubject;
 use Modules\Core\Models\AppPermission;
 use Modules\Core\Models\BusinessApp;
+use Modules\Core\Models\Space;
 use WeakMap;
 
 /**
@@ -18,8 +19,8 @@ use WeakMap;
  * 1. ユーザー種別 super_admin: everything, in every status. An app that is not registered yet counts as 開発中.
  * 2. admin: everything once the app has left development (準備完了 / 公開中 / メンテナンス中 / 停止中).
  * 3. employee, only for 公開中 and メンテナンス中 apps, and only when
- *    - the app is placed in a space, the user can open that space's dashboard (DashboardAccess) and is a
- *      member of the space;
+ *    - the app is placed in a space (it may be in several) whose dashboard the user can open (DashboardAccess)
+ *      and of which the user is a member;
  *    - then the app's permission rows decide: the user's own row, else the rows of their 従業員カテゴリ (a user
  *      may have several: their abilities are combined), else the 全員 row, else nothing. A matching level
  *      replaces the lower ones entirely (like the legacy system's first match).
@@ -46,7 +47,7 @@ final class AppAccess
         $key = $user->id.':'.$appCode;
 
         if (! array_key_exists($key, $cached)) {
-            $app = BusinessApp::query()->with('space')->where('code', $appCode)->first();
+            $app = BusinessApp::query()->with('spaces')->where('code', $appCode)->first();
             $cached[$key] = self::abilitiesFor($user, $app);
             self::$perRequest[$request] = $cached;
         }
@@ -91,12 +92,14 @@ final class AppAccess
     /** @return list<AppAbility> */
     private static function employeeAbilities(User $user, BusinessApp $app): array
     {
-        $space = $app->space;
+        if (! $app->status->isOpenToEmployees()) {
+            return [];
+        }
 
-        if (! $app->status->isOpenToEmployees()
-            || $space === null
-            || ! DashboardAccess::allows($user, $space->panel_id)
-            || ! $space->users()->whereKey($user->id)->exists()) {
+        $member = $app->spaces->contains(fn (Space $space): bool => DashboardAccess::allows($user, $space->panel_id)
+            && $space->users()->whereKey($user->id)->exists());
+
+        if (! $member) {
             return [];
         }
 

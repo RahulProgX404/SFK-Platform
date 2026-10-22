@@ -54,7 +54,8 @@ function publishHrApps(User ...$members): void
     $space = Space::query()->firstOrCreate(['panel_id' => 'erp', 'name' => '総務スペース']);
     $space->users()->attach(array_map(fn (User $member): int => $member->id, $members));
     BusinessApp::query()->whereIn('code', array_keys($codes))->get()->each(function (BusinessApp $app) use ($space): void {
-        $app->forceFill(['status' => AppStatus::Published, 'space_id' => $space->id])->save();
+        $app->forceFill(['status' => AppStatus::Published])->save();
+        $app->spaces()->syncWithoutDetaching([$space->id]);
         $app->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true, AppAbility::Create->column() => true,
             AppAbility::Update->column() => true]);
     });
@@ -107,7 +108,7 @@ it('takes a request through 申請する, 差戻し and 承認済, and shows emp
     $this->get(LeaveRequestResource::getUrl('view', ['record' => $others]))->assertNotFound();
 
     Livewire::test(ViewLeaveRequest::class, ['record' => $request->getRouteKey()])
-        ->assertSeeInOrder(['ステータス', '申請前', '作業者', '申請 太郎', '申請区分', '早退申請', '申請者', '申請 太郎', '申請分類', '早退(時間欠勤)', '対象日付', '2026-10-23',
+        ->assertSeeInOrder(['ステータス', '申請前', '作業者', '申請 太郎', '申請区分', '早退申請', '申請分類', '早退(時間欠勤)', '対象日付', '2026-10-23', '申請者', '申請 太郎',
             '01:30', '15:30', '申請理由', '通院のため'])
         ->assertActionVisible(TestAction::make('submit'))
         ->assertActionHidden(TestAction::make('approve'))
@@ -165,7 +166,7 @@ it('keeps a checklist with its rows and reuses it for the next month', function 
     expect($check->user_id)->toBe($this->employee->id)->and($check->items)->toHaveCount(2)->and($check->items[1]->checked)->toBeTrue();
 
     Livewire::test(ViewSafetyCheck::class, ['record' => $check->getRouteKey()])
-        ->assertSeeInOrder(['部署・機械', '製袋機1号', '部署', '製造', '名前', '申請 太郎', '日付', '2026-09-30', '※営業は1～6・14・15・19を記入してください',
+        ->assertSeeInOrder(['日付', '2026-09-30', '名前', '申請 太郎', '部署', '製造', '部署・機械', '製袋機1号', '※営業は1～6・14・15・19を記入してください',
             'チェックリスト', '整理整頓ができている', 'はい', '✓', '保護具を着用している', 'いいえ', '✓', '手袋の替えが必要']);
 
     Livewire::test(ListSafetyChecks::class)
@@ -208,8 +209,8 @@ it('records the alcohol check before and after driving', function () {
     expect($check->driver_id)->toBe($this->employee->id);
 
     Livewire::test(ViewAlcoholCheck::class, ['record' => $check->getRouteKey()])
-        ->assertSeeInOrder(['運転前', '検査日', '2026-10-21', '検査時刻', '08:05', '氏名', '申請 太郎', '確認者', '管理者', '車両番号', 'な　2-10（トラック）', '確認方法', '対面',
-            '酒気帯び運転の有無', '無', '運転後', '17:20', '電話']);
+        ->assertSeeInOrder(['検査日', '2026-10-21', '氏名', '申請 太郎', '運転前', '検査時刻', '08:05', '車両番号', 'な　2-10（トラック）', '確認方法', '対面',
+            '酒気帯び運転の有無', '無', '確認者', '管理者', '運転後', '17:20', '電話']);
 
     Livewire::test(ListAlcoholChecks::class)
         ->assertSee(['検査時刻(運転後)', '確認方法(運転後)'])

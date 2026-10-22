@@ -56,7 +56,7 @@ final class AppsSettings extends Page
     protected function getViewData(): array
     {
         $superAdmin = self::actor()?->isSuperAdmin() ?? false;
-        $apps = BusinessApp::query()->with('space')->orderBy('sort_order')->get()->groupBy(fn (BusinessApp $app): string => $app->status->value);
+        $apps = BusinessApp::query()->with('spaces')->orderBy('sort_order')->get()->groupBy(fn (BusinessApp $app): string => $app->status->value);
 
         return [
             'columns' => array_map(fn (AppStatus $status): array => [

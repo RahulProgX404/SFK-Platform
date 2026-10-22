@@ -19,21 +19,21 @@ use Modules\HumanResources\Domain\HrFields;
 use Modules\HumanResources\Filament\Support\Employees;
 
 /**
- * Form and record page of 18. アルコールチェック (SYSTEM_BRAIN APP_18 fields.md "Form layout", widths from the template):
- * 運転前 — 検査日, 検査時刻 (now to start with), 氏名, 従業員名, 確認者, 車両番号, 確認方法, 酒気帯び運転の有無, 指示項目
- * (the legacy default text), その他必要な項目 — and 運転後 with the same checks.
+ * Form and record page of 18. アルコールチェック (fields of SYSTEM_BRAIN APP_18 fields.md), on a 12-column grid of the 1,500 px
+ * canvas: 基本情報 (検査日, 氏名, 従業員名), then 運転前 — 検査時刻 (now to start with), 車両番号, 確認方法, 酒気帯び運転の有無,
+ * 確認者, 指示項目 (the legacy default text), その他必要な項目 — and 運転後 with the same checks in the same places.
  */
 final class AlcoholCheckLayout
 {
     private const MAIN = [
+        '基本情報',
+        [['checked_on', 250], ['driver_id', 625], ['employee_id', 625]],
         '運転前',
-        [['checked_on', 117], ['before_time', 101], ['driver_id', 344], ['employee_id', 330], ['before_checker_id', 344]],
-        [['before_vehicle', 196], ['before_method', 196], ['before_detected', 196], ['before_instruction', 392]],
-        [['before_notes', 980]],
+        [['before_time', 250], ['before_vehicle', 250], ['before_method', 250], ['before_detected', 375], ['before_checker_id', 375]],
+        [['before_instruction', 750], ['before_notes', 750]],
         '運転後',
-        [['after_time', 101], ['after_vehicle', 196], ['after_method', 196], ['after_detected', 196], ['after_checker_id', 344]],
-        [['after_instruction', 392]],
-        [['after_notes', 980]],
+        [['after_time', 250], ['after_vehicle', 250], ['after_method', 250], ['after_detected', 375], ['after_checker_id', 375]],
+        [['after_instruction', 750], ['after_notes', 750]],
     ];
 
     private const FOOTER = [[['id', 120], ['creator', 136], ['created_at', 196], ['updater', 136], ['updated_at', 196]]];

@@ -26,9 +26,10 @@ use Modules\Production\Domain\ProductionFields;
 use Modules\Production\Models\BagSchedule;
 
 /**
- * Form and record page of 12. 製袋予定管理 (SYSTEM_BRAIN APP_12 fields.md "Form layout", widths from the template): 開始 /
- * 終了日時, 機械名, 使用状況, 入力方法 and either 注番 (a job, its 品名 shown) or 注番(フリー) / 品名(フリー) — the inputs of the
- * other 入力方法 cannot be typed —, 部数 and 備考. 開発者用フィールド shows the job's values the schedule print uses.
+ * Form and record page of 12. 製袋予定管理 (fields of SYSTEM_BRAIN APP_12 fields.md), on a 12-column grid of the 1,500 px
+ * canvas: 予定 (開始 / 終了日時, 機械名, 使用状況) and 内容 (入力方法, 部数, either 注番 — a job, its 品名 shown — or 注番(フリー) /
+ * 品名(フリー) — the inputs of the other 入力方法 cannot be typed — and 備考). 開発者用フィールド shows the job's values the
+ * schedule print uses.
  */
 final class BagScheduleLayout
 {
@@ -37,10 +38,13 @@ final class BagScheduleLayout
         'brought_by' => 'delivery_service', 'die_cut' => 'die_cut', 'window' => 'window', 'flap_glue' => 'flap_glue'];
 
     private const MAIN = [
-        [['starts_at', 196], ['ends_at', 196]],
-        [['machine_id', 392], ['usage_status', 196]],
-        [['entry_mode', 334]],
-        [['order_id', 246], ['product_name', 349], ['free_order_number', 246], ['free_product_name', 349], ['copies', 154], ['notes', 333]],
+        '予定',
+        [['starts_at', 375], ['ends_at', 375], ['machine_id', 500], ['usage_status', 250]],
+        '内容',
+        [['entry_mode', 500], ['copies', 250]],
+        [['order_id', 375], ['product_name', 1125]],
+        [['free_order_number', 375], ['free_product_name', 1125]],
+        [['notes', 1500]],
     ];
 
     private const FOOTER = [[['id', 120], ['creator', 136], ['created_at', 196], ['updater', 136], ['updated_at', 196]]];

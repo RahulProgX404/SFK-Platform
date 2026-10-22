@@ -46,11 +46,13 @@ trait HasAppChrome
     {
         $resource = $this->appResource();
         $app = $resource::app() ?? new BusinessApp(['name' => $resource::appName()]);
+        $user = auth()->user();
 
         return [
             'name' => $app->name,
             'icon' => $app->iconText(),
-            'space' => $app->relationLoaded('space') ? $app->space?->name : null,
+            // the space it is shown under on this dashboard (it may be in several)
+            'space' => $app->exists ? $app->spaceOn(Filament::getCurrentOrDefaultPanel()->getId(), $user instanceof User ? $user : null)?->name : null,
             'description' => filled($app->description) ? $app->description : $resource::appDescription(),
             'index_url' => $resource::getUrl('index'),
             'create_url' => $resource::hasPage('create') && $resource::canCreate() ? $resource::getUrl('create') : null,
@@ -157,6 +159,25 @@ trait HasAppChrome
         }
 
         return Route::has('filament.settings.pages.apps') ? route('filament.settings.pages.apps') : null;
+    }
+
+    /**
+     * The レコード ('records') or フィールド ('fields') アクセス権 of the app (administrators), in this dashboard's settings;
+     * null where the app is not in them.
+     */
+    public function appAccessUrl(BusinessApp $app, string $page): ?string
+    {
+        if (! $this->isAppAdministrator() || ! $app->exists) {
+            return null;
+        }
+
+        $panel = Filament::getCurrentPanel();
+
+        return $panel !== null
+            && in_array(AppSettingsResource::class, $panel->getResources(), true)
+            && AppSettingsResource::getEloquentQuery()->whereKey($app->getKey())->exists()
+            ? AppSettingsResource::getUrl($page, ['record' => $app])
+            : null;
     }
 
     private function isAppAdministrator(): bool

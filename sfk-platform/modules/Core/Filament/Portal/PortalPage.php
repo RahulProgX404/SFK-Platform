@@ -101,7 +101,7 @@ final class PortalPage extends Dashboard
                 ])->all()
                 : [],
             'filterSpaces' => $this->spaces(forFilter: true),
-            'apps' => $this->appSpace === null ? $apps : $apps->where('space_id', $this->appSpace)->values(),
+            'apps' => $this->appSpace === null ? $apps : $apps->filter(fn (BusinessApp $app): bool => $app->spaces->contains('id', $this->appSpace))->values(),
             'appUrls' => $apps->mapWithKeys(fn (BusinessApp $app): array => [$app->id => AppResource::urlForApp($app->code, Filament::getCurrentOrDefaultPanel())])->all(),
             'isAdministrator' => self::isAdministrator(),
             'isSuperAdmin' => $user?->isSuperAdmin() ?? false,
@@ -178,7 +178,7 @@ final class PortalPage extends Dashboard
             ->visible(fn (): bool => self::isAdministrator())
             ->modalHeading('アプリの並び替え')
             ->modalWidth('lg')
-            ->modalContent(fn (): View => view('core::filament.portal-app-order', ['apps' => $this->visibleApps()]))
+            ->modalContent(fn (): View => view('core::filament.portal-app-order', ['apps' => $this->visibleApps(), 'panelId' => self::panelId()]))
             ->modalSubmitAction(false)
             ->modalCancelActionLabel('閉じる');
     }
@@ -211,14 +211,15 @@ final class PortalPage extends Dashboard
             return collect();
         }
 
-        // Apps placed in this dashboard's spaces; super admins also see apps built for this dashboard that are not
+        // Apps placed in this dashboard's spaces (an app in several of them is listed once); super admins also see apps
+        // built for this dashboard that are not
         // placed yet. Who sees which stage: AppAccess::listsOnDashboard (unpublished ones are dimmed in the view).
         $builtHere = AppResource::appCodesIn(Filament::getCurrentOrDefaultPanel());
 
         return BusinessApp::query()
-            ->with('space')
+            ->with('spaces')
             ->where(fn ($query) => $query
-                ->whereHas('space', fn ($query) => $query->where('panel_id', self::panelId()))
+                ->whereHas('spaces', fn ($query) => $query->where('panel_id', self::panelId()))
                 ->when($user->isSuperAdmin(), fn ($query) => $query->orWhereIn('code', $builtHere)))
             ->orderBy('sort_order')
             ->orderBy('id')

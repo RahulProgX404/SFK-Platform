@@ -11,7 +11,7 @@ use Modules\Core\Models\Space;
 
 /**
  * Spaces of one dashboard, maintained by administrators in that dashboard's ダッシュボード設定: name, members
- * and apps. An app belongs to at most one space, so only unplaced apps (or the space's own) can be added.
+ * and apps. An app may be placed in several spaces (of this dashboard and others), so every app can be added.
  */
 final class SpaceService
 {
@@ -41,36 +41,24 @@ final class SpaceService
             throw new AppActionNotAllowed('スペースを管理できるのは管理者のみです。');
         }
 
-        // Its apps become unplaced again (space_id is nulled by the foreign key).
+        // Its apps leave it (the placements go with the space); they stay in their other spaces.
         $space->delete();
     }
 
     /** @param  list<int>  $appIds */
     private function syncApps(Space $space, array $appIds): void
     {
-        $taken = BusinessApp::query()
-            ->whereIn('id', $appIds)
-            ->whereNotNull('space_id')
-            ->where('space_id', '!=', $space->id)
-            ->pluck('name');
-
-        if ($taken->isNotEmpty()) {
-            throw new AppActionNotAllowed('他のスペースに配置済みのアプリは追加できません：'.$taken->implode('、'));
-        }
-
-        BusinessApp::query()->where('space_id', $space->id)->whereNotIn('id', $appIds)->update(['space_id' => null]);
-        BusinessApp::query()->whereIn('id', $appIds)->update(['space_id' => $space->id]);
+        $space->apps()->sync(BusinessApp::query()->whereIn('id', $appIds)->pluck('id')->all());
     }
 
     /**
-     * Apps that can be placed in the space: unplaced ones and its own.
+     * Apps that can be placed in the space: every app (an app may be in several spaces).
      *
      * @return array<int, string> id => "name (code)"
      */
     public static function placeableApps(?Space $space): array
     {
         return BusinessApp::query()
-            ->where(fn ($query) => $query->whereNull('space_id')->when($space !== null, fn ($query) => $query->orWhere('space_id', $space?->id)))
             ->orderBy('sort_order')
             ->get(['id', 'name', 'code'])
             ->mapWithKeys(fn (BusinessApp $app): array => [$app->id => "{$app->name}（{$app->code}）"])

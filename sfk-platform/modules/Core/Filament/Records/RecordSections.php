@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\Core\Filament\Records;
 
+use Filament\Forms\Components\Field;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Text;
+use Modules\Core\Access\FieldAccess;
+use Modules\Core\Domain\Apps\FieldAccessLevel;
 
 /**
  * Builds the white record cards of an app's legacy form from rows of [attribute, width px] (RecordLayout::row()):
  * `$make` returns the input or entry of an attribute, or null for what a screen does not show (that cell is left out,
- * and a row without any shown cell too); a null attribute is a legacy SPACER. A string row is a legacy label field
- * shown as a group label (blue bar). The form and the record page of an app both build from the same rows.
+ * and a row without any shown cell too); a null attribute is a legacy SPACER. A string row is a group label (blue bar)
+ * over the rows after it, left out when none of them is shown. The form and the record page of an app both build from
+ * the same rows.
  */
 final class RecordSections
 {
@@ -39,9 +43,18 @@ final class RecordSections
     public static function rows(array $rows, callable $make): array
     {
         $built = [];
+        $levels = FieldAccess::onCurrentPage();
+        // group labels wait for the first shown row under them: a group with nothing shown has no label (labels
+        // straight after one another, e.g. two notes, belong together)
+        $labels = [];
+        $skipped = false;
         foreach ($rows as $row) {
             if (is_string($row)) {
-                $built[] = Text::make($row)->extraAttributes(['class' => 'kt-record-label'])->columnSpanFull();
+                if ($skipped) {
+                    $labels = [];
+                    $skipped = false;
+                }
+                $labels[] = Text::make($row)->extraAttributes(['class' => 'kt-record-label'])->columnSpanFull();
 
                 continue;
             }
@@ -49,7 +62,7 @@ final class RecordSections
             $cells = [];
             $shown = false;
             foreach ($row as [$attribute, $width]) {
-                $component = $attribute === null ? null : $make($attribute);
+                $component = $attribute === null ? null : self::gate($attribute, $make($attribute), $levels);
                 if ($attribute !== null && $component === null) {
                     continue;
                 }
@@ -57,11 +70,35 @@ final class RecordSections
                 $cells[] = [$component, $width];
             }
 
-            if ($shown) {
-                $built[] = RecordLayout::row($cells);
+            if (! $shown) {
+                $skipped = $labels !== [];
+
+                continue;
             }
+
+            array_push($built, ...$labels);
+            $labels = [];
+            $skipped = false;
+            $built[] = RecordLayout::row($cells);
         }
 
         return $built;
+    }
+
+    /**
+     * フィールドのアクセス権 of the field on this screen (FieldAccess::onCurrentPage()): なし leaves it out, 閲覧 shows its
+     * input disabled (a disabled input is not saved).
+     *
+     * @param  array<string, FieldAccessLevel>  $levels
+     */
+    public static function gate(string $attribute, ?Component $component, array $levels): ?Component
+    {
+        $level = $levels[$attribute] ?? FieldAccessLevel::Edit;
+
+        if ($component === null || ! $level->canView()) {
+            return null;
+        }
+
+        return ! $level->canEdit() && $component instanceof Field ? $component->disabled() : $component;
     }
 }

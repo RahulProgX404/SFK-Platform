@@ -32,8 +32,10 @@ use Modules\Purchasing\Domain\PurchasingFields;
 use Modules\Purchasing\Models\Purchase;
 
 /**
- * Form and record page of 05. 納品(仕入)入力 (SYSTEM_BRAIN APP_05 fields.md "Form layout", widths from the template), with
- * the legacy Customine behaviour:
+ * Form and record page of 05. 納品(仕入)入力 (fields of SYSTEM_BRAIN APP_05 fields.md), grouped by task on a 12-column grid
+ * of the 1,500 px canvas — 基本情報 (No, 納品(仕入)日, 仕入先, 帳端処理; the categories), 受注 (受注No, 品名, FSC, 注番基本情報),
+ * 金額 (数量 × 単価 = 金額 and 仕入金額合計, then 断裁 / 版代 / 置き版代 / 特色), 原価チェック (仕入原価超過, 通知先) and
+ * 同注番の仕入履歴 — with the legacy Customine behaviour:
  *
  * - 仕入先: 仕入先 only, newest first (lookup); its 消費税区分 and 仕入カテゴリ(マスタ) are shown from the master.
  * - 仕入カテゴリ: chosen only when it differs from the master (BR-PU-04); the four un-numbered legacy options are left out.
@@ -48,14 +50,19 @@ use Modules\Purchasing\Models\Purchase;
 final class PurchaseLayout
 {
     private const MAIN = [
-        [['purchased_on', 117], ['supplier_id', 475], ['tax_mode', 193], ['master_category', 193], ['category', 196], ['purchase_number', 193]],
-        [['order_id', 246], ['order_info', 1254]],
-        [['product_name', 399], ['quantity', 193], ['unit_price', 193], ['amount', 193], ['cutting_amount', 193]],
-        [[null, 293], ['is_fsc', 106], ['plate_amount', 193], ['stored_plate_amount', 218], ['spot_color_amount', 193]],
-        [['period_end', 94]],
+        '基本情報',
+        [['purchase_number', 250], ['purchased_on', 250], ['supplier_id', 750], ['period_end', 250]],
+        [['category', 500], ['master_category', 500], ['tax_mode', 500]],
+        '受注',
+        [['order_id', 375], ['product_name', 875], ['is_fsc', 250]],
+        [['order_info', 1500]],
+        '金額',
+        [['quantity', 375], ['unit_price', 375], ['amount', 375], ['total', 375]],
+        [['cutting_amount', 375], ['plate_amount', 375], ['stored_plate_amount', 375], ['spot_color_amount', 375]],
+        '原価チェック',
+        [['overruns', 750], ['notified_users', 750]],
+        '同注番の仕入履歴',
         [['same_order', 1500]],
-        [['overruns', 394], ['notified_users', 344]],
-        [['total', 193]],
     ];
 
     private const FOOTER = [[['id', 120], ['creator', 136], ['created_at', 196], ['updater', 136], ['updated_at', 196]]];

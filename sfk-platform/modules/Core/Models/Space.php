@@ -7,11 +7,11 @@ namespace Modules\Core\Models;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * スペース: a group inside one dashboard (`panel_id`) holding member users and apps. A user may belong to
- * several spaces; an app to at most one. Employees use an app only as members of its space.
+ * several spaces, and so may an app (of this dashboard or others). Employees use an app as members of one of its
+ * spaces.
  *
  * @property int $id
  * @property string $panel_id
@@ -40,9 +40,9 @@ final class Space extends Model
         return $this->belongsToMany(User::class)->withTimestamps();
     }
 
-    /** @return HasMany<BusinessApp, $this> */
-    public function apps(): HasMany
+    /** @return BelongsToMany<BusinessApp, $this> */
+    public function apps(): BelongsToMany
     {
-        return $this->hasMany(BusinessApp::class)->orderBy('sort_order')->orderBy('name');
+        return $this->belongsToMany(BusinessApp::class)->withTimestamps()->orderBy('business_apps.sort_order')->orderBy('business_apps.name');
     }
 }

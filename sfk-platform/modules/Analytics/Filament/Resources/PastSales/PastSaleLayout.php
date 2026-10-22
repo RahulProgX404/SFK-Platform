@@ -22,8 +22,9 @@ use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Support\UserPopup;
 
 /**
- * Form and record page of 22. 過去の売上データ (SYSTEM_BRAIN APP_22 fields.md "Form layout", widths from the template):
- * 担当者, 異常値フラグ, 決算最終月初 with 決算年度, 小計 / 年間合計, the twelve months May–April and レコードキー.
+ * Form and record page of 22. 過去の売上データ (fields of SYSTEM_BRAIN APP_22 fields.md), on a 12-column grid of the 1,500 px
+ * canvas: 基本情報 (担当者, 決算最終月初 with 決算年度, 異常値フラグ, レコードキー) and 売上 (年間合計 / 小計, then the twelve
+ * months May–April).
  */
 final class PastSaleLayout
 {
@@ -98,13 +99,14 @@ final class PastSaleLayout
      */
     private static function components(callable $make, bool $withFooter): array
     {
-        $months = array_map(fn (string $column): array => [$column, 193], FiscalYear::columns());
+        $months = array_map(fn (string $column): array => [$column, 250], FiscalYear::columns());
         $main = [
-            [['salesperson', 193], ['flag', 253]],
-            [['fiscal_month_start', 117], ['fiscal_year', 193], ['subtotal', 193], ['total', 193]],
+            '基本情報',
+            [['salesperson', 375], ['fiscal_month_start', 250], ['fiscal_year', 250], ['flag', 375], ['record_key', 250]],
+            '売上',
+            [['total', 375], ['subtotal', 375]],
             array_slice($months, 0, 6),
             array_slice($months, 6),
-            [['record_key', 193]],
         ];
 
         $components = [RecordSections::section($main, $make)];

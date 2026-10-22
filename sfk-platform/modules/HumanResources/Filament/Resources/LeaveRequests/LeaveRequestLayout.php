@@ -23,18 +23,22 @@ use Modules\HumanResources\Filament\Support\Employees;
 use Modules\HumanResources\Models\LeaveRequest;
 
 /**
- * Form and record page of 16. 申請管理 (SYSTEM_BRAIN APP_16 fields.md "Form layout", widths from the template): 申請区分,
- * 申請者 (the signed-in user to start with), 作業員名 (employees 在籍中), 申請分類, 対象日付, the late / early times in steps of
- * 30 minutes and 申請理由. The record page shows ステータス and 作業者 of the プロセス管理 above the fields.
+ * Form and record page of 16. 申請管理 (fields of SYSTEM_BRAIN APP_16 fields.md), on a 12-column grid of the 1,500 px canvas:
+ * 申請内容 (申請区分, 申請分類, 対象日付; 申請者 — the signed-in user to start with — and 作業員名, employees 在籍中), 遅刻・早退
+ * (the times in steps of 30 minutes) and 申請理由. The record page shows ステータス and 作業者 of the プロセス管理 above the fields.
  */
 final class LeaveRequestLayout
 {
-    private const STATUS = [[['status', 117], ['assignee', 193]]];
+    private const STATUS = [[['status', 250], ['assignee', 375]]];
 
     private const MAIN = [
-        [['request_type', 196], ['applicant_id', 344], ['worker_id', 301]],
-        [['category', 196], ['target_on', 117], ['total_time', 258], ['clock_time', 286]],
-        [['reason', 540]],
+        '申請内容',
+        [['request_type', 500], ['category', 500], ['target_on', 500]],
+        [['applicant_id', 750], ['worker_id', 750]],
+        '遅刻・早退',
+        [['total_time', 750], ['clock_time', 750]],
+        '申請理由',
+        [['reason', 1500]],
     ];
 
     private const FOOTER = [[['id', 120], ['creator', 136], ['created_at', 196], ['updater', 136], ['updated_at', 196]]];

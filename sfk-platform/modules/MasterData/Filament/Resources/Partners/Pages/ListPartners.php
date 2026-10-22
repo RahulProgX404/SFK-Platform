@@ -79,7 +79,7 @@ final class ListPartners extends AppListRecords
                 ->label('ファイルに書き出す')
                 ->icon(Heroicon::OutlinedArrowDownTray)
                 ->visible(fn (): bool => PartnerResource::appCan(AppAbility::Export))
-                ->action(fn (): StreamedResponse => app(PartnerCsvExport::class)->download($this->exportQuery())),
+                ->action(fn (): StreamedResponse => app(PartnerCsvExport::class)->download($this->exportQuery(), $this->hiddenFields())),
         ];
     }
 

@@ -49,7 +49,8 @@ function publishedOrderApp(): BusinessApp
     app(AppLifecycle::class)->syncWithCode(['order-entry' => '04. 受注入力'], ['order-entry' => OrderResource::appSettingDefaults()]);
     $space = Space::query()->firstOrCreate(['panel_id' => 'erp', 'name' => '営業スペース']);
     $app = BusinessApp::query()->where('code', 'order-entry')->sole();
-    $app->forceFill(['status' => AppStatus::Published, 'space_id' => $space->id])->save();
+    $app->forceFill(['status' => AppStatus::Published])->save();
+    $app->spaces()->syncWithoutDetaching([$space->id]);
 
     return $app;
 }
@@ -70,7 +71,7 @@ function orderEmployeeWith(array $abilities): User
     $app->permissions()->create(['subject_type' => PermissionSubject::Everyone, ...$columns]);
 
     $employee = grantDashboards(User::factory()->create(), 'erp');
-    $app->space?->users()->attach($employee);
+    $app->spaces->first()?->users()->attach($employee);
 
     return $employee;
 }
@@ -148,10 +149,11 @@ it('creates an order with 注番, the customer terms and the estimate rounded by
         ->and(RecordVersion::query()->where('record_type', $order->getMorphClass())->where('record_id', $order->id)->sole()->snapshot['papers'])->toHaveCount(1);
 
     Livewire::test(ViewOrder::class, ['record' => $order->getRouteKey()])
-        ->assertSeeInOrder(['ステータス', '断裁作業中', '注番', 'sfk-0000001', '担当者', '営業 花子', '得意先(受注先)', '株式会社サンプル', '締日', '20日',
-            '品名', '長3封筒', '数量', '10,000', '用紙情報', '紙商事', '紙商', 'クラフト', '¥45,205', '小計', '¥51,205', '金額(刷版)', '¥10,002',
-            '印刷', '¥6,000', 'トムソン・NO・シルク・箔', '手動', '¥2,500', '製 袋・製 本・他 加 工', '▲ 折りたたむ', '売上金額', '¥120,000',
-            '見積原価合計', '¥82,207', '見積利益', '¥37,793', '過去の受注履歴検索', 'その他', '日報一覧', '仕入履歴', '受注入力ID', '各種原価']);
+        ->assertSeeInOrder(['基本情報', '得意先(受注先)', '株式会社サンプル', '注番', 'sfk-0000001', 'ステータス', '断裁作業中', '締日', '20日',
+            '品名', '長3封筒', '数量', '10,000', '担当者', '営業 花子', '売上・納品', '売上金額', '¥120,000', '見積原価合計', '¥82,207', '見積利益', '¥37,793',
+            '過去の受注履歴検索', '用紙情報', '紙商事', '紙商', 'クラフト', '¥45,205', '小計', '¥51,205', '金額(刷版)', '¥10,002',
+            '印　刷', '¥6,000', 'トムソン・NO・シルク・箔', '手動', '¥2,500', '製 袋・製 本・他 加 工', '▲ 折りたたむ', 'その他', '日報一覧', '仕入履歴',
+            '受注入力ID', '各種原価']);
 });
 
 it('numbers each new order and never reuses a number taken from the legacy data (BR-OR-01)', function () {

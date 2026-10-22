@@ -29,22 +29,24 @@ use Modules\Orders\Models\Quotation;
 use Modules\Orders\Models\QuotationLine;
 
 /**
- * Form and record page of 09. 見積書管理 (SYSTEM_BRAIN APP_09 fields.md "Form layout", widths from the template): 見積日付,
- * 得意先名 (found by name or 略名 — the legacy 略名取得ver lookup is part of the search), 担当者 (copied from the customer's
- * 自社担当者 when it is chosen), 見積書番号, 品名, the specification, 見積金額(税抜), the quantity tiers 見積内容 (金額 =
- * 単価 × 枚数), 備考 and 見積書PDF. The quotation itself is printed with 印刷する.
+ * Form and record page of 09. 見積書管理 (fields of SYSTEM_BRAIN APP_09 fields.md), grouped by task on a 12-column grid of
+ * the 1,500 px canvas: 基本情報 (見積書番号, 見積日付, 得意先名 (found by name or 略名 — the legacy 略名取得ver lookup is part of the search), 担当者 (copied from the customer's
+ * 自社担当者 when it is chosen); 品名 with 見積金額(税抜)), 仕様 (サイズ … その他フリー入力), the quantity tiers 見積内容
+ * (金額 = 単価 × 枚数) and その他 (備考, 見積書PDF). The quotation itself is printed with 印刷する.
  */
 final class QuotationLayout
 {
     private const MAIN = [
-        [['quoted_on', 117], ['customer_id', 493], ['assignees', 344], ['quote_number', 193]],
-        [['product_name', 410]],
-        [['size', 249], ['paper', 249], ['printing', 249], ['window', 249], ['flap_glue', 249]],
-        [['free_text_1', 249], ['free_text_2', 249], ['free_text_3', 249]],
-        [['total', 193]],
-        [['lines', 600]],
-        [['notes', 965]],
-        [['pdf_files', 400]],
+        '基本情報',
+        [['quote_number', 250], ['quoted_on', 250], ['customer_id', 625], ['assignees', 375]],
+        [['product_name', 1000], ['total', 500]],
+        '仕様',
+        [['size', 375], ['paper', 375], ['printing', 375], ['window', 375]],
+        [['flap_glue', 375], ['free_text_1', 375], ['free_text_2', 375], ['free_text_3', 375]],
+        '見積内容',
+        [['lines', 750]],
+        'その他',
+        [['notes', 1000], ['pdf_files', 500]],
     ];
 
     private const FOOTER = [[['id', 120], ['creator', 136], ['created_at', 196], ['updater', 136], ['updated_at', 196]]];

@@ -25,9 +25,9 @@ use Modules\Core\Filament\Support\UserPopup;
 use Modules\MasterData\Models\Partner;
 
 /**
- * Form and record page of 25. 販売先別売上計画 (SYSTEM_BRAIN APP_25 fields.md "Form layout", widths from the template): the
- * customer (得意先ID lookup; 得意先コード, 旧得意先コード, 得意先名, グループ名 and 分類 from the master), 中分類, 日付 / 年,
- * 計画値, 年間合計, 計画比進捗率, ▼ 計画値 and ▼ 実績 by month (May–April) and 備考.
+ * Form and record page of 25. 販売先別売上計画 (fields of SYSTEM_BRAIN APP_25 fields.md), on a 12-column grid of the 1,500 px
+ * canvas: 得意先 (得意先ID lookup and 得意先名; 得意先コード, 旧得意先コード, グループ名 and 分類 from the master, 中分類), 計画
+ * (日付 / 年, 計画値, 年間合計, 計画比進捗率), ▼ 計画値 and ▼ 実績 by month (May–April) and その他 (備考).
  */
 final class SalesPlanLayout
 {
@@ -125,18 +125,21 @@ final class SalesPlanLayout
      */
     private static function components(callable $make, bool $withFooter): array
     {
-        $months = fn (string $prefix): array => array_map(fn (string $column): array => [$column, 193], FiscalYear::columns($prefix));
+        $months = fn (string $prefix): array => array_map(fn (string $column): array => [$column, 250], FiscalYear::columns($prefix));
         $main = [
-            [['customer_id', 246], ['customer_code', 193], ['legacy_customer_code', 193]],
-            [['customer_name', 514], ['partner_group', 250], ['segment', 193], ['sub_category', 193]],
-            [['planned_on', 117], ['year', 193], ['plan_total', 193], ['actual_total', 193], ['progress', 193]],
+            '得意先',
+            [['customer_id', 375], ['customer_name', 1125]],
+            [['customer_code', 250], ['legacy_customer_code', 250], ['partner_group', 375], ['segment', 250], ['sub_category', 375]],
+            '計画',
+            [['planned_on', 250], ['year', 250], ['plan_total', 375], ['actual_total', 375], ['progress', 250]],
             self::label('plans'),
             array_slice($months('plan_'), 0, 6),
             array_slice($months('plan_'), 6),
             self::label('actuals'),
             array_slice($months('actual_'), 0, 6),
             array_slice($months('actual_'), 6),
-            [['notes', 1158]],
+            'その他',
+            [['notes', 1500]],
         ];
 
         $components = [RecordSections::section($main, $make)];

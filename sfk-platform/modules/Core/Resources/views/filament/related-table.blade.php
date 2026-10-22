@@ -6,13 +6,13 @@
 @once
     <style>
         .sfk-related-table { overflow-x: auto; }
-        .sfk-related-table table { width: 100%; border-collapse: collapse; font-size: .8125rem; }
+        .sfk-related-table table { width: 100%; border-collapse: collapse; font-size: .9375rem; }
         .sfk-related-table th { padding: 8px 12px; background: var(--kt-blue-soft); color: var(--kt-label); text-align: start; white-space: nowrap; }
         .sfk-related-table td { padding: 6px 12px; border-top: 1px solid var(--kt-border); color: var(--kt-text); }
         .sfk-related-table .is-number { text-align: end; font-variant-numeric: tabular-nums; }
         .sfk-related-table a { color: var(--kt-blue); }
         .sfk-related-table .sfk-related-icon { width: 1rem; height: 1rem; }
-        .sfk-related-title { margin: 0 0 6px; color: var(--kt-label); font-size: .8125rem; font-weight: 700; }
+        .sfk-related-title { margin: 0 0 6px; color: var(--kt-label); font-size: .9375rem; font-weight: 700; }
     </style>
 @endonce
 

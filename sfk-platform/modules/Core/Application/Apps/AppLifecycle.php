@@ -40,7 +40,6 @@ final class AppLifecycle
                     ]);
                     $app->forceFill([
                         'status' => AppStatus::Developing,
-                        'space_id' => null,
                         ...array_intersect_key($settingDefaults[$code] ?? [], array_flip(BusinessApp::SETTINGS)),
                     ])->save();
                     $added[] = $code;

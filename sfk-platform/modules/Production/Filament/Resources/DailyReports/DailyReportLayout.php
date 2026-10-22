@@ -37,32 +37,35 @@ use Modules\Production\Domain\ProductionFields;
 use Modules\Production\Models\DailyReport;
 
 /**
- * Form and record page of 08. 日報入力 (SYSTEM_BRAIN APP_08 fields.md "Form layout", widths from the template), one record
- * per task: 作業日 / 作業者 (employees 在籍中, newest first), 注番情報, 使用機械情報, 使用ダンボール情報 and その他作業情報
- * with the overtime. The job's 品名 / 受注数 / 製造済数 / 製造残数 / 現在のステータス and the boxes' 在庫数 are shown from
+ * Form and record page of 08. 日報入力 (fields of SYSTEM_BRAIN APP_08 fields.md), one record per task, grouped by task on
+ * a 12-column grid of the 1,500 px canvas: 作業情報 (作業日, 作業者 — employees 在籍中, newest first — 機械名, 日種別), 注番情報,
+ * 作業時間・出来高 (with 型変 and the overtime), 使用資材 (ダンボール, 仕切, 糊), 品質・ステータス, その他 and 原価. The job's 品名 / 受注数 / 製造済数 / 製造残数 / 現在のステータス and the boxes' 在庫数 are shown from
  * the masters; the figures follow TaskCosting (BR-PR-01..04). The money figures (時給計算 … 社内原価, 残業時給計算) and
  * 開発者用フィールド are shown to administrators only, like the cost data of the other production screens.
  */
 final class DailyReportLayout
 {
     private const MAIN = [
-        [['worked_on', 117], ['user_id', 284]],
+        '作業情報',
+        [['worked_on', 250], ['user_id', 500], ['machine_id', 500], ['day_type', 250]],
         '注番情報',
-        [['order_id', 358], ['product_name', 377], ['order_quantity', 112], ['manufactured_quantity', 112], ['manufacturing_remaining', 112]],
-        '使用機械情報',
-        [['machine_id', 358]],
-        '使用ダンボール情報',
-        [['cardboard_id', 358], ['cardboard_stock', 117], ['cardboard_used', 117]],
-        [['partition_id', 358], ['partition_stock', 119], ['partition_used', 119]],
-        'その他作業情報',
-        [['glue', 169], ['glue_cost', 189], ['started_at', 133], ['ended_at', 133], ['break_time', 109], ['changeover_minutes', 120], ['changeover_count', 117],
-            ['produced', 124], ['crew', 99], ['per_person', 136]],
-        [['day_type', 253], ['overtime_started_at', 161], ['overtime_ended_at', 161], ['overtime_break', 133]],
-        [['quality_checks', 246], ['gloves', 112], ['damaged_before', 117], ['damaged_after', 117], ['current_status', 213], ['update_status', 148],
-            ['new_status', 211], ['difficulty', 160]],
-        [['notes', 1164]],
-        [['work_hours', 193], ['labor_cost', 193], ['machine_fee', 193], ['sheet_fee', 193], ['changeover_fee', 193], ['internal_cost', 193]],
-        [['overtime_hours', 193], ['overtime_labor_cost', 193]],
+        [['order_id', 375], ['product_name', 1125]],
+        [['order_quantity', 500], ['manufactured_quantity', 500], ['manufacturing_remaining', 500]],
+        '作業時間・出来高',
+        [['started_at', 250], ['ended_at', 250], ['break_time', 250], ['produced', 250], ['crew', 250], ['per_person', 250]],
+        [['changeover_minutes', 250], ['changeover_count', 250], ['overtime_started_at', 375], ['overtime_ended_at', 375], ['overtime_break', 250]],
+        '使用資材',
+        [['cardboard_id', 750], ['cardboard_stock', 375], ['cardboard_used', 375]],
+        [['partition_id', 750], ['partition_stock', 375], ['partition_used', 375]],
+        [['glue', 375], ['glue_cost', 375]],
+        '品質・ステータス',
+        [['quality_checks', 375], ['difficulty', 375], ['gloves', 250], ['damaged_before', 250], ['damaged_after', 250]],
+        [['current_status', 375], ['update_status', 375], ['new_status', 375]],
+        'その他',
+        [['notes', 1500]],
+        '原価',
+        [['work_hours', 250], ['labor_cost', 250], ['machine_fee', 250], ['sheet_fee', 250], ['changeover_fee', 250], ['internal_cost', 250]],
+        [['overtime_hours', 250], ['overtime_labor_cost', 250]],
     ];
 
     private const FOOTER = [[['id', 120], ['creator', 136], ['created_at', 196], ['updater', 136], ['updated_at', 196]]];

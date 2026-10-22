@@ -18,8 +18,9 @@ use Modules\Core\Models\Space;
 
 function portal_app(string $code, string $name, Space $space, AppStatus $status = AppStatus::Published, ?string $iconText = null): BusinessApp
 {
-    $app = new BusinessApp(['code' => $code, 'name' => $name, 'space_id' => $space->id, 'icon_text' => $iconText]);
+    $app = new BusinessApp(['code' => $code, 'name' => $name, 'icon_text' => $iconText]);
     $app->forceFill(['status' => $status])->save();
+    $app->spaces()->attach($space);
 
     return $app;
 }

@@ -26,25 +26,32 @@ use Modules\Sales\Filament\SalesFormat;
 use Modules\Sales\Models\Invoice;
 
 /**
- * Form and record page of 11. 請求書管理(売上) (SYSTEM_BRAIN APP_11 fields.md "Form layout", widths from the template):
- * 送付 / 請求区分 / 登録番号 / 請求書番号, 請求日付 / 得意先名 / 担当者 / 今回締日 / 発行区分, 郵便番号 / 請求先, the statement
- * (前月御請求額, ご入金額, 繰越金額 = 前月 − 入金, 今回御買上額(税抜), 今回消費税額, 合計御買上金額, 御請求額, BR-SA-11),
- * 直近請求レコード (record page), the table 請求内容詳細, the subtotals and taxes per rate, 備考, 請求書PDF and
- * 締日売掛連携キー (請求月度). Invoices are created from 06. 売上入力 with the balances of 23-2 (BR-SA-12).
+ * Form and record page of 11. 請求書管理(売上) (fields of SYSTEM_BRAIN APP_11 fields.md), grouped by task on a 12-column
+ * grid of the 1,500 px canvas: 基本情報 (請求書番号, 請求日付, 今回締日, 請求区分, 送付; 得意先名, 担当者, 登録番号), 請求先
+ * (郵便番号 / 請求先 with the issuance categories), 請求金額 — the statement as it reads: 前月御請求額 − ご入金額 = 繰越金額,
+ * then 今回御買上額(税抜) + 今回消費税額 = 合計御買上金額 and 御請求額 at the end (BR-SA-11) — 請求内容 (the table
+ * 請求内容詳細), 税率別内訳, その他 (備考, 請求書PDF) and 直近請求レコード (record page). 締日売掛連携キー (請求月度) is in the
+ * footer. Invoices are created from 06. 売上入力 with the balances of 23-2 (BR-SA-12).
  */
 final class InvoiceLayout
 {
     private const MAIN = [
-        [['send_status', 265], ['kind', 250], [null, 549], ['registration_number', 193], ['number', 191]],
-        [['invoiced_on', 117], ['customer_id', 449], ['assignees', 344], ['closing_day', 193], ['invoice_issuance', 193], ['delivery_note_issuance', 193]],
-        [['postal_code', 193], ['address', 581]],
-        [['previous_amount', 193], ['received_amount', 193], ['carried_amount', 193], ['subtotal', 193], ['tax_total', 193], ['purchase_total', 193], ['billed_total', 193]],
-        [['recent_invoices', 1500]],
+        '基本情報',
+        [['number', 250], ['invoiced_on', 250], ['closing_day', 250], ['kind', 375], ['send_status', 375]],
+        [['customer_id', 750], ['assignees', 375], ['registration_number', 375]],
+        '請求先',
+        [['postal_code', 250], ['address', 750], ['invoice_issuance', 250], ['delivery_note_issuance', 250]],
+        '請求金額',
+        [['previous_amount', 375], ['received_amount', 375], ['carried_amount', 375]],
+        [['subtotal', 375], ['tax_total', 375], ['purchase_total', 375], ['billed_total', 375]],
+        '請求内容',
         [['lines', 1500]],
-        [['standard_subtotal', 193], ['reduced_subtotal', 193], ['exempt_subtotal', 193], ['out_of_scope_subtotal', 193]],
-        [['standard_tax', 193], ['reduced_tax', 193], ['exempt_tax', 193], ['out_of_scope_tax', 193], ['tax_sum', 193]],
-        [['notes', 860]],
-        [['pdf_files', 207]],
+        '税率別内訳',
+        [['standard_subtotal', 250], ['reduced_subtotal', 250], ['exempt_subtotal', 250], ['out_of_scope_subtotal', 250]],
+        [['standard_tax', 250], ['reduced_tax', 250], ['exempt_tax', 250], ['out_of_scope_tax', 250], ['tax_sum', 250]],
+        'その他',
+        [['notes', 1000], ['pdf_files', 500]],
+        [['recent_invoices', 1500]],
     ];
 
     private const FOOTER = [

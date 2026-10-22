@@ -77,6 +77,28 @@ abstract class AppSettings extends Page
         return $this->appPermissionsUrl($this->app());
     }
 
+    /**
+     * How much each アクセス権 holds: rows of the アプリ permissions, レコード settings, fields with フィールド settings.
+     *
+     * @return array{app: int, records: int, fields: int}
+     */
+    public function accessCounts(): array
+    {
+        $app = $this->app();
+
+        return [
+            'app' => $app->permissions()->count(),
+            'records' => $app->recordRules()->count(),
+            'fields' => $app->fieldPermissions()->distinct()->count('field'),
+        ];
+    }
+
+    /** アクセス権 → レコード / フィールド (null where the app is not in this dashboard's settings). */
+    public function accessUrl(string $page): ?string
+    {
+        return $this->appAccessUrl($this->app(), $page);
+    }
+
     /** その他の設定 → 保存 */
     public function saveMisc(): void
     {

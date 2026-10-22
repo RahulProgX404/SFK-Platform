@@ -6,20 +6,20 @@
         .sfk-column.is-blocked { opacity: .35; }
         .sfk-column.is-target { outline-color: var(--kt-blue, #3498db); background: var(--kt-blue-soft, #ebf5fb); }
         .sfk-column-head { display: flex; align-items: center; justify-content: space-between; padding: .625rem .75rem; border-bottom: 1px solid var(--kt-border, #e3e7e8); background: #fff; }
-        .sfk-column-title { margin: 0; font-size: .875rem; font-weight: 700; }
-        .sfk-column-count { font-size: .75rem; color: var(--kt-muted, #888); }
+        .sfk-column-title { margin: 0; font-size: 1rem; font-weight: 700; }
+        .sfk-column-count { font-size: .875rem; color: var(--kt-muted, #888); }
         .sfk-cards { display: flex; flex-direction: column; gap: .5rem; padding: .5rem; flex: 1; }
         .sfk-card { background: #fff; border: 1px solid var(--kt-border, #e3e7e8); padding: .625rem .75rem; }
         .sfk-card[draggable="true"] { cursor: grab; }
         .sfk-card[draggable="true"]:hover { border-color: var(--kt-blue, #3498db); }
         .sfk-card.is-dragging { opacity: .5; }
-        .sfk-card-name { margin: 0; font-size: .875rem; font-weight: 700; color: #333; }
-        .sfk-card-code { margin: .125rem 0 0; font-size: .75rem; color: var(--kt-muted, #888); font-family: monospace; }
-        .sfk-card-meta { margin: .375rem 0 0; font-size: .75rem; color: #555; }
+        .sfk-card-name { margin: 0; font-size: 1rem; font-weight: 700; color: #333; }
+        .sfk-card-code { margin: .125rem 0 0; font-size: .875rem; color: var(--kt-muted, #888); font-family: monospace; }
+        .sfk-card-meta { margin: .375rem 0 0; font-size: .875rem; color: #555; }
         .sfk-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem; margin-top: .5rem; }
-        .sfk-move { font-size: .75rem; border: 1px solid var(--kt-border, #e3e7e8); background: #fff; padding: .125rem .5rem; }
+        .sfk-move { font-size: .875rem; border: 1px solid var(--kt-border, #e3e7e8); background: #fff; padding: .125rem .5rem; }
         .sfk-move:hover { border-color: var(--kt-blue, #3498db); color: var(--kt-blue, #3498db); }
-        .sfk-empty { margin: .5rem; font-size: .75rem; color: var(--kt-muted, #888); text-align: center; }
+        .sfk-empty { margin: .5rem; font-size: .875rem; color: var(--kt-muted, #888); text-align: center; }
         .sfk-status-developing .sfk-column-head, .sfk-status-testing .sfk-column-head { border-top: 3px solid #95a5a6; }
         .sfk-status-ready .sfk-column-head { border-top: 3px solid var(--kt-blue, #3498db); }
         .sfk-status-published .sfk-column-head { border-top: 3px solid #27ae60; }
@@ -74,7 +74,7 @@
                             <p class="sfk-card-name">{{ $app->name }}</p>
                             <p class="sfk-card-code">{{ $app->code }}</p>
                             <p class="sfk-card-meta">
-                                {{ $app->space !== null ? 'スペース：'.$app->space->name : '未配置' }}
+                                {{ $app->spaces->isNotEmpty() ? 'スペース：'.$app->spaces->pluck('name')->implode('、') : '未配置' }}
                             </p>
 
                             <div class="sfk-card-actions">

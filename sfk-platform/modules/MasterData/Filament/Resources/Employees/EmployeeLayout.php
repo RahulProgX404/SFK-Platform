@@ -9,7 +9,7 @@ use Closure;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Section;
 use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Filament\Records\RecordLayout;
+use Modules\Core\Filament\Records\RecordSections;
 use Modules\MasterData\Domain\Employees\EmployeeFields;
 
 /**
@@ -42,7 +42,7 @@ final class EmployeeLayout
             self::section(self::FOOTER, $make),
             Section::make('開発者用フィールド')
                 ->collapsed()
-                ->schema(self::rows(self::DEVELOPER, $make))
+                ->schema(RecordSections::rows(self::DEVELOPER, $make))
                 ->extraAttributes(['class' => 'kt-record'])
                 ->columnSpanFull()
                 ->visible(fn (?Model $record): bool => $showRates($record instanceof User ? $record : null)),
@@ -55,24 +55,11 @@ final class EmployeeLayout
     }
 
     /**
-     * @param  list<list<array{0: string, 1: int}>>  $rows
-     * @param  callable(string): Component  $make
+     * @param  list<list<array{0: string|null, 1: int}>|string>  $rows  rows, a string row is a group label
+     * @param  callable(string): ?Component  $make
      */
     private static function section(array $rows, callable $make): Section
     {
-        return Section::make()->schema(self::rows($rows, $make))->extraAttributes(['class' => 'kt-record'])->columnSpanFull();
-    }
-
-    /**
-     * @param  list<list<array{0: string, 1: int}>>  $rows
-     * @param  callable(string): Component  $make
-     * @return list<Component>
-     */
-    private static function rows(array $rows, callable $make): array
-    {
-        return array_map(
-            fn (array $row): Component => RecordLayout::row(array_map(fn (array $cell): array => [$make($cell[0]), $cell[1]], $row)),
-            $rows,
-        );
+        return Section::make()->schema(RecordSections::rows($rows, $make))->extraAttributes(['class' => 'kt-record'])->columnSpanFull();
     }
 }

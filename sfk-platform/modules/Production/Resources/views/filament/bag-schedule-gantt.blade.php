@@ -16,20 +16,20 @@
         .sfk-gantt-nav button { min-width: 36px; height: 32px; padding: 0 10px; border: 1px solid var(--kt-border); background: #f7f9fa; color: var(--kt-blue); cursor: pointer; }
         .sfk-gantt-nav button:hover { background: #c8d6dd; }
         .sfk-gantt-title { font-weight: 700; color: var(--kt-label); }
-        .sfk-gantt-legend { display: flex; gap: 14px; margin-inline-start: auto; font-size: .8125rem; color: var(--kt-label); }
+        .sfk-gantt-legend { display: flex; gap: 14px; margin-inline-start: auto; font-size: .9375rem; color: var(--kt-label); }
         .sfk-gantt-legend span { display: inline-flex; align-items: center; gap: 6px; }
         .sfk-gantt-legend i { display: inline-block; width: 28px; height: 12px; }
         .sfk-gantt-scroll { overflow-x: auto; }
         .sfk-gantt-grid { min-width: 960px; }
         .sfk-gantt-row { display: grid; grid-template-columns: 200px 1fr; border-bottom: 1px solid #f0f2f3; }
-        .sfk-gantt-row.is-head { background: var(--kt-blue-soft); font-weight: 700; color: var(--kt-label); font-size: .75rem; }
-        .sfk-gantt-machine { padding: 8px 12px; border-inline-end: 1px solid var(--kt-border); color: var(--kt-label); font-size: .8125rem; }
+        .sfk-gantt-row.is-head { background: var(--kt-blue-soft); font-weight: 700; color: var(--kt-label); font-size: .875rem; }
+        .sfk-gantt-machine { padding: 8px 12px; border-inline-end: 1px solid var(--kt-border); color: var(--kt-label); font-size: .9375rem; }
         .sfk-gantt-cols { display: grid; }
         .sfk-gantt-cols > div { padding: 6px 2px; text-align: center; border-inline-start: 1px solid #e3e7e8; white-space: nowrap; overflow: hidden; }
         .sfk-gantt-track { position: relative; }
         .sfk-gantt-lines { position: absolute; inset: 0; display: grid; pointer-events: none; }
         .sfk-gantt-lines > div { border-inline-start: 1px solid #f0f2f3; }
-        .sfk-gantt-bar { position: absolute; height: 26px; padding: 0 6px; overflow: hidden; color: #fff; font-size: .75rem; line-height: 26px; white-space: nowrap; text-overflow: ellipsis; }
+        .sfk-gantt-bar { position: absolute; height: 26px; padding: 0 6px; overflow: hidden; color: #fff; font-size: .875rem; line-height: 26px; white-space: nowrap; text-overflow: ellipsis; }
         .sfk-gantt-bar:hover { filter: brightness(.92); }
     </style>
 @endonce

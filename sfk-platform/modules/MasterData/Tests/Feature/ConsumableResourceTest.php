@@ -52,7 +52,8 @@ function publishedConsumableApp(): BusinessApp
     app(AppLifecycle::class)->syncWithCode(['consumables-master' => '19. 消耗品マスタ'], ['consumables-master' => ConsumableResource::appSettingDefaults()]);
     $space = Space::query()->firstOrCreate(['panel_id' => 'erp', 'name' => '製造スペース']);
     $app = BusinessApp::query()->where('code', 'consumables-master')->sole();
-    $app->forceFill(['status' => AppStatus::Published, 'space_id' => $space->id])->save();
+    $app->forceFill(['status' => AppStatus::Published])->save();
+    $app->spaces()->syncWithoutDetaching([$space->id]);
 
     return $app;
 }
@@ -102,8 +103,8 @@ it('creates a consumable with its supplier and shows the saved record with 在�
         ->and($consumable->created_by)->toBe($this->admin->id);
 
     Livewire::test(ViewConsumable::class, ['record' => $consumable->getRouteKey()])
-        ->assertSeeInOrder(['名称', '段ボール A-1', 'カテゴリ', '【A式】', '区分', '段ボール', '発注点', '50', '金額', '¥12,000', '単価', '¥120.5',
-            '単位', '枚', '在庫数', 'ロット数', '100', '仕入先名', '株式会社ダンボール', '備考', '角2用', 'レコード番号', '作成者', '更新者',
+        ->assertSeeInOrder(['名称', '段ボール A-1', 'カテゴリ', '【A式】', '区分', '段ボール', '仕入先名', '株式会社ダンボール', '単価', '¥120.5', '単位', '枚',
+            '金額', '¥12,000', '在庫数', '発注点', '50', 'ロット数', '100', '備考', '角2用', 'レコード番号', '作成者', '更新者',
             '得意先コード', 'S100', '入出庫履歴']);
 
     Livewire::test(CreateConsumable::class)->fillForm(['name' => '段ボール A-1'])->call('create')->assertHasFormErrors(['name' => 'unique']);
@@ -209,7 +210,7 @@ it('limits employees to what the app permissions allow, 入出庫 included', fun
     $app = publishedConsumableApp();
     $app->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true]);
     $viewer = grantDashboards(User::factory()->create(), 'erp');
-    $app->space?->users()->attach($viewer);
+    $app->spaces->first()?->users()->attach($viewer);
     $this->actingAs($viewer);
 
     $this->get(ConsumableResource::getUrl('index'))->assertOk()->assertSee('段ボール A-1');

@@ -6,8 +6,8 @@
     <style>
         .kt-password { max-width: 520px; margin: 0 auto; }
         .kt-field { margin-bottom: 18px; }
-        .kt-field label { display: block; padding: 4px 0 8px; font-size: 14px; }
-        .kt-required { color: var(--kt-red); margin-left: 2px; font-size: 20px; line-height: 1; }
+        .kt-field label { display: block; padding: 4px 0 8px; font-size: 16px; }
+        .kt-required { color: var(--kt-red); margin-left: 2px; font-size: 23px; line-height: 1; }
         .kt-actions {
             display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;
             margin: 8px -16px -16px; padding: 16px; border-top: 1px solid var(--kt-border); background: var(--kt-header);

@@ -1,4 +1,5 @@
-{{-- アプリの並び替え (ポータル ⚙, administrators): drag an app by its handle; the order applies when it is dropped. --}}
+{{-- アプリの並び替え (ポータル ⚙, administrators): drag an app by its handle; the order applies when it is dropped. Each app
+     shows its spaces of this dashboard ($panelId). --}}
 <ul
     class="sfk-app-order"
     x-data
@@ -14,8 +15,9 @@
             </button>
             <span class="sfk-app-icon" aria-hidden="true">{{ $app->iconText() }}</span>
             <span class="sfk-app-order-name">{{ $app->name }}</span>
-            @if ($app->space !== null)
-                <span class="sfk-row-muted">{{ $app->space->name }}</span>
+            @php($spaceNames = $app->spaces->where('panel_id', $panelId)->pluck('name'))
+            @if ($spaceNames->isNotEmpty())
+                <span class="sfk-row-muted">{{ $spaceNames->implode('、') }}</span>
             @endif
         </li>
     @endforeach

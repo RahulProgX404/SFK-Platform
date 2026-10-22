@@ -31,21 +31,26 @@ use Modules\Production\Models\AccidentDamage;
 use Modules\Production\Models\AccidentReport;
 
 /**
- * Form and record page of 14. 事故報告管理 (SYSTEM_BRAIN APP_14 fields.md "Form layout", widths from the template): 事故発生日,
- * 報告者氏名 (employees 在籍中), 注番 with the job's 得意先名 / 品名 shown, 数量, 担当機械, 製造者1 / 2, 営業関係者, the four
- * texts, 備考, the table 損害 (小計 = 原価 × 数量) and 合計損害額.
+ * Form and record page of 14. 事故報告管理 (fields of SYSTEM_BRAIN APP_14 fields.md), grouped by task on a 12-column grid of
+ * the 1,500 px canvas: 基本情報 (事故発生日, 報告者氏名 — employees 在籍中 — 注番 with the job's 得意先名 / 品名 shown, 数量),
+ * 関係者 (担当機械, 製造者1 / 2, 営業関係者), 事故内容 (the four texts), 損害 (the table, 小計 = 原価 × 数量, and 合計損害額)
+ * and その他 (備考).
  */
 final class AccidentReportLayout
 {
     private const MAIN = [
-        [['occurred_on', 117], ['reporter_id', 288], ['order_id', 246]],
-        [['customer', 405], ['product_name', 405], ['quantity', 146]],
-        [['machine_id', 405], ['maker1_id', 288], ['maker2_id', 288], ['sales_users', 344]],
-        [['description', 651], ['cause', 651]],
-        [['response', 651], ['prevention', 651]],
-        [['notes', 651]],
-        [['damages', 1000]],
-        [['total_damage', 193]],
+        '基本情報',
+        [['occurred_on', 250], ['reporter_id', 500], ['order_id', 375], ['quantity', 375]],
+        [['customer', 750], ['product_name', 750]],
+        '関係者',
+        [['machine_id', 375], ['maker1_id', 375], ['maker2_id', 375], ['sales_users', 375]],
+        '事故内容',
+        [['description', 750], ['cause', 750]],
+        [['response', 750], ['prevention', 750]],
+        '損害',
+        [['damages', 1125], ['total_damage', 375]],
+        'その他',
+        [['notes', 1500]],
     ];
 
     private const FOOTER = [[['id', 120], ['creator', 136], ['created_at', 196], ['updater', 136], ['updated_at', 196]]];

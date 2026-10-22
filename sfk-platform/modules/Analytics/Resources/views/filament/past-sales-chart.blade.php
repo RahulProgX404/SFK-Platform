@@ -16,9 +16,9 @@
         .sfk-chart { background: #fff; border: 1px solid var(--kt-border); padding: 16px 20px; }
         .sfk-chart-group { display: grid; grid-template-columns: 180px 1fr; gap: 6px 16px; padding: 10px 0; border-bottom: 1px solid #f0f2f3; }
         .sfk-chart-group:last-child { border-bottom: 0; }
-        .sfk-chart-name { color: var(--kt-label); font-size: .8125rem; font-weight: 700; }
+        .sfk-chart-name { color: var(--kt-label); font-size: .9375rem; font-weight: 700; }
         .sfk-chart-bars { display: grid; gap: 6px; }
-        .sfk-chart-bar { display: grid; grid-template-columns: 72px 1fr; align-items: center; gap: 8px; font-size: .75rem; color: var(--kt-label); }
+        .sfk-chart-bar { display: grid; grid-template-columns: 72px 1fr; align-items: center; gap: 8px; font-size: .875rem; color: var(--kt-label); }
         .sfk-chart-track { position: relative; height: 18px; margin-inline-end: 240px; }
         .sfk-chart-fill { position: absolute; top: 0; bottom: 0; background: var(--kt-blue); }
         .sfk-chart-fill:hover { filter: brightness(.9); }

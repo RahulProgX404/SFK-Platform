@@ -43,7 +43,7 @@ function registered_app(AppStatus $status, string $code = 'partner-master'): Bus
 it('adds apps built in code as 開発中 and removes apps whose code was deleted', function () {
     $space = Space::query()->create(['panel_id' => 'erp', 'name' => '営業']);
     $kept = registered_app(AppStatus::Published, 'live-app');
-    $kept->update(['space_id' => $space->id]);
+    $kept->spaces()->attach($space);
     $gone = registered_app(AppStatus::Published, 'deleted-from-code');
     $gone->permissions()->create(['subject_type' => 'everyone', 'can_view' => true]);
     $this->actingAs($this->superAdmin);
@@ -52,10 +52,10 @@ it('adds apps built in code as 開発中 and removes apps whose code was deleted
 
     $added = BusinessApp::query()->where('code', 'partner-master')->firstOrFail();
     expect($added->status)->toBe(AppStatus::Developing)
-        ->and($added->space_id)->toBeNull()
+        ->and($added->spaces()->exists())->toBeFalse()
         ->and(BusinessApp::query()->whereKey($gone->id)->exists())->toBeFalse()
         ->and($kept->fresh()->status)->toBe(AppStatus::Published)
-        ->and($kept->fresh()->space_id)->toBe($space->id)
+        ->and($kept->fresh()->spaces->pluck('id')->all())->toBe([$space->id])
         ->and($kept->fresh()->name)->toBe('live-app');
 });
 

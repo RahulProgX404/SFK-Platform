@@ -14,8 +14,8 @@
     <h3 id="{{ $idPrefix }}-conditions" class="sfk-filter-label">{{ $conditionsLabel }}</h3>
 
     <div class="sfk-filter-match" x-show="conditions.length > 1" role="radiogroup" aria-label="条件の組み合わせ">
-        <label><input type="radio" value="and" x-model="match"> すべての条件を満たす</label>
-        <label><input type="radio" value="or" x-model="match"> いずれかの条件を満たす</label>
+        <label><input type="radio" class="sfk-ui-radio" value="and" x-model="match"> すべての条件を満たす</label>
+        <label><input type="radio" class="sfk-ui-radio" value="or" x-model="match"> いずれかの条件を満たす</label>
     </div>
 
     <div class="sfk-filter-box">

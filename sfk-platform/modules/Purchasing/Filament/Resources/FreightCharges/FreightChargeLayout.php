@@ -22,17 +22,21 @@ use Modules\Purchasing\Filament\Resources\Purchases\PurchaseResource;
 use Modules\Purchasing\Models\FreightCharge;
 
 /**
- * Form and record page of 15. 運送請求データ取込 (SYSTEM_BRAIN APP_15 fields.md "Form layout", widths from the template):
- * 日付 (a date here, text in the legacy app), 注番 (a job), 金額, 運送会社番号, the purchase-style figures and 備考.
+ * Form and record page of 15. 運送請求データ取込 (fields of SYSTEM_BRAIN APP_15 fields.md), grouped by task on a 12-column
+ * grid of the 1,500 px canvas: 基本情報 (日付 — a date here, text in the legacy app — 運送会社番号, 注番 (a job),
+ * 納品(仕入)入力No), 金額 (数量 × 単価 = 金額, then the purchase-style figures) and その他 (備考).
  * 納品(仕入)入力No is the purchase the record was posted as (選択して納品(仕入)を作成), not typed.
  */
 final class FreightChargeLayout
 {
     private const MAIN = [
-        [['charged_on', 193], ['order_id', 193], ['amount', 193], ['carrier_number', 193]],
-        [['purchase_id', 193], ['unit_price', 193], ['quantity', 193], ['cutting_amount', 193], ['plate_amount', 193], ['stored_plate_amount', 193],
-            ['spot_color_amount', 193]],
-        [['notes', 772]],
+        '基本情報',
+        [['charged_on', 250], ['carrier_number', 375], ['order_id', 375], ['purchase_id', 500]],
+        '金額',
+        [['quantity', 375], ['unit_price', 375], ['amount', 375]],
+        [['cutting_amount', 375], ['plate_amount', 375], ['stored_plate_amount', 375], ['spot_color_amount', 375]],
+        'その他',
+        [['notes', 1500]],
     ];
 
     private const FOOTER = [[['id', 150], ['creator', 136], ['created_at', 196], ['updater', 136], ['updated_at', 196]]];

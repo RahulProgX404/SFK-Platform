@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Modules\Core\Domain\Apps\AppStatus;
 
 /**
  * アプリ: one feature of the system (e.g. 01. 取引先マスタ, 04. 受注入力 — SYSTEM_BRAIN 03_APPS). Created by a
- * super admin as 開発中, outside any space; `code` links it to the screens that implement it
+ * super admin as 開発中, outside any space, then placed in one or more spaces (of one or more dashboards); `code` links it to the screens that implement it
  * (Modules\Core\Filament\AppResource). `status` changes only through AppLifecycle.
  *
  * @property int $id
@@ -21,7 +23,6 @@ use Modules\Core\Domain\Apps\AppStatus;
  * @property string|null $description
  * @property string|null $icon_text short text shown on the app's icon / shortcut tile (e.g. 受注)
  * @property AppStatus $status
- * @property int|null $space_id
  * @property int $sort_order
  * @property Carbon|null $list_views_seeded_at when the code-defined 一覧 were stored (ListViewService)
  * @property bool $record_duplicate_enabled その他の設定: 「レコードの再利用」 on the record page
@@ -29,7 +30,7 @@ use Modules\Core\Domain\Apps\AppStatus;
  * @property bool $inline_edit_enabled その他の設定: インライン編集 (pencil and × on the list rows)
  * @property bool $record_comments_enabled その他の設定: コメント機能 on the record page
  * @property bool $bulk_delete_enabled その他の設定: 一括削除 of the listed records
- * @property-read Space|null $space
+ * @property-read Collection<int, Space> $spaces
  */
 final class BusinessApp extends Model
 {
@@ -38,7 +39,7 @@ final class BusinessApp extends Model
         'inline_edit_enabled', 'record_comments_enabled', 'record_duplicate_enabled', 'record_history_enabled', 'bulk_delete_enabled',
     ];
 
-    protected $fillable = ['code', 'name', 'description', 'icon_text', 'space_id', 'sort_order'];
+    protected $fillable = ['code', 'name', 'description', 'icon_text', 'sort_order'];
 
     protected $attributes = [
         'status' => 'developing',
@@ -76,16 +77,40 @@ final class BusinessApp extends Model
         return filled($this->icon_text) ? (string) $this->icon_text : mb_substr($this->displayName(), 0, 2);
     }
 
-    /** @return BelongsTo<Space, $this> */
-    public function space(): BelongsTo
+    /** @return BelongsToMany<Space, $this> the spaces the app is placed in, in their order */
+    public function spaces(): BelongsToMany
     {
-        return $this->belongsTo(Space::class);
+        return $this->belongsToMany(Space::class)->withTimestamps()->orderBy('spaces.sort_order')->orderBy('spaces.id');
+    }
+
+    /**
+     * The space the app is shown under on a dashboard (sidebar group, breadcrumb): the first of its spaces there the
+     * user is a member of, else the first of its spaces there; null when it is in none of that dashboard's spaces.
+     */
+    public function spaceOn(string $panelId, ?User $user): ?Space
+    {
+        $spaces = $this->spaces->where('panel_id', $panelId)->values();
+        $member = $user === null ? null : $spaces->first(fn (Space $space): bool => $space->users()->whereKey($user->id)->exists());
+
+        return $member ?? $spaces->first();
     }
 
     /** @return HasMany<AppPermission, $this> */
     public function permissions(): HasMany
     {
         return $this->hasMany(AppPermission::class);
+    }
+
+    /** @return HasMany<AppRecordRule, $this> the レコードのアクセス権 rules, in priority order */
+    public function recordRules(): HasMany
+    {
+        return $this->hasMany(AppRecordRule::class)->orderBy('sort_order')->orderBy('id');
+    }
+
+    /** @return HasMany<AppFieldPermission, $this> the フィールドのアクセス権 entries, by field in order */
+    public function fieldPermissions(): HasMany
+    {
+        return $this->hasMany(AppFieldPermission::class)->orderBy('field')->orderBy('sort_order')->orderBy('id');
     }
 
     /** @return HasMany<AppListView, $this> the app's 一覧, in dropdown order */

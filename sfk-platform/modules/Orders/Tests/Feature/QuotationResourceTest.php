@@ -49,8 +49,8 @@ it('enters a quotation with its tiers and the customer\'s 担当者', function (
     expect($quotation->total)->toBe(61750)->and($quotation->assignees->pluck('name')->all())->toBe(['営業 花子'])->and($quotation->fileName())->toBe('Q-0001_株式会社見積先');
 
     Livewire::test(ViewQuotation::class, ['record' => $quotation->getRouteKey()])
-        ->assertSeeInOrder(['見積日付', '2026-10-21', '得意先名', '株式会社見積先', '担当者', '営業 花子', '見積書番号', 'Q-0001', '品名', '長3封筒', '紙', 'クラフト70',
-            '見積金額(税抜)', '¥61,750', '見積内容', '1,000', '12.5', '¥12,500', '5,000', '9.85', '¥49,250']);
+        ->assertSeeInOrder(['見積書番号', 'Q-0001', '見積日付', '2026-10-21', '得意先名', '株式会社見積先', '担当者', '営業 花子', '品名', '長3封筒', '見積金額(税抜)', '¥61,750',
+            '紙', 'クラフト70', '見積内容', '1,000', '12.5', '¥12,500', '5,000', '9.85', '¥49,250']);
 
     // 見積書番号 is unique
     Livewire::test(CreateQuotation::class)->fillForm(['quoted_on' => '2026-10-22', 'quote_number' => 'Q-0001'])->call('create')->assertHasFormErrors(['quote_number' => 'unique']);

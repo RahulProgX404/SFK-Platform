@@ -30,8 +30,11 @@ final class PartnerMasterTestResource extends AppResource
 
 function app_with_status(AppStatus $status, ?Space $space = null): BusinessApp
 {
-    $app = new BusinessApp(['code' => 'partner-master', 'name' => '01. 取引先マスタ', 'space_id' => $space?->id]);
+    $app = new BusinessApp(['code' => 'partner-master', 'name' => '01. 取引先マスタ']);
     $app->forceFill(['status' => $status])->save();
+    if ($space !== null) {
+        $app->spaces()->attach($space);
+    }
 
     return $app;
 }
@@ -125,7 +128,8 @@ it('requires space membership, dashboard access and a placed app for employees',
     $this->space->users()->attach($noDashboard);
     expect(abilities_of($noDashboard, $app))->toBe([]);
 
-    $app->update(['space_id' => null]);
+    $app->spaces()->detach();
+    $app->unsetRelation('spaces');
     expect(abilities_of($this->employee, $app))->toBe([]);
 });
 

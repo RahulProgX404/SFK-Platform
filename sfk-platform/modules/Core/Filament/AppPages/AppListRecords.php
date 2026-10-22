@@ -30,6 +30,7 @@ use Illuminate\Support\Facades\Schema as DatabaseSchema;
 use Livewire\Attributes\Session;
 use Livewire\Attributes\Url;
 use Livewire\Livewire;
+use Modules\Core\Access\FieldAccess;
 use Modules\Core\Application\Filters\FilterField;
 use Modules\Core\Application\Filters\RecordFilterQuery;
 use Modules\Core\Application\History\HasRecordHistory;
@@ -38,6 +39,7 @@ use Modules\Core\Application\Views\ListView;
 use Modules\Core\Application\Views\ListViewInvalid;
 use Modules\Core\Application\Views\ListViewSchema;
 use Modules\Core\Application\Views\ListViewService;
+use Modules\Core\Domain\Apps\FieldAccessLevel;
 use Modules\Core\Domain\Filters\FilterFieldType;
 use Modules\Core\Domain\Filters\RecordFilter;
 use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
@@ -157,7 +159,7 @@ abstract class AppListRecords extends ListRecords
 
     public function inlineField(string $name): ?InlineField
     {
-        foreach ($this->inlineFields() as $field) {
+        foreach ($this->allowedInlineFields() as $field) {
             if ($field->name === $name) {
                 return $field;
             }
@@ -205,7 +207,7 @@ abstract class AppListRecords extends ListRecords
 
         $rules = [];
         $attributes = [];
-        foreach ($this->inlineFields() as $field) {
+        foreach ($this->allowedInlineFields() as $field) {
             foreach ($field->rules($record) as $path => $fieldRules) {
                 $rules['inlineData.'.$path] = $fieldRules;
             }
@@ -215,7 +217,7 @@ abstract class AppListRecords extends ListRecords
 
         /** @var array<string, mixed> $data */
         $data = $this->validate($rules, [], $attributes)['inlineData'] ?? [];
-        foreach ($this->inlineFields() as $field) {
+        foreach ($this->allowedInlineFields() as $field) {
             $data[$field->name] = match (true) {
                 $field->isBoolean() => (bool) ($data[$field->name] ?? false),
                 $field->isMultiple() => array_values((array) ($data[$field->name] ?? [])),
@@ -275,15 +277,16 @@ abstract class AppListRecords extends ListRecords
         return $this->listViews()[0];
     }
 
-    /** @return list<string> columns of the current 表形式 view, in its order */
+    /** @return list<string> columns of the current 表形式 view, in its order (without the fields the user may not see) */
     public function viewColumns(): array
     {
         $columns = array_values(array_filter(
             $this->currentView()->columns,
             fn (string $column): bool => array_key_exists($column, $this->listColumns()),
         ));
+        $columns = $columns !== [] ? $columns : array_keys($this->listColumns());
 
-        return $columns !== [] ? $columns : array_keys($this->listColumns());
+        return array_values(array_filter($columns, fn (string $column): bool => $this->fieldLevel($column)->canView()));
     }
 
     public function mount(): void
@@ -394,7 +397,7 @@ abstract class AppListRecords extends ListRecords
     public function filterDialog(): array
     {
         return [
-            ...self::filterEditorConfig($this->filterFields()),
+            ...self::filterEditorConfig($this->allowedFilterFields()),
             'canSave' => $this->canSaveListViews(),
         ];
     }
@@ -751,7 +754,7 @@ abstract class AppListRecords extends ListRecords
     {
         $state = [];
         $columns = $record->getAttributes();
-        foreach ($this->inlineFields() as $field) {
+        foreach ($this->allowedInlineFields() as $field) {
             // columns only: related data (e.g. selected users) is added by the app
             $value = array_key_exists($field->name, $columns) ? $record->getAttribute($field->name) : null;
             $state[$field->name] = match (true) {
@@ -779,7 +782,7 @@ abstract class AppListRecords extends ListRecords
     /** The record behind a row key, when インライン編集 is on, the app has inline fields and the user may edit it. */
     private function inlineRecord(?string $key): ?Model
     {
-        if ($key === null || ! $this->rowActionsEnabled() || $this->inlineFields() === []) {
+        if ($key === null || ! $this->rowActionsEnabled() || $this->allowedInlineFields() === []) {
             return null;
         }
 
@@ -848,10 +851,46 @@ abstract class AppListRecords extends ListRecords
     private function filterFieldMap(): array
     {
         $fields = [];
-        foreach ($this->filterFields() as $field) {
+        foreach ($this->allowedFilterFields() as $field) {
             $fields[$field->name] = $field;
         }
 
         return $fields;
+    }
+
+    /**
+     * フィールドのアクセス権 of the signed-in user in this app (FieldAccess; fields not listed: 編集).
+     *
+     * @return array<string, FieldAccessLevel>
+     */
+    private function fieldLevels(): array
+    {
+        $user = auth()->user();
+        $app = $this->appResource()::app();
+
+        return $user instanceof User && $app !== null ? FieldAccess::levels($user, $app) : [];
+    }
+
+    private function fieldLevel(string $name): FieldAccessLevel
+    {
+        return $this->fieldLevels()[$name] ?? FieldAccessLevel::Edit;
+    }
+
+    /** @return list<string> fields the user may not see (フィールドのアクセス権 なし), e.g. for ファイルに書き出す */
+    protected function hiddenFields(): array
+    {
+        return array_keys(array_filter($this->fieldLevels(), fn (FieldAccessLevel $level): bool => ! $level->canView()));
+    }
+
+    /** @return list<FilterField> the 絞り込む fields the user may see */
+    private function allowedFilterFields(): array
+    {
+        return array_values(array_filter($this->filterFields(), fn (FilterField $field): bool => $this->fieldLevel($field->name)->canView()));
+    }
+
+    /** @return list<InlineField> the インライン編集 fields the user may change */
+    private function allowedInlineFields(): array
+    {
+        return array_values(array_filter($this->inlineFields(), fn (InlineField $field): bool => $this->fieldLevel($field->name)->canEdit()));
     }
 }

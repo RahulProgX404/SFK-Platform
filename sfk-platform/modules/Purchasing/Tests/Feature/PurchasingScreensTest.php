@@ -67,7 +67,10 @@ function publishPurchasingApps(): void
     app(AppLifecycle::class)->syncWithCode($codes, $defaults);
     $space = Space::query()->firstOrCreate(['panel_id' => 'erp', 'name' => '購買スペース']);
     BusinessApp::query()->whereIn('code', array_keys($codes))->get()
-        ->each(fn (BusinessApp $app) => $app->forceFill(['status' => AppStatus::Published, 'space_id' => $space->id])->save());
+        ->each(function (BusinessApp $app) use ($space): void {
+            $app->forceFill(['status' => AppStatus::Published])->save();
+            $app->spaces()->syncWithoutDetaching([$space->id]);
+        });
 }
 
 /** The id of a stored list view of an app (stored when its list is first shown). */
@@ -146,8 +149,8 @@ it('enters a purchase: 金額 from 数量 × 単価, numbered, totalled, its job
 
     $other = Purchase::query()->create(['supplier_id' => $this->supplier->id, 'purchased_on' => '2026-11-01', 'order_id' => $job->id, 'product_name' => '別の紙', 'amount' => 700]);
     Livewire::test(ViewPurchase::class, ['record' => $purchase->getRouteKey()])
-        ->assertSeeInOrder(['納品(仕入)日', '2026-11-05', '仕入先', '紙商事', '消費税区分', '外', '仕入カテゴリ(マスタ)', '03.材料仕入', '0000001',
-            '注番基本情報', '長3封筒', '¥50,000', '品名', 'クラフト紙', '¥1,851', '同注番の仕入履歴', '別の紙', '¥700', '仕入金額合計', '¥2,351']);
+        ->assertSeeInOrder(['基本情報', '0000001', '納品(仕入)日', '2026-11-05', '仕入先', '紙商事', '仕入カテゴリ(マスタ)', '03.材料仕入', '消費税区分', '外',
+            '受注', '品名', 'クラフト紙', '注番基本情報', '長3封筒', '¥50,000', '金額', '¥1,851', '仕入金額合計', '¥2,351', '同注番の仕入履歴', '別の紙', '¥700']);
 
     // an unchanged alert is not sent again; a new 通知先 gets it
     $second = User::factory()->create();
@@ -256,7 +259,7 @@ it('imports carrier billing data and posts the chosen rows as purchases', functi
         ->and(PayableMonth::query()->where('supplier_id', $carrier->id)->sole()->getAttribute('cat_cost_delivery'))->toBe(3470);
 
     Livewire::test(ViewFreightCharge::class, ['record' => $first->getRouteKey()])
-        ->assertSeeInOrder(['日付', '2026-11-04', '注番', $job->order_number, '金額', '¥3,300', '運送会社番号', 'A-1', '納品(仕入)入力No', $first->purchase?->purchase_number]);
+        ->assertSeeInOrder(['日付', '2026-11-04', '運送会社番号', 'A-1', '注番', $job->order_number, '納品(仕入)入力No', $first->purchase?->purchase_number, '金額', '¥3,300']);
 });
 
 it('orders consumables: 単価 / 単位 copied from the master, 承認依頼 and 承認する', function () {
@@ -264,7 +267,7 @@ it('orders consumables: 単価 / 単位 copied from the master, 承認依頼 and
     $app = BusinessApp::query()->where('code', 'consumable-order')->sole();
     $app->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true, AppAbility::Create->column() => true,
         AppAbility::Update->column() => true]);
-    $app->space?->users()->attach($creator);
+    $app->spaces->first()?->users()->attach($creator);
     $box = Consumable::query()->create(['name' => '段ボール A式', 'unit_price' => '85.5', 'unit' => '枚']);
     $this->actingAs($creator);
     $undoFake = Repeater::fake();
@@ -382,7 +385,7 @@ it('lets employees use the purchasing apps as the app permissions allow', functi
     $app = BusinessApp::query()->where('code', 'purchase-entry')->sole();
     $app->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true]);
     $employee = grantDashboards(User::factory()->create(), 'erp');
-    $app->space?->users()->attach($employee);
+    $app->spaces->first()?->users()->attach($employee);
     $this->actingAs($employee);
 
     $this->get(PurchaseResource::getUrl('index'))->assertOk()->assertSee('クラフト紙');
@@ -412,7 +415,7 @@ it('has the legacy list buttons of 05 for administrators (Customine 05 pages 6 /
 
     $employee = grantDashboards(User::factory()->create(), 'erp');
     BusinessApp::query()->where('code', 'purchase-entry')->sole()->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true]);
-    BusinessApp::query()->where('code', 'purchase-entry')->sole()->space?->users()->attach($employee);
+    BusinessApp::query()->where('code', 'purchase-entry')->sole()->spaces->first()?->users()->attach($employee);
     $this->actingAs($employee);
     Livewire::test(ListPurchases::class)->assertActionHidden('numberPurchases')->assertDontSee('csv一括読み込み後');
 });

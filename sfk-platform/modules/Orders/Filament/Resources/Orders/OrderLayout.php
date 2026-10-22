@@ -9,14 +9,17 @@ use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Text;
 use Filament\Schemas\Components\View;
+use Modules\Core\Access\FieldAccess;
 use Modules\Core\Filament\Records\RecordLayout;
+use Modules\Core\Filament\Records\RecordSections;
 use Modules\Orders\Domain\Orders\OrderFields;
 
 /**
- * The legacy form of 04. 受注入力 (template ZIP layout, SYSTEM_BRAIN APP_04 fields.md "Form layout"), section by section
- * with the legacy labels (orange mark) 用　紙 / 版 下・製 版・刷 版 / 印　刷 / 製 袋・製 本・他 加 工 / その他, the groups 各種原価 and
- * 開発者用フィールド, and the field widths of the template. Very long legacy rows are split where they would not fit
- * the 1,500 px canvas. The form and the record page both build from it; `$make` returns null for what a screen does
+ * The form of 04. 受注入力 (fields of SYSTEM_BRAIN APP_04 fields.md) on a 12-column grid of the 1,500 px canvas, section
+ * by section with labels (orange mark): 基本情報 (得意先 / 注番 / ステータス, 品名, 数量, 受注日 / 納期 / 担当者, the production
+ * progress), 売上・納品 (売上金額 / 原価 / 利益, 印刷日 / 持込日, 完成日), then the job in production order — 用　紙 / 版 下・
+ * 製 版・刷 版 / 印　刷 / 製 袋・製 本・他 加 工 — and その他 (memos, 作業明細表, the costs with 日報一覧 / 仕入履歴), with the groups
+ * 各種原価 and 開発者用フィールド. The form and the record page both build from it; `$make` returns null for what a screen does
  * not show (e.g. the related lists in the form), and such cells / rows are left out.
  *
  * The bag-making fields (仕入先(製造場所) … 送料) fold with 「▲ 折りたたむ」 / 「▼ 展開する」 (legacy toggle script, open
@@ -25,23 +28,23 @@ use Modules\Orders\Domain\Orders\OrderFields;
 final class OrderLayout
 {
     private const HEAD = [
-        [['status', 196]],
-        [['order_number', 193], ['assignees', 344], ['customer_id', 420], ['closing_day', 141]],
-        [['product_name', 387], ['is_fsc', 108], ['category1', 196], ['category2', 196]],
-        [['quantity', 117], ['unit', 117], ['sample', 117], ['spare', 117], ['due_date', 117], ['due_time', 117], ['order_date', 117], ['expected_hours', 162]],
-        [['manufactured_quantity', 117], ['manufacturing_remaining', 117], ['sold_quantity', 117], ['sales_remaining', 117]],
+        'label:基本情報',
+        [['customer_id', 750], ['order_number', 250], ['status', 250], ['closing_day', 250]],
+        [['product_name', 625], ['is_fsc', 125], ['category1', 375], ['category2', 375]],
+        [['quantity', 375], ['unit', 375], ['sample', 375], ['spare', 375]],
+        [['order_date', 250], ['due_date', 250], ['due_time', 250], ['expected_hours', 250], ['assignees', 500]],
+        [['manufactured_quantity', 375], ['manufacturing_remaining', 375], ['sold_quantity', 375], ['sales_remaining', 375]],
     ];
 
     private const PAPER = [
         [['papers', 1500]],
-        [[null, 1307], ['paper_subtotal', 193]],
+        [[null, 1250], ['paper_subtotal', 250]],
     ];
 
     private const PLATE = [
         'sub:刷版',
-        [['plate_supplier_id', 420], ['plate_version', 196], ['plate_last_used_on', 117], ['plate_count', 117], ['plate_unit_price', 169], ['plate_amount', 193]],
-        [['plate_storage', 180], ['plate_size', 196], ['design_fee', 155]],
-        [['plate_notes', 616]],
+        [['plate_supplier_id', 500], ['plate_version', 250], ['plate_last_used_on', 250], ['plate_storage', 250], ['plate_size', 250]],
+        [['plate_count', 250], ['plate_unit_price', 250], ['plate_amount', 250], ['design_fee', 250], ['plate_notes', 500]],
     ];
 
     private const PRINTING = [
@@ -51,32 +54,31 @@ final class OrderLayout
 
     /** Folded by the toggle. */
     private const BAG = [
-        [['manufacturer_id', 420], ['bag_schedule', 520]],
-        [['width', 137], ['height', 137], ['flap', 137], ['bottom', 137], ['unfolded_width', 137], ['unfolded_height', 137]],
-        [['envelope_shape', 196], ['envelope_other', 352], ['size_no', 137], ['pasting', 274], ['as_per_artwork', 137], ['flap_type', 196]],
-        [['die_cut', 196], ['flap_glue', 196], ['side_glue', 156], ['die', 193]],
-        [['window', 196], ['window_width', 137], ['window_height', 137], ['window_from_left', 137], ['window_from_bottom', 137]],
-        [['carton_number', 193], ['per_case', 140], ['per_case_specified', 137], ['partition_case', 137], ['band', 137], ['band_sheets', 140], ['has_label', 137]],
-        [['bag_unit_price', 193], ['bag_manual', 140], ['bag_manual_amount', 193], ['bag_amount', 193], ['bag_subtotal', 193]],
-        [['case_cost', 193], ['shipping_cost', 193]],
+        [['manufacturer_id', 625], ['bag_schedule', 875]],
+        [['width', 250], ['height', 250], ['flap', 250], ['bottom', 250], ['unfolded_width', 250], ['unfolded_height', 250]],
+        [['envelope_shape', 250], ['size_no', 125], ['envelope_other', 375], ['flap_type', 250], ['pasting', 250], ['as_per_artwork', 250]],
+        [['die_cut', 375], ['flap_glue', 375], ['side_glue', 375], ['die', 375]],
+        [['window', 250], ['window_width', 250], ['window_height', 250], ['window_from_left', 250], ['window_from_bottom', 250]],
+        [['carton_number', 250], ['per_case', 250], ['per_case_specified', 250], ['partition_case', 250], ['band', 125], ['band_sheets', 250], ['has_label', 125]],
+        [['bag_unit_price', 250], ['bag_manual', 250], ['bag_manual_amount', 250], ['bag_amount', 250], ['bag_subtotal', 250]],
+        [['case_cost', 250], ['shipping_cost', 250]],
     ];
 
     private const SALES = [
-        [['sales_amount', 193], ['estimated_cost_total', 193], ['estimated_profit', 193], ['profit', 193], ['profit_rate', 193]],
-        [['printed_on', 117], ['print_location', 269]],
-        [['delivered_on', 117], ['delivery_location', 269], ['delivery_service', 269]],
-        [['completed_on', 117], ['remarks', 538]],
+        'label:売上・納品',
+        [['sales_amount', 375], ['estimated_cost_total', 375], ['estimated_profit', 250], ['profit', 250], ['profit_rate', 250]],
+        [['printed_on', 250], ['print_location', 375], ['delivered_on', 250], ['delivery_location', 375], ['delivery_service', 250]],
+        [['completed_on', 250], ['remarks', 1250]],
         [['past_orders', 1500]],
     ];
 
     private const OTHER = [
-        [['memo', 404], ['worker_message', 415], ['notes', 447]],
-        [['internal_cost', 193]],
+        [['memo', 500], ['worker_message', 500], ['notes', 500]],
+        [['work_sheet_order_files', 500], ['work_sheet_sales_files', 500], ['work_sheet_draft_files', 500]],
+        'sub:原価',
+        [['internal_cost', 375], ['purchase_total', 375], ['actual_cost_total', 375]],
         [['daily_reports', 1500]],
-        [['purchase_total', 193]],
         [['purchase_history', 1500]],
-        [['actual_cost_total', 193]],
-        [['work_sheet_order_files', 207], ['work_sheet_sales_files', 207], ['work_sheet_draft_files', 207]],
     ];
 
     private const FOOTER = [[['id', 120], ['creator', 136], ['created_at', 196], ['updater', 136], ['updated_at', 196]]];
@@ -105,6 +107,7 @@ final class OrderLayout
     {
         $components = [
             self::section(self::rows(self::HEAD, $make)),
+            self::section(self::rows(self::SALES, $make)),
             self::section(['label:用　紙', ...self::rows(self::PAPER, $make)]),
             self::section(['label:版 下・製 版・刷 版', ...self::rows(self::PLATE, $make)]),
             self::section(['label:印　刷', ...self::rows(self::PRINTING, $make)]),
@@ -114,7 +117,6 @@ final class OrderLayout
                     View::make('orders::filament.bag-toggle'),
                 ])->extraAttributes(['class' => 'sfk-order-bag-head'])->columnSpanFull(),
                 Group::make(self::rows(self::BAG, $make))->extraAttributes(['x-show' => 'bagOpen', 'class' => 'sfk-order-bag'])->columnSpanFull(),
-                ...self::rows(self::SALES, $make),
             ])->extraAttributes(['x-data' => '{ bagOpen: true }'], merge: true),
             self::section(['label:その他', ...self::rows(self::OTHER, $make)]),
         ];
@@ -178,6 +180,7 @@ final class OrderLayout
     private static function rows(array $rows, callable $make): array
     {
         $built = [];
+        $levels = FieldAccess::onCurrentPage();
         foreach ($rows as $row) {
             if (is_string($row)) {
                 $built[] = $row;
@@ -188,7 +191,7 @@ final class OrderLayout
             $cells = [];
             $shown = false;
             foreach ($row as [$attribute, $width]) {
-                $component = $attribute === null ? null : $make($attribute);
+                $component = $attribute === null ? null : RecordSections::gate($attribute, $make($attribute), $levels);
                 if ($attribute !== null && $component === null) {
                     continue;
                 }

@@ -10,11 +10,15 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 use Modules\Core\Application\Apps\AppDiscovery;
+use Modules\Core\Application\Apps\FieldPermissionService;
+use Modules\Core\Application\Apps\RecordRuleService;
 use Modules\Core\Application\Comments\RecordComments;
 use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\AppStatus;
 use Modules\Core\Domain\Apps\PermissionSubject;
 use Modules\Core\Filament\AppPages\AppListRecords;
+use Modules\Core\Filament\DashboardSettings\Resources\AppSettings\Pages\EditFieldPermissions;
+use Modules\Core\Filament\DashboardSettings\Resources\AppSettings\Pages\EditRecordPermissions;
 use Modules\Core\Models\BusinessApp;
 use Modules\Core\Models\RecordComment;
 use Modules\Core\Models\RecordVersion;
@@ -60,8 +64,9 @@ function makePartner(array $overrides = []): Partner
 function employeeWith(array $abilities): User
 {
     $space = Space::query()->create(['panel_id' => 'erp', 'name' => '営業スペース']);
-    $app = new BusinessApp(['code' => 'partner-master', 'name' => '01. 取引先マスタ（得意先・仕入先）', 'space_id' => $space->id]);
+    $app = new BusinessApp(['code' => 'partner-master', 'name' => '01. 取引先マスタ（得意先・仕入先）']);
     $app->forceFill(['status' => AppStatus::Published])->save();
+    $app->spaces()->attach($space);
 
     $columns = [];
     foreach (AppAbility::cases() as $ability) {
@@ -206,7 +211,7 @@ it('shows the record like the legacy system, with the tabs above the fields and 
     Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
         ->assertSee('取引先名')
         ->assertSee('取引先名(ふりがな)')
-        ->assertSee('住所/連絡先 その他')
+        ->assertSee('住所・連絡先')
         ->assertSeeInOrder(['基本情報', '仕入先情報', '見積履歴', '納品履歴', '請求履歴', '取引先コード'])
         ->assertDontSee('関連するレコードはありません。')
         ->assertActionVisible('edit')
@@ -353,8 +358,9 @@ it('hides the collapsed menu completely and lets the app use the full screen wid
 
 it('frames the list like the legacy app: title bar, breadcrumb, description, views, paging', function () {
     $space = Space::query()->create(['panel_id' => 'erp', 'name' => '営業スペース']);
-    $app = new BusinessApp(['code' => 'partner-master', 'name' => '01. 取引先マスタ（得意先・仕入先）', 'icon_text' => '取引先', 'space_id' => $space->id]);
+    $app = new BusinessApp(['code' => 'partner-master', 'name' => '01. 取引先マスタ（得意先・仕入先）', 'icon_text' => '取引先']);
     $app->forceFill(['status' => AppStatus::Published])->save();
+    $app->spaces()->attach($space);
     $staff = User::factory()->create(['name' => '山田太郎', 'sales_staff_code' => '0101']);
     makePartner(['name' => '一社目'])->staff()->attach($staff);
     makePartner(['name' => '二社目']);
@@ -388,8 +394,8 @@ it('puts the paging right of the search box and shows table headers and field na
         ->and(strpos($toolbar, 'fi-ta-search-field'))->toBeLessThan(strpos($toolbar, 'sfk-app-pager'))
         ->and($html)->toContain('--kt-label: #000000;')
         ->and($html)->toContain('.fi-ta-header-cell {'."\n".'        color: var(--kt-label);')
-        ->and(compactCss($html))->toContain(compactCss('.kt-record .fi-in-entry-label { font-size: .75rem; font-weight: 400; color: var(--kt-label); }'))
-        ->and(compactCss($html))->toContain(compactCss('.fi-fo-field-label-content { font-size: .8125rem; color: var(--kt-label); }'));
+        ->and(compactCss($html))->toContain(compactCss('.kt-record .fi-in-entry-label { font-size: .875rem; font-weight: 400; color: var(--kt-label); }'))
+        ->and(compactCss($html))->toContain(compactCss('.fi-fo-field-label-content { font-size: .9375rem; color: var(--kt-label); }'));
 });
 
 it('shows no column of the list in bold, 取引先名 included', function () {
@@ -564,8 +570,9 @@ it('lets administrators save the filter as a list view with a 一覧名', functi
     $b = makePartner(['name' => '二社目', 'short_name' => '二', 'closing_day' => '末日']);
     makePartner(['name' => '三社目', 'short_name' => '三']);
     $space = Space::query()->create(['panel_id' => 'erp', 'name' => '営業スペース']);
-    $app = new BusinessApp(['code' => 'partner-master', 'name' => '01. 取引先マスタ（得意先・仕入先）', 'space_id' => $space->id]);
+    $app = new BusinessApp(['code' => 'partner-master', 'name' => '01. 取引先マスタ（得意先・仕入先）']);
     $app->forceFill(['status' => AppStatus::Published])->save();
+    $app->spaces()->attach($space);
     $this->actingAs($this->admin);
     $filter = ['conditions' => [['field' => 'closing_day', 'operator' => 'in', 'values' => ['5日', '末日']]], 'sorts' => [['field' => 'code', 'direction' => 'desc']]];
 
@@ -610,8 +617,9 @@ it('does not let employees save list views', function () {
 function publishedPartnerApp(): BusinessApp
 {
     $space = Space::query()->create(['panel_id' => 'erp', 'name' => '営業スペース']);
-    $app = new BusinessApp(['code' => 'partner-master', 'name' => '01. 取引先マスタ（得意先・仕入先）', 'space_id' => $space->id]);
+    $app = new BusinessApp(['code' => 'partner-master', 'name' => '01. 取引先マスタ（得意先・仕入先）']);
     $app->forceFill(['status' => AppStatus::Published])->save();
+    $app->spaces()->attach($space);
 
     return $app;
 }
@@ -1197,4 +1205,95 @@ it('hides コメント when it is off in その他の設定, and in the print vi
         ->set('commentData.body', '書けない')
         ->call('postComment');
     expect(RecordComment::query()->count())->toBe(0);
+});
+
+it('narrows the records with the レコードのアクセス権: the first matching setting decides, 作成者 first, the rest by the app permissions', function () {
+    $employee = employeeWith([AppAbility::View, AppAbility::Update, AppAbility::Delete]);
+    $app = BusinessApp::query()->where('code', 'partner-master')->sole();
+    $other = User::factory()->create();
+    $by = fn (Partner $partner, User $creator): Partner => tap($partner, fn (Partner $record) => $record->forceFill(['created_by' => $creator->id])->saveQuietly()); // 作成者 is guarded
+    $secretByOther = $by(makePartner(['name' => '機密商事']), $other);
+    $secretMine = $by(makePartner(['name' => '機密工業']), $employee);
+    $plain = $by(makePartner(['name' => '一般商事']), $other);
+    $grouped = $by(makePartner(['name' => '子会社', 'parent_company' => 'グループ本社']), $other);
+
+    // 1. names with 機密: only their creator; 2. a parent company with グループ: 閲覧 only; else (blank 親会社 too): the app permissions
+    $this->actingAs($this->admin);
+    app(RecordRuleService::class)->save($app, [
+        ['match' => 'and', 'conditions' => [['field' => 'name', 'operator' => 'like', 'value' => '機密']],
+            'entries' => [['subject_type' => 'creator', 'can_view' => true, 'can_edit' => true, 'can_delete' => true], ['subject_type' => 'everyone']]],
+        ['match' => 'and', 'conditions' => [['field' => 'parent_company', 'operator' => 'like', 'value' => 'グループ']],
+            'entries' => [['subject_type' => 'everyone', 'can_view' => true]]],
+    ], PartnerResource::filterFieldMap(), $this->admin);
+    expect($app->recordRules()->count())->toBe(2)
+        ->and($app->recordRules()->first()?->filter)->toEqual(['match' => 'and', 'conditions' => [['field' => 'name', 'operator' => 'like', 'values' => ['機密'], 'mode' => null, 'time' => null, 'sub' => null]]]);
+
+    $this->actingAs($employee);
+    Livewire::test(ListPartners::class)
+        ->assertCanSeeTableRecords([$secretMine, $plain, $grouped])
+        ->assertCanNotSeeTableRecords([$secretByOther]);
+    $this->get(PartnerResource::getUrl('view', ['record' => $secretByOther]))->assertNotFound();
+    expect(PartnerResource::canEdit($secretMine))->toBeTrue()
+        ->and(PartnerResource::canDelete($secretMine))->toBeTrue()
+        ->and(PartnerResource::canView($grouped))->toBeTrue()
+        ->and(PartnerResource::canEdit($grouped))->toBeFalse()
+        ->and(PartnerResource::canEdit($plain))->toBeTrue(); // no setting covers it (blank 親会社 included)
+
+    // administrators are not restricted
+    $this->actingAs($this->admin);
+    Livewire::test(ListPartners::class)->assertCanSeeTableRecords([$secretByOther, $secretMine, $plain, $grouped]);
+});
+
+it('hides or locks fields with the フィールドのアクセス権, for employees only', function () {
+    $employee = employeeWith([AppAbility::View, AppAbility::Update]);
+    $app = BusinessApp::query()->where('code', 'partner-master')->sole();
+    $partner = makePartner(['name' => '一般商事', 'phone' => '03-9999-0000', 'notes' => '社内メモ']);
+    $this->actingAs($this->admin);
+    app(FieldPermissionService::class)->save($app, [
+        ['field' => 'phone', 'entries' => [['subject_type' => 'everyone', 'access' => 'none']]],
+        ['field' => 'notes', 'entries' => [['subject_type' => 'user', 'user_id' => $this->admin->id, 'access' => 'edit'], ['subject_type' => 'everyone', 'access' => 'view']]],
+    ], PartnerResource::permissionFields(), $this->admin);
+
+    $this->actingAs($employee);
+    expect(Livewire::test(ListPartners::class)->instance()->viewColumns())->not->toContain('phone');
+    Livewire::test(EditPartner::class, ['record' => $partner->getRouteKey()])
+        ->assertFormFieldDoesNotExist('phone')
+        ->assertFormFieldIsDisabled('notes')
+        ->assertFormFieldIsEnabled('name');
+    $this->get(PartnerResource::getUrl('view', ['record' => $partner]))->assertOk()->assertDontSee('03-9999-0000')->assertSee('社内メモ');
+
+    $this->actingAs($this->admin);
+    Livewire::test(EditPartner::class, ['record' => $partner->getRouteKey()])->assertFormFieldExists('phone')->assertFormFieldIsEnabled('notes');
+});
+
+it('edits the レコード / フィールド アクセス権 on their settings pages and refuses an incomplete condition', function () {
+    employeeWith([AppAbility::View]);
+    $app = BusinessApp::query()->where('code', 'partner-master')->sole();
+    $this->actingAs($this->admin);
+
+    Livewire::test(EditRecordPermissions::class, ['record' => $app->getRouteKey()])
+        ->set('data.rules', [['match' => 'and', 'conditions' => [['field' => 'name', 'operator' => 'like', 'value' => '']], 'entries' => [['subject_type' => 'everyone', 'can_view' => true]]]])
+        ->call('save')
+        ->assertHasErrors();
+    expect($app->recordRules()->count())->toBe(0);
+
+    Livewire::test(EditRecordPermissions::class, ['record' => $app->getRouteKey()])
+        ->set('data.rules', [['match' => 'or', 'conditions' => [['field' => 'closing_day', 'operator' => 'in', 'choices' => ['20日', '末日']]],
+            'entries' => [['subject_type' => 'creator', 'can_edit' => true], ['subject_type' => 'everyone', 'can_view' => true]]]])
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertNotified('レコードのアクセス権を保存しました');
+    $rule = $app->recordRules()->with('entries')->sole();
+    expect($rule->filter['match'] ?? null)->toBe('or')
+        ->and($rule->filter['conditions'][0]['values'] ?? null)->toBe(['20日', '末日'])
+        ->and($rule->entries->map(fn ($entry): array => [$entry->subject_type->value, $entry->can_view, $entry->can_edit])->all())
+        ->toBe([['creator', true, true], ['everyone', true, false]]); // 編集 brings 閲覧
+
+    Livewire::test(EditFieldPermissions::class, ['record' => $app->getRouteKey()])
+        ->set('data.fields', [['field' => 'phone', 'entries' => [['subject_type' => 'everyone', 'access' => 'view']]]])
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertNotified('フィールドのアクセス権を保存しました');
+    expect($app->fieldPermissions()->sole()->field)->toBe('phone')
+        ->and($app->fieldPermissions()->sole()->access->value)->toBe('view');
 });

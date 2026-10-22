@@ -30,19 +30,23 @@ use Modules\Purchasing\Models\ConsumableOrder;
 use Modules\Purchasing\Models\ConsumableOrderLine;
 
 /**
- * Form and record page of 20. 消耗品発注 (SYSTEM_BRAIN APP_20 fields.md "Form layout", widths from the template): 発注日,
+ * Form and record page of 20. 消耗品発注 (fields of SYSTEM_BRAIN APP_20 fields.md, on a 12-column grid of the 1,500 px
+ * canvas): 基本情報 (発注日,
  * 発注先 (仕入先 only, newest first), 発注者, the table 発注明細 (商品名 = lookup of 19. 消耗品マスタ, newest first, copying
- * 単価 / 単位 — shown, not typed) and 備考. The record page shows ステータス and 作業者 of the プロセス管理 above the
+ * 単価 / 単位 — shown, not typed) and その他 (備考). The record page shows ステータス and 作業者 of the プロセス管理 above the
  * fields; 開発者用フィールド shows the 発注先's master values (the legacy lookup copies).
  */
 final class ConsumableOrderLayout
 {
-    private const STATUS = [[['status', 117], ['assignee', 193]]];
+    private const STATUS = [[['status', 250], ['assignee', 375]]];
 
     private const MAIN = [
-        [['ordered_on', 117], ['supplier_id', 587], ['orderers', 344]],
+        '基本情報',
+        [['ordered_on', 250], ['supplier_id', 875], ['orderers', 375]],
+        '発注明細',
         [['lines', 1500]],
-        [['notes', 983]],
+        'その他',
+        [['notes', 1500]],
     ];
 
     private const FOOTER = [[['id', 120], ['creator', 136], ['created_at', 196], ['updater', 136], ['updated_at', 196]]];

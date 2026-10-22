@@ -29,8 +29,8 @@ use Modules\HumanResources\Filament\Support\Employees;
 use Modules\HumanResources\Models\SafetyCheckItem;
 
 /**
- * Form and record page of 17. 安全衛生チェック (SYSTEM_BRAIN APP_17 fields.md "Form layout", widths from the template):
- * 部署・機械, 部署, 名前, 従業員名, 日付, the legacy label on who fills which items, and the table チェックリスト — No, 項目,
+ * Form and record page of 17. 安全衛生チェック (fields of SYSTEM_BRAIN APP_17 fields.md), on a 12-column grid of the 1,500 px
+ * canvas: 基本情報 (日付, 名前, 従業員名; 部署, 部署・機械), the legacy labels on who fills which items, and the table チェックリスト — No, 項目,
  * 評価 (はい / いいえ) and チェック (required once a row is filled in), 備考. A new checklist starts with the items of its
  * 部署 (ChecklistTemplate, BR-HR-05: 営業 1–6 / 14 / 15 / 19 and driving 20–25, the others 1–19); a typed No brings its
  * item.
@@ -38,18 +38,20 @@ use Modules\HumanResources\Models\SafetyCheckItem;
 final class SafetyCheckLayout
 {
     private const MAIN = [
-        [['department_machine', 223], ['department', 196], ['user_id', 344], ['employee_id', 322], ['checked_on', 117]],
+        '基本情報',
+        [['checked_on', 250], ['user_id', 625], ['employee_id', 625]],
+        [['department', 750], ['department_machine', 750]],
         '※営業は1～6・14・15・19を記入してください',
         '※運転をしてる方は20～25を記入してください',
-        [['items', 1300]],
+        [['items', 1500]],
     ];
 
     private const FOOTER = [[['id', 120], ['creator', 136], ['created_at', 196], ['updater', 136], ['updated_at', 196]]];
 
     private const DEVELOPER = [[['legacy_id', 193]]];
 
-    /** チェックリスト columns => width (legacy template). */
-    private const ITEM_COLUMNS = ['number' => 59, 'item' => 542, 'answer' => 209, 'checked' => 97, 'notes' => 315];
+    /** チェックリスト columns => width (legacy template; No wide enough for two digits at 16px). */
+    private const ITEM_COLUMNS = ['number' => 80, 'item' => 542, 'answer' => 209, 'checked' => 97, 'notes' => 315];
 
     public static function form(Schema $schema): Schema
     {

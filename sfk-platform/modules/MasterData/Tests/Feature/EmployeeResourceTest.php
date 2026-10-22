@@ -30,7 +30,8 @@ function publishedEmployeeApp(): BusinessApp
     app(AppLifecycle::class)->syncWithCode(['employee-master' => '02. 従業員マスタ'], ['employee-master' => EmployeeResource::appSettingDefaults()]);
     $space = Space::query()->firstOrCreate(['panel_id' => 'erp', 'name' => '総務スペース']);
     $app = BusinessApp::query()->where('code', 'employee-master')->sole();
-    $app->forceFill(['status' => AppStatus::Published, 'space_id' => $space->id])->save();
+    $app->forceFill(['status' => AppStatus::Published])->save();
+    $app->spaces()->syncWithoutDetaching([$space->id]);
 
     return $app;
 }
@@ -46,7 +47,7 @@ function employeeAppUser(array $attributes = []): User
     $app->permissions()->firstOrCreate(['subject_type' => PermissionSubject::Everyone], $columns);
 
     $employee = grantDashboards(User::factory()->create($attributes), 'erp');
-    $app->space?->users()->attach($employee);
+    $app->spaces->first()?->users()->attach($employee);
 
     return $employee;
 }
@@ -132,7 +133,7 @@ it('shows the legacy record with コメント, and 作業単価 only to administ
     Livewire::test(ListEmployees::class)->set('listView', 'all')->assertTableColumnDoesNotExist('work_rate');
 
     $this->actingAs($employee);
-    publishedEmployeeApp()->space?->users()->attach($employee);
+    publishedEmployeeApp()->spaces->first()?->users()->attach($employee);
     grantDashboards($employee, 'erp');
     Livewire::test(ViewEmployee::class, ['record' => $employee->getRouteKey()])->assertSee(['作業単価', '¥1,500']);
 

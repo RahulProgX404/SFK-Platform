@@ -30,7 +30,8 @@ use Modules\Purchasing\Models\Payment;
 use Modules\Purchasing\Models\PaymentLine;
 
 /**
- * Form and record page of 07. 支払入力 (SYSTEM_BRAIN APP_07 fields.md "Form layout", widths from the template): 支払日,
+ * Form and record page of 07. 支払入力 (fields of SYSTEM_BRAIN APP_07 fields.md, on a 12-column grid of the 1,500 px
+ * canvas): 基本情報 — 支払日,
  * 支払金額合計 (= Σ 支払額) and the table 支払内容詳細 — 仕入先 (仕入先 only, newest first; 仕入先ID from the master), 金種名
  * (default 7.振込), 支払額, 出金日, 備考 and 支払年月. Like auto-fill-payment-date.js, every row's 出金日 is the 支払日 and
  * cannot be typed (BR-PU-08). The legacy key columns 買掛更新キー / コピー用日付 are not carried over.
@@ -38,7 +39,9 @@ use Modules\Purchasing\Models\PaymentLine;
 final class PaymentLayout
 {
     private const MAIN = [
-        [['paid_on', 117], ['total', 193]],
+        '基本情報',
+        [['paid_on', 250], ['total', 375]],
+        '支払内容詳細',
         [['lines', 1500]],
     ];
 

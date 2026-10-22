@@ -15,11 +15,11 @@
         /* Dashboard selection in the legacy vendor's flat style: hairline boxes, square icon tiles, light-blue hover */
         main { max-width: 1120px; }
         .sp-hero { margin: 4px 0 24px; padding: 16px 20px; background: #fff; border: 1px solid var(--kt-border); border-left: 5px solid var(--kt-blue); }
-        .sp-hero h1 { margin: 0; font-size: 20px; font-weight: 700; }
-        .sp-hero p { margin: 4px 0 0; font-size: 13px; color: var(--kt-muted); }
+        .sp-hero h1 { margin: 0; font-size: 23px; font-weight: 700; }
+        .sp-hero p { margin: 4px 0 0; font-size: 15px; color: var(--kt-muted); }
 
-        .sp-heading { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 16px; font-weight: 700; }
-        .sp-heading span { padding: 0 8px; background: var(--kt-blue); color: #fff; font-size: 12px; font-weight: 400; }
+        .sp-heading { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 18px; font-weight: 700; }
+        .sp-heading span { padding: 0 8px; background: var(--kt-blue); color: #fff; font-size: 14px; font-weight: 400; }
 
         .sp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
         .sp-card { display: flex; align-items: center; gap: 16px; height: 100%; padding: 16px; background: #fff; border: 1px solid var(--kt-border); color: var(--kt-text); }
@@ -27,7 +27,7 @@
         .sp-card:focus-visible { outline: 1px solid var(--kt-blue); outline-offset: 1px; }
         .sp-icon { display: grid; place-items: center; width: 56px; height: 56px; flex-shrink: 0; color: #fff; }
         .sp-icon svg { width: 30px; height: 30px; }
-        .sp-name { display: flex; flex: 1; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; font-size: 16px; font-weight: 700; color: var(--kt-blue); }
+        .sp-name { display: flex; flex: 1; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; font-size: 18px; font-weight: 700; color: var(--kt-blue); }
         .sp-arrow { display: grid; place-items: center; width: 24px; height: 24px; flex-shrink: 0; color: var(--kt-blue); }
         .sp-arrow svg { width: 16px; height: 16px; }
 

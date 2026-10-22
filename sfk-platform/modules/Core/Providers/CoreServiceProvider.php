@@ -9,6 +9,11 @@ use App\Modules\ModuleServiceProvider;
 use Filament\Auth\Http\Responses\Contracts\LogoutResponse;
 use Filament\Facades\Filament;
 use Filament\Navigation\NavigationItem;
+use Filament\Notifications\Livewire\Notifications;
+use Filament\Notifications\View\NotificationsIconAlias;
+use Filament\Support\Enums\Alignment;
+use Filament\Support\Enums\VerticalAlignment;
+use Filament\Support\Facades\FilamentIcon;
 use Filament\Support\Facades\FilamentView;
 use Filament\Support\Icons\Heroicon;
 use Filament\View\PanelsRenderHook;
@@ -59,6 +64,17 @@ final class CoreServiceProvider extends ModuleServiceProvider
         FilamentView::registerRenderHook(PanelsRenderHook::SIDEBAR_LOGO_AFTER, fn (): string => self::dashboardSwitcher('sidebar'));
         FilamentView::registerRenderHook(PanelsRenderHook::TOPBAR_LOGO_AFTER, fn (): string => self::dashboardSwitcher('topbar'));
         FilamentView::registerRenderHook(PanelsRenderHook::SIDEBAR_NAV_START, fn (): string => self::dashboardMenu());
+
+        // Toasts: top middle of the screen, a solid icon per status — drawn white on the coloured icon tile of the
+        // theme (core::filament.theme), the glyph showing the tile's colour through it; danger has the ✕ circle.
+        Notifications::alignment(Alignment::Center);
+        Notifications::verticalAlignment(VerticalAlignment::Start);
+        FilamentIcon::register([
+            NotificationsIconAlias::NOTIFICATION_SUCCESS => Heroicon::CheckCircle,
+            NotificationsIconAlias::NOTIFICATION_INFO => Heroicon::InformationCircle,
+            NotificationsIconAlias::NOTIFICATION_WARNING => Heroicon::ExclamationTriangle,
+            NotificationsIconAlias::NOTIFICATION_DANGER => Heroicon::XCircle,
+        ]);
     }
 
     private static function dashboardSwitcher(string $place): string

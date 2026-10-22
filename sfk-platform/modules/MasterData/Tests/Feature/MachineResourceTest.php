@@ -40,7 +40,8 @@ function publishedMachineApp(): BusinessApp
     app(AppLifecycle::class)->syncWithCode(['machine-master' => '03. 機械マスタ'], ['machine-master' => MachineResource::appSettingDefaults()]);
     $space = Space::query()->firstOrCreate(['panel_id' => 'erp', 'name' => '製造スペース']);
     $app = BusinessApp::query()->where('code', 'machine-master')->sole();
-    $app->forceFill(['status' => AppStatus::Published, 'space_id' => $space->id])->save();
+    $app->forceFill(['status' => AppStatus::Published])->save();
+    $app->spaces()->syncWithoutDetaching([$space->id]);
 
     return $app;
 }
@@ -55,7 +56,7 @@ function machineEmployeeWith(array $abilities): User
     $app->permissions()->create(['subject_type' => PermissionSubject::Everyone, ...$columns]);
 
     $employee = grantDashboards(User::factory()->create(), 'erp');
-    $app->space?->users()->attach($employee);
+    $app->spaces->first()?->users()->attach($employee);
 
     return $employee;
 }

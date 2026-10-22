@@ -7,6 +7,7 @@ namespace Modules\Core\Filament\DashboardSettings\Resources\AppSettings;
 use App\Models\User;
 use BackedEnum;
 use Closure;
+use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Repeater;
@@ -28,6 +29,8 @@ use Modules\Core\Domain\Apps\AppStatus;
 use Modules\Core\Domain\Apps\PermissionSubject;
 use Modules\Core\Filament\DashboardSettings\DashboardSettingsPlugin;
 use Modules\Core\Filament\DashboardSettings\Resources\AppSettings\Pages\EditAppSettings;
+use Modules\Core\Filament\DashboardSettings\Resources\AppSettings\Pages\EditFieldPermissions;
+use Modules\Core\Filament\DashboardSettings\Resources\AppSettings\Pages\EditRecordPermissions;
 use Modules\Core\Filament\DashboardSettings\Resources\AppSettings\Pages\ListAppSettings;
 use Modules\Core\Models\BusinessApp;
 use Modules\Core\Models\EmployeeCategory;
@@ -36,7 +39,8 @@ use UnitEnum;
 /**
  * アプリの権限 (permission.md "App"): the apps placed in this dashboard's spaces and, per app, who may do what —
  * 全員, a 従業員カテゴリ or one employee, each with 閲覧・追加・編集・削除・ファイル読み込み・ファイル書き出し.
- * 個人 overrides 従業員カテゴリ, which overrides 全員 (AppAccess). Administrators only.
+ * 個人 overrides 従業員カテゴリ, which overrides 全員 (AppAccess). Per app also the レコード (EditRecordPermissions,
+ * RecordAccess) and フィールド (EditFieldPermissions, FieldAccess) アクセス権. Administrators only.
  */
 final class AppSettingsResource extends Resource
 {
@@ -61,7 +65,7 @@ final class AppSettingsResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->whereHas('space', fn (Builder $query) => $query->where('panel_id', DashboardSettingsPlugin::currentPanelId()));
+            ->whereHas('spaces', fn (Builder $query) => $query->where('panel_id', DashboardSettingsPlugin::currentPanelId()));
     }
 
     public static function form(Schema $schema): Schema
@@ -74,7 +78,7 @@ final class AppSettingsResource extends Resource
                     ->schema([
                         TextEntry::make('name')->label('アプリ名')->weight(FontWeight::SemiBold),
                         TextEntry::make('code')->label('コード'),
-                        TextEntry::make('space.name')->label('スペース'),
+                        TextEntry::make('space_names')->label('スペース')->state(fn (BusinessApp $record): string => self::spaceNames($record)),
                         TextEntry::make('status')
                             ->label('状態')
                             ->badge()
@@ -90,6 +94,8 @@ final class AppSettingsResource extends Resource
                             ->defaultItems(0)
                             ->reorderable(false)
                             ->addActionLabel('権限を追加')
+                            ->itemLabel(fn (array $state): string => AccessEntryFields::subjectLabel($state))
+                            ->extraAttributes(['class' => 'sfk-access'])
                             ->columns(6)
                             ->rule(fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
                                 $everyone = array_filter((array) $value, fn (mixed $item): bool => is_array($item)
@@ -108,6 +114,7 @@ final class AppSettingsResource extends Resource
                                     ->live()
                                     ->columnSpan(2),
                                 Select::make('employee_category_id')
+                                    ->live()
                                     ->label('従業員カテゴリ')
                                     ->options(fn (mixed $state): array => EmployeeCategory::options($state))
                                     ->visible(fn (Get $get): bool => $get('subject_type') === PermissionSubject::Category->value)
@@ -116,6 +123,7 @@ final class AppSettingsResource extends Resource
                                     ->native(false)
                                     ->columnSpan(4),
                                 Select::make('user_id')
+                                    ->live()
                                     ->label('従業員')
                                     ->options(fn (): array => User::query()
                                         ->where('user_type', UserType::Employee->value)
@@ -127,11 +135,11 @@ final class AppSettingsResource extends Resource
                                     ->distinct()
                                     ->searchable()
                                     ->columnSpan(4),
-                                ...array_map(
+                                AccessEntryFields::rights(array_map(
                                     fn (AppAbility $ability): Checkbox => Checkbox::make($ability->column())
                                         ->label($ability->label()),
                                     AppAbility::cases(),
-                                ),
+                                ))->columnSpanFull(),
                             ]),
                     ]),
             ]);
@@ -140,12 +148,12 @@ final class AppSettingsResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $query) => $query->with('space')->withCount('permissions'))
+            ->modifyQueryUsing(fn (Builder $query) => $query->with('spaces')->withCount('permissions'))
             ->columns([
                 TextColumn::make('name')
                     ->label('アプリ名')
                     ->searchable(['name', 'code']),
-                TextColumn::make('space.name')->label('スペース'),
+                TextColumn::make('space_names')->label('スペース')->state(fn (BusinessApp $record): string => self::spaceNames($record)),
                 TextColumn::make('status')
                     ->label('状態')
                     ->badge()
@@ -160,7 +168,15 @@ final class AppSettingsResource extends Resource
             ->paginated(false)
             ->striped()
             ->recordActions([
-                EditAction::make()->label('権限を設定'),
+                EditAction::make()->label('アプリ'),
+                Action::make('records')
+                    ->label('レコード')
+                    ->icon(Heroicon::OutlinedQueueList)
+                    ->url(fn (BusinessApp $record): string => self::getUrl('records', ['record' => $record])),
+                Action::make('fields')
+                    ->label('フィールド')
+                    ->icon(Heroicon::OutlinedViewColumns)
+                    ->url(fn (BusinessApp $record): string => self::getUrl('fields', ['record' => $record])),
             ])
             ->emptyStateIcon(Heroicon::OutlinedLockClosed)
             ->emptyStateHeading('このダッシュボードに配置されたアプリはありません');
@@ -207,6 +223,14 @@ final class AppSettingsResource extends Resource
         return [
             'index' => ListAppSettings::route('/'),
             'edit' => EditAppSettings::route('/{record}/edit'),
+            'records' => EditRecordPermissions::route('/{record}/records'),
+            'fields' => EditFieldPermissions::route('/{record}/fields'),
         ];
+    }
+
+    /** The app's spaces of this dashboard (an app may be in several). */
+    private static function spaceNames(BusinessApp $app): string
+    {
+        return $app->spaces->where('panel_id', DashboardSettingsPlugin::currentPanelId())->pluck('name')->implode('、');
     }
 }

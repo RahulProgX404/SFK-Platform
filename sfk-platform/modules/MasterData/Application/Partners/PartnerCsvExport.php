@@ -33,23 +33,27 @@ final class PartnerCsvExport
         'supplier_notes', 'created_at', 'updated_at',
     ];
 
-    /** @param  Builder<Partner>  $query */
-    public function download(Builder $query): StreamedResponse
+    /**
+     * @param  Builder<Partner>  $query
+     * @param  list<string>  $hidden  fields the user may not see (フィールドのアクセス権 なし): left out
+     */
+    public function download(Builder $query, array $hidden = []): StreamedResponse
     {
+        $columns = array_values(array_diff(self::COLUMNS, $hidden));
         $fileName = '取引先マスタ_'.now()->format('Ymd_His').'.csv';
 
-        return response()->streamDownload(function () use ($query): void {
+        return response()->streamDownload(function () use ($query, $columns): void {
             $out = fopen('php://output', 'wb');
             if ($out === false) {
                 return;
             }
 
             fwrite($out, "\u{FEFF}");
-            fputcsv($out, array_map(fn (string $column): string => PartnerFields::label($column), self::COLUMNS), escape: '');
+            fputcsv($out, array_map(fn (string $column): string => PartnerFields::label($column), $columns), escape: '');
 
-            $query->with('staff')->chunk(500, function ($partners) use ($out): void {
+            $query->with('staff')->chunk(500, function ($partners) use ($out, $columns): void {
                 foreach ($partners as $partner) {
-                    fputcsv($out, $this->row($partner), escape: '');
+                    fputcsv($out, $this->row($partner, $columns), escape: '');
                 }
             });
 
@@ -57,8 +61,11 @@ final class PartnerCsvExport
         }, $fileName, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
-    /** @return list<string> */
-    public function row(Partner $partner): array
+    /**
+     * @param  list<string>|null  $columns  default: every column
+     * @return list<string>
+     */
+    public function row(Partner $partner, ?array $columns = null): array
     {
         return array_map(fn (string $column): string => match ($column) {
             'roles' => implode(',', array_map(fn (PartnerRole $role): string => $role->value, $partner->roles())),
@@ -66,7 +73,7 @@ final class PartnerCsvExport
             'supplier_same_address', 'electronic_billing' => $partner->getAttribute($column) ? '✓' : '',
             'collects_by_bill' => $partner->getAttribute($column) ? '手形' : '',
             default => self::scalar($partner->getAttribute($column)),
-        }, self::COLUMNS);
+        }, $columns ?? self::COLUMNS);
     }
 
     private static function scalar(mixed $value): string

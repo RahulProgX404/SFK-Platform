@@ -6,14 +6,15 @@ namespace Modules\MasterData\Filament\Resources\Partners;
 
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Text;
 use Modules\Core\Filament\Records\RecordLayout;
+use Modules\Core\Filament\Records\RecordSections;
 use Modules\MasterData\Domain\Partners\PartnerFields;
 
 /**
- * The legacy form of 01. 取引先マスタ, row by row with the field widths of the app template
- * (SYSTEM_BRAIN APP_01 schema.json; group rows from the template ZIP). The form and the record page both build
- * from it, so they always look like the legacy record. 取引先名(ふりがな) is new (not in the legacy app). The
+ * The form of 01. 取引先マスタ (fields of SYSTEM_BRAIN APP_01 schema.json), grouped on a 12-column grid of the 1,500 px
+ * canvas. Above the tabs: 基本情報 (コード, 取引先名, ふりがな; 略名, 取引先カテゴリ, 登録番号), 住所・連絡先, 親会社/グループ会社
+ * and 契約書等添付. 得意先 tab (基本情報): 得意先区分, 担当, 請求・回収条件 and その他; 仕入先情報 tab: 仕入条件, 住所・連絡先
+ * (with 仕入先住所も同様) and その他. The form and the record page both build from it. 取引先名(ふりがな) is new (not in the legacy app). The
  * その他関連情報 tab of the old JS pointed to a missing group (D-01-1) and is not rebuilt.
  */
 final class PartnerLayout
@@ -32,29 +33,41 @@ final class PartnerLayout
 
     /** Rows shown on every tab: [attribute|null (spacer), width px]. */
     private const HEAD = [
-        [['code', 128], ['parent_company', 400], ['name', 400], ['name_kana', 400]],
-        [['short_name', 472], ['registration_number', 259]],
-        'label',
-        [['parent_postal_code', 193], ['parent_address', 591], ['parent_phone', 193], ['parent_fax', 193]],
-        [['postal_code', 193], ['address', 591], ['phone', 193], ['fax', 193], ['supplier_same_address', 148]],
-        [['roles', 380], ['contract_files', 207], ['supplier_contract_files', 207]],
+        '基本情報',
+        [['code', 250], ['name', 625], ['name_kana', 625]],
+        [['short_name', 375], ['roles', 750], ['registration_number', 375]],
+        '住所・連絡先',
+        [['postal_code', 250], ['address', 750], ['phone', 250], ['fax', 250]],
+        '親会社/グループ会社',
+        [['parent_company', 750]],
+        [['parent_postal_code', 250], ['parent_address', 750], ['parent_phone', 250], ['parent_fax', 250]],
+        '契約書等添付',
+        [['contract_files', 750], ['supplier_contract_files', 750]],
     ];
 
     private const BASIC = [
-        [['customer_status', 196], ['customer_classification', 196], ['legacy_customer_code', 128], [null, 145], ['partner_group', 236], ['segment', 116]],
-        [['invoice_recipient', 236], ['delivery_note_recipient', 236]],
-        [['contact_person', 193], ['staff', 344]],
-        [['contact_note', 980]],
-        [['tax_mode', 196], ['rounding', 196], ['tax_calculation_unit', 196], ['closing_day', 196], ['invoice_issuance', 196], ['delivery_note_issuance', 196], ['electronic_billing', 94]],
-        [['collection_month', 196], ['collection_day', 196], ['collects_by_bill', 108], ['bill_threshold_man', 193], ['bill_site_days', 106]],
-        [['notes', 980]],
+        '得意先区分',
+        [['customer_status', 375], ['customer_classification', 375], ['partner_group', 375], ['segment', 375]],
+        '担当',
+        [['staff', 750], ['contact_person', 750]],
+        [['contact_note', 1500]],
+        '請求・回収条件',
+        [['closing_day', 250], ['collection_month', 250], ['collection_day', 250], ['collects_by_bill', 250], ['bill_threshold_man', 250], ['bill_site_days', 250]],
+        [['tax_mode', 250], ['rounding', 250], ['tax_calculation_unit', 250], ['electronic_billing', 250]],
+        [['invoice_recipient', 375], ['delivery_note_recipient', 375], ['invoice_issuance', 375], ['delivery_note_issuance', 375]],
+        'その他',
+        [['notes', 1500]],
+        [['legacy_customer_code', 250]],
     ];
 
     private const SUPPLIER = [
-        [['purchase_category', 196], ['supplier_tax_mode', 196], ['supplier_rounding', 196], ['supplier_tax_calculation_unit', 196]],
-        [['supplier_contact_person', 193]],
-        [['supplier_postal_code', 193], ['supplier_address', 591], ['supplier_phone', 193], ['supplier_fax', 193]],
-        [['supplier_notes', 980]],
+        '仕入条件',
+        [['purchase_category', 375], ['supplier_tax_mode', 375], ['supplier_rounding', 375], ['supplier_tax_calculation_unit', 375]],
+        '住所・連絡先',
+        [['supplier_contact_person', 375], ['supplier_same_address', 375]],
+        [['supplier_postal_code', 250], ['supplier_address', 750], ['supplier_phone', 250], ['supplier_fax', 250]],
+        'その他',
+        [['supplier_notes', 1500]],
     ];
 
     private const FOOTER = [[['id', 120], ['creator', 136], ['created_at', 196], ['updater', 136], ['updated_at', 196]]];
@@ -107,21 +120,12 @@ final class PartnerLayout
     }
 
     /**
-     * @param  list<list<array{0: string|null, 1: int}>|string>  $rows
+     * @param  list<list<array{0: string|null, 1: int}>|string>  $rows  rows, a string row is a group label
      * @param  callable(string): Component  $make
      * @return list<Component>
      */
     private static function rows(array $rows, callable $make): array
     {
-        return array_map(function (array|string $row) use ($make): Component {
-            if ($row === 'label') {
-                return Text::make('住所/連絡先 その他')->extraAttributes(['class' => 'kt-record-label'])->columnSpanFull();
-            }
-
-            return RecordLayout::row(array_map(
-                fn (array $cell): array => [$cell[0] === null ? null : $make($cell[0]), $cell[1]],
-                $row,
-            ));
-        }, $rows);
+        return RecordSections::rows($rows, $make);
     }
 }

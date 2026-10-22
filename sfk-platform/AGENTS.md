@@ -21,12 +21,29 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
 - Screens of an app (feature) extend `Modules\Core\Filament\AppResource` (app permissions, spaces, status) and its
   pages extend `Modules\Core\Filament\AppPages\App{List,Create,Edit,View}Record(s)` (the shared app screen design) —
   see `docs/permissions.md`.
-- Look: no rounded corners anywhere (the theme forces `border-radius: 0`; only radio buttons stay round) — never add
-  a radius. Table headers and field labels (key names on record / edit / new pages) are black (`--kt-label`), never
+- Components (SFK UI, `core::filament.ui`, included by the theme and the login layout): our own styles for check boxes,
+  radio buttons, option lists, switches, tooltips, attachments, collapsible groups, multi-select chips, drop-down
+  options and read-only tables, whose design language follows KUC (Cybozu's MIT UI component library — see
+  `THIRD_PARTY_NOTICES.md`; no library code is copied). Style a new component there, by component; our own native
+  inputs take the look with `sfk-ui-check` / `sfk-ui-radio`. Toasts keep their own design. A new Composer / npm
+  dependency gets a license check (`composer licenses --no-dev`) and a line in THIRD_PARTY_NOTICES.md.
+- Access rights beyond the app permissions (docs/permissions.md): レコード (`RecordAccess`, via
+  `AppResource::getEloquentQuery()` and `canView/canEdit/canDelete($record)`) and フィールド (`FieldAccess`, via
+  `RecordSections::gate()` and AppListRecords). Keep them working: overrides of `getEloquentQuery()` call the parent,
+  forms and record pages build their fields through `RecordSections::rows()` (or call `RecordSections::gate()`), list
+  column names are the form's attribute names, and records that have a 作成者 store it in `created_by`.
+- Look: no rounded corners anywhere (the theme forces `border-radius: 0`; only radio buttons and the toasts — their
+  own design, `toad-notification.png`, top middle — stay round) — never add a radius. Text: Filament's `text-sm` is 16px (the theme redefines `--text-xs` … `--text-3xl` × 16/14); give new
+  styles sizes from that scale — 16px (1rem) everyday text, 15px (.9375rem) labels / toolbar buttons, 14px (.875rem)
+  small notes, 13px (.8125rem) badges. Table headers and field labels (key names on record / edit / new pages) are black (`--kt-label`), never
   grey. No table column is bold (no `->weight()` on table columns; the theme forces normal weight in table cells —
   only the header row is bold). App lists show the paging 「1 - 100（N件中）」 at the right end of the search row (Core render hook). On a record page every toolbar button sits on the right: 編集, 再利用, 「…」 (印刷 / 削除), gear, ‹ ›
   (Core `app-header`, nothing per app).
-- The new-record page resembles the legacy create page: legacy field order and widths, legacy labels, drop-downs
+- Field order (create, edit and record page — one layout per app, `<App>Layout` rows): related fields in labelled
+  groups (string rows = blue group bars, left out when nothing under them is shown), the most important first (who /
+  when / what, then details, amounts, notes and attachments; derived and internal fields last), each row filling the
+  12-column grid of the 1,500 px canvas (125 px a column: 250 dates / amounts / codes, 375 users / selects, 500–750
+  names, 1,500 notes and tables) and every field wide enough for its content at 16px. Legacy labels, drop-downs
   showing 「-----」 when blank, lookups listing their choices when opened. Table fields (サブテーブル) are built with
   `Modules\Core\Filament\Records\RecordTable::form()` / `entry()`: legacy column widths, the first row always shown,
   ⊕ / ⊖ at the end of each row, empty rows not saved; drop-downs inside a table are native selects (a custom

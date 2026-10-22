@@ -37,19 +37,25 @@ use Modules\Sales\Models\Receipt;
 use Modules\Sales\Models\ReceiptLine;
 
 /**
- * Form and record page of 21. 売入金管理（売上） (SYSTEM_BRAIN APP_21 fields.md "Form layout", widths from the template):
- * 請求書番号 (lookup of the invoices without a receipt; copies 得意先名, 担当者, 請求日, 請求金額 and 今回締日, with 回収予定月 /
- * 回収予定日 / 締日(マスタ) from the customer), 入金済 / 入金不足 / 過入金, the table 入金明細 (入金年月 and 月度 shown per row
+ * Form and record page of 21. 売入金管理（売上） (fields of SYSTEM_BRAIN APP_21 fields.md), grouped by task on a 12-column
+ * grid of the 1,500 px canvas: 請求情報 — 請求書番号 first (lookup of the invoices without a receipt; copies 得意先名, 担当者,
+ * 請求日, 請求金額 and 今回締日, with 回収予定月 / 回収予定日 / 締日(マスタ) from the customer) — 入金状況 (請求金額, 入金済,
+ * 入金不足, 過入金), the table 入金明細 (入金年月 and 月度 shown per row
  * — the months the row counts in for 23 / 23-2, BR-AR-06), 備考 and 請求明細 (the invoice's rows, record page). The
  * legacy helper columns of the rows (keys, 日 / 年 / 月 …) are not carried over.
  */
 final class ReceiptLayout
 {
     private const MAIN = [
-        [['invoice_id', 246], ['customer_id', 390], ['assignees', 386], ['collection_month', 153], ['collection_day', 154], ['master_closing_day', 154], ['closing_day', 154]],
-        [['billed_on', 117], ['billed_amount', 193], ['settled_amount', 193], ['shortfall', 193], ['overpayment', 193]],
+        '請求情報',
+        [['invoice_id', 375], ['customer_id', 750], ['assignees', 375]],
+        [['billed_on', 250], ['closing_day', 250], ['master_closing_day', 250], ['collection_month', 375], ['collection_day', 375]],
+        '入金状況',
+        [['billed_amount', 375], ['settled_amount', 375], ['shortfall', 375], ['overpayment', 375]],
+        '入金明細',
         [['lines', 1500]],
-        [['notes', 1087]],
+        'その他',
+        [['notes', 1500]],
         [['invoice_lines', 1500]],
     ];
 
