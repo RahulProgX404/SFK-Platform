@@ -57,7 +57,7 @@
                 @if ($page->filterFields() !== [])
                     <button
                         type="button"
-                        @class(['sfk-app-tool', 'is-active' => $page->isFiltered()])
+                        class="sfk-app-tool sfk-app-filter-button"
                         x-on:click="$dispatch('sfk-app-filter-open', @js($page->appFilterState()))"
                         title="絞り込む"
                         aria-haspopup="dialog"

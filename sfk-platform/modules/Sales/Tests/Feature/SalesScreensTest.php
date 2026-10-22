@@ -424,7 +424,7 @@ it('sums the receivables list and creates the missing months from 「…」 (Cus
         ->set('listView', salesView('receivable', '売掛一覧'))
         ->assertSee(['合計', '対象件数: 2 件', '前月売掛残', '当月売掛残', '¥11,000'])
         ->callAction('refreshReceivables')
-        ->assertNotified('売掛を更新しました（1得意先）');
+        ->assertNotified('売掛を更新しました（2件・1得意先）');
 
     ReceivableMonth::query()->ofBasis(ReceivableBasis::Calendar)->where('year_month', '2026-11')->delete();
     Livewire::test(ListReceivables::class)->callAction('createCurrentMonth')->assertNotified('処理が完了しました（2026年11月：1件作成）');
@@ -455,7 +455,7 @@ it('makes the delivery notes of a period from 期間指定から納品レコー�
         ->assertSeeInOrder(['納品書発行あり', '納品レコード更新', '請求レコード更新', 'ボタンの説明', '納品書発行あり', 'このレコードのみの納品書を発行します。']);
 });
 
-it('adds the checked sales to the note or invoice one of them is on with the 【新】 buttons of 06_SalesEntry.bundle.js', function () {
+it('asks what to do with sales already on a 納品書 / 請求書: refuse, or add the others to that document', function () {
     $this->actingAs($this->admin); // the default view lists the sales one created
     $first = screenSale($this->customer);
     app(DeliveryNoteIssuer::class)->issue([$first]);
@@ -463,12 +463,27 @@ it('adds the checked sales to the note or invoice one of them is on with the 【
     $second = screenSale($this->customer, ['delivery_due_on' => '2026-10-08', 'product_name' => '角2封筒']);
 
     Livewire::test(ListSales::class)
-        ->assertSeeInOrder(['編集制限', '【新】選択して納品書レコード作成', 'sfk-menu-badge', '【新】選択して請求書レコード作成', 'sfk-menu-badge', '削除'], false)
-        ->callAction('appendDeliveryNotes')
-        ->assertNotified('レコードを選択してください。')
+        ->assertSeeInOrder(['選択して請求書レコード作成', 'sfk-menu-badge', '編集制限', '削除'], false)
+        ->assertDontSee(['【新】選択して納品書レコード作成', '【新】選択して請求書レコード作成'])
+        // the choice is asked only when ticked sales are already on a 納品書, and it must be made
         ->set('selectedTableRecords', [(string) $first->id, (string) $second->id])
-        ->callAction('appendDeliveryNotes')
-        ->assertNotified('納品書レコードの作成が完了しました。');
+        ->mountAction('createDeliveryNotes')
+        ->assertMountedActionModalSee(['既に納品書が作成されている売上が含まれています', '売上No: '.$first->sales_number, '作成しない（中止する）', '既存の納品書に追加する'])
+        ->callMountedAction()
+        ->assertHasFormErrors(['existing' => 'required']);
+
+    // 作成しない: refused as before, nothing created
+    Livewire::test(ListSales::class)
+        ->set('selectedTableRecords', [(string) $first->id, (string) $second->id])
+        ->callAction('createDeliveryNotes', data: ['existing' => 'refuse'])
+        ->assertNotified('すでに納品書が作成されている売上が含まれています（売上No: '.$first->sales_number.'）。');
+    expect(DeliveryNote::query()->count())->toBe(1)->and($second->fresh()->delivery_note_id)->toBeNull();
+
+    // 既存の納品書に追加する
+    Livewire::test(ListSales::class)
+        ->set('selectedTableRecords', [(string) $first->id, (string) $second->id])
+        ->callAction('createDeliveryNotes', data: ['existing' => 'append'])
+        ->assertNotified('納品書レコードの作成が完了しました（1件）');
 
     // the second sale joined the note of the first (no new note), its row added at the end
     expect(DeliveryNote::query()->count())->toBe(1)
@@ -481,21 +496,34 @@ it('adds the checked sales to the note or invoice one of them is on with the 【
     app(DeliveryNoteIssuer::class)->issue([$other]);
     Livewire::test(ListSales::class)
         ->set('selectedTableRecords', [(string) $first->id, (string) $other->id])
-        ->callAction('appendDeliveryNotes')
+        ->callAction('createDeliveryNotes', data: ['existing' => 'append'])
         ->assertNotified('売上先「株式会社得意先」のレコードに、異なる「納品書番号」が混在しています：'.$note->number.'、'.$other->fresh()->deliveryNote?->number.'。同じ売上先では同じ納品書番号のレコードのみ選択してください。');
 
-    // invoices: every sale needs a note; then onto a new invoice, and a later sale onto that invoice
+    // invoices: every sale needs a note; then a new invoice, and a later sale: refused or added to that invoice, as chosen
     $undelivered = screenSale($this->customer);
     Livewire::test(ListSales::class)
         ->set('selectedTableRecords', [(string) $first->id, (string) $undelivered->id])
-        ->callAction('appendInvoices')
-        ->assertNotified('納品書番号が未設定のレコードが 1 件あります。請求書を作成するには、すべての選択レコードに納品書番号が必要です。（未設定の売上No: '.$undelivered->sales_number.'）')
+        ->callAction('createInvoices')
+        ->assertNotified('納品書が作成されていない売上が含まれています（売上No: '.$undelivered->sales_number.'）。')
         ->set('selectedTableRecords', [(string) $first->id])
-        ->callAction('appendInvoices', data: ['invoiced_on' => '2026-10-20'])
-        ->assertNotified('請求書レコードの作成が完了しました。')
+        ->callAction('createInvoices', data: ['invoiced_on' => '2026-10-20'])
+        ->assertNotified('請求書レコードの作成が完了しました（1件）');
+
+    Livewire::test(ListSales::class)
         ->set('selectedTableRecords', [(string) $first->id, (string) $second->id])
-        ->callAction('appendInvoices')
-        ->assertNotified('請求書レコードの作成が完了しました。');
+        ->mountAction('createInvoices')
+        ->assertMountedActionModalSee(['既に請求書が作成されている売上が含まれています', '売上No: '.$first->sales_number, '作成しない（中止する）', '既存の請求書に追加する'])
+        ->callMountedAction()
+        ->assertHasFormErrors(['existing' => 'required']);
+    Livewire::test(ListSales::class)
+        ->set('selectedTableRecords', [(string) $first->id, (string) $second->id])
+        ->callAction('createInvoices', data: ['existing' => 'refuse'])
+        ->assertNotified('すでに請求書が作成されている売上が含まれています（売上No: '.$first->sales_number.'）。');
+    expect($second->fresh()->invoice_id)->toBeNull();
+    Livewire::test(ListSales::class)
+        ->set('selectedTableRecords', [(string) $first->id, (string) $second->id])
+        ->callAction('createInvoices', data: ['existing' => 'append'])
+        ->assertNotified('請求書レコードの作成が完了しました（1件）');
 
     $invoice = Invoice::query()->sole();
     expect($invoice->invoiced_on?->toDateString())->toBe('2026-10-20')
@@ -531,7 +559,7 @@ it('deletes the checked sales after two confirmations with 削除 of 06_SalesEnt
     $employee = grantDashboards(User::factory()->create(), 'erp');
     $app->spaces->first()?->users()->attach($employee);
     $this->actingAs($employee);
-    Livewire::test(ListSales::class)->assertActionHidden('deleteSales')->assertActionHidden('appendDeliveryNotes')->assertActionHidden('appendInvoices');
+    Livewire::test(ListSales::class)->assertActionHidden('deleteSales')->assertActionHidden('createDeliveryNotes')->assertActionHidden('createInvoices');
 });
 
 it('writes a changed sale address to its delivery note when an administrator saves (AutoReflectSalesDeliveryAddress.bundle.js)', function () {
@@ -556,17 +584,22 @@ it('writes a changed sale address to its delivery note when an administrator sav
     expect($note->fresh()->address)->toBeNull();
 });
 
-it('brings the listed 23-2 records up to date with 「[新]一括更新」, not on 売掛一覧 (23-2_AccountsReceivableManagement.bundle.js)', function () {
+it('brings the listed 23-2 records up to date with 一括更新 (with 「[新]一括更新」), not on 売掛一覧 (23-2_AccountsReceivableManagement.bundle.js)', function () {
     screenInvoice($this->customer);
     $this->actingAs($this->admin);
 
-    Livewire::test(ListReceivables::class)->assertActionDoesNotExist('refreshListedReceivables');
+    Livewire::test(ListReceivables::class)->assertDontSee('[新]一括更新');
+    $count = ReceivableMonth::query()->ofBasis(ReceivableBasis::Cycle)->count();
 
     Livewire::test(ListCycleReceivables::class)
+        ->assertDontSee('[新]一括更新')
         ->set('listView', salesView('receivable-cycle', '売掛一覧'))
-        ->mountAction('refreshListedReceivables')
+        ->mountAction('refreshReceivables')
         ->assertNotified('売掛一覧はレコード数が多いため一覧条件を変更の上実行してください。')
+        ->assertActionNotMounted('refreshReceivables')
         ->set('listView', salesView('receivable-cycle', '売掛一覧 - 20日締'))
-        ->callAction('refreshListedReceivables')
-        ->assertNotified('更新が完了しました。（'.ReceivableMonth::query()->ofBasis(ReceivableBasis::Cycle)->count().'件）');
+        ->mountAction('refreshReceivables')
+        ->assertMountedActionModalSee('現在の一覧に表示されているレコードをすべて最新の状態に更新しますか？（'.$count.'件）')
+        ->callMountedAction()
+        ->assertNotified('売掛を更新しました（'.$count.'件・1得意先）');
 });

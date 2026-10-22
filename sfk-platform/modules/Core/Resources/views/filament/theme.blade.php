@@ -1254,16 +1254,17 @@
         height: 1rem;
     }
 
-    /* 絞り込む (core::filament.app-filter, design_ref/filter1-3.png): funnel in the list toolbar, blue while a filter is on */
-    .sfk-app-tool.is-active {
+    /* 絞り込む (core::filament.app-filter, design_ref/filter1-3.png): the funnel is always blue, in every app */
+    .sfk-app-tool.sfk-app-filter-button {
         background: var(--kt-blue);
         border-color: var(--kt-blue);
         box-shadow: none;
         color: #ffffff;
     }
 
-    .sfk-app-tool.is-active:hover {
+    .sfk-app-tool.sfk-app-filter-button:hover {
         background: var(--kt-blue-dark);
+        border-color: var(--kt-blue-dark);
         color: #ffffff;
     }
 

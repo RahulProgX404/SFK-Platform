@@ -480,7 +480,7 @@ it('applies keyword, list-box and number conditions and lights the funnel', func
         ]])
         ->assertCanSeeTableRecords([$match])
         ->assertCanNotSeeTableRecords([$otherDay, $noDay])
-        ->assertSee('sfk-app-tool is-active', false)
+        ->assertSee('sfk-app-tool sfk-app-filter-button', false)
         ->assertSee('1 - 1（1件中）')
         ->call('applyAppFilter', ['conditions' => [['field' => 'closing_day', 'operator' => 'in', 'values' => ['']]]])
         ->assertCanSeeTableRecords([$noDay])
@@ -561,8 +561,7 @@ it('drops an applied filter when another view is chosen', function () {
         ->assertCanNotSeeTableRecords([$b])
         ->set('listView', 'all')
         ->assertSet('appFilter', null)
-        ->assertCanSeeTableRecords([$a, $b])
-        ->assertDontSee('sfk-app-tool is-active', false);
+        ->assertCanSeeTableRecords([$a, $b]);
 });
 
 it('lets administrators save the filter as a list view with a 一覧名', function () {
@@ -594,8 +593,7 @@ it('lets administrators save the filter as a list view with a 一覧名', functi
     Livewire::withQueryParams(['view' => (string) $view->id])
         ->test(ListPartners::class)
         ->assertSeeInOrder(['取引先一覧', '締日5日・末日', '（すべて）'])
-        ->assertCountTableRecords(2)
-        ->assertSee('sfk-app-tool is-active', false);
+        ->assertCountTableRecords(2);
 });
 
 it('does not let employees save list views', function () {

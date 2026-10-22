@@ -7,6 +7,7 @@ namespace Modules\Sales\Filament\Resources\Sales\Pages;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
@@ -114,7 +115,9 @@ final class ListSales extends AppListRecords
      * The legacy list buttons, for administrators (Customine 06 pages 1 / 6 / 9 / 13 / 18): 期間指定から納品レコード作成 and,
      * on the checked rows, 選択して納品書レコード作成, 選択して請求書レコード作成 (optional 請求日), 随時請求書レコード作成 and
      * 編集制限 (編集不可にする / 編集可能にする). The issuers refuse what the legacy flow refused (rows already on a
-     * document, 随時請求 rows on a closing-day invoice, rows without a delivery note).
+     * document, 随時請求 rows on a closing-day invoice, rows without a delivery note) — except that 選択して納品書 / 請求書
+     * レコード作成, when ticked sales are already on such a document, ask whether to refuse (作成しない) or to add the
+     * customer's other sales to it (既存の…に追加する, the 【新】 buttons of 06_SalesEntry.bundle.js, issueOrAppend()).
      */
     protected function menuActions(): array
     {
@@ -142,22 +145,58 @@ final class ListSales extends AppListRecords
                 ->label('選択して納品書レコード作成')
                 ->icon(Heroicon::OutlinedDocumentText)
                 ->visible(fn (): bool => SaleForm::isAdministrator())
-                ->requiresConfirmation()
-                ->modalHeading('選択された売上レコードから得意先別に納品書レコードを作成しますか？')
+                ->modalIcon(Heroicon::OutlinedDocumentText)
+                ->modalWidth('lg')
+                ->modalHeading(fn (Action $action): string => self::deliveredOf($action)->isEmpty()
+                    ? '選択された売上レコードから得意先別に納品書レコードを作成しますか？'
+                    : '既に納品書が作成されている売上が含まれています')
+                ->modalDescription(fn (Action $action): ?string => ($delivered = self::deliveredOf($action))->isEmpty()
+                    ? null
+                    : '選択された'.$action->getSelectedRecords()->count().'件のうち'.$delivered->count().'件は納品書作成済みです（売上No: '
+                        .$delivered->pluck('sales_number')->implode('、').'）。どうしますか？')
+                ->schema(fn (Action $action): array => self::deliveredOf($action)->isEmpty() ? [] : [
+                    Radio::make('existing')
+                        ->hiddenLabel()
+                        ->options([self::REFUSE => '作成しない（中止する）', self::APPEND => '既存の納品書に追加する'])
+                        ->required(),
+                ])
                 ->modalSubmitActionLabel('作成する')
-                ->action(fn (Collection $records) => self::onRecords($records, '納品書レコードの作成が完了しました',
-                    fn (Collection $sales): array => app(DeliveryNoteIssuer::class)->issue($sales)))
+                ->modalCancelActionLabel('キャンセル')
+                ->action(fn (Collection $records, array $data) => self::onRecords($records, '納品書レコードの作成が完了しました',
+                    fn (Collection $sales): array => ($data['existing'] ?? null) === self::APPEND
+                        ? app(DeliveryNoteIssuer::class)->issueOrAppend($sales)
+                        : app(DeliveryNoteIssuer::class)->issue($sales)))
                 ->deselectRecordsAfterCompletion(),
             MenuButtons::withCheckedCount(self::onCheckedRows(Action::make('createInvoices')))
                 ->label('選択して請求書レコード作成')
                 ->icon(Heroicon::OutlinedDocumentCurrencyYen)
                 ->visible(fn (): bool => SaleForm::isAdministrator())
-                ->modalHeading('選択された売上レコードから得意先別に請求書レコードを作成しますか？')
-                ->modalWidth('md')
+                ->modalIcon(Heroicon::OutlinedDocumentCurrencyYen)
+                ->modalWidth('lg')
+                ->modalHeading(fn (Action $action): string => self::invoicedOf($action)->isEmpty()
+                    ? '選択された売上レコードから得意先別に請求書レコードを作成しますか？'
+                    : '既に請求書が作成されている売上が含まれています')
+                ->modalDescription(fn (Action $action): ?string => ($invoiced = self::invoicedOf($action))->isEmpty()
+                    ? null
+                    : '選択された'.$action->getSelectedRecords()->count().'件のうち'.$invoiced->count().'件は請求書作成済みです（売上No: '
+                        .$invoiced->pluck('sales_number')->implode('、').'）。どうしますか？')
+                ->schema(fn (Action $action): array => [
+                    ...(self::invoicedOf($action)->isEmpty() ? [] : [
+                        Radio::make('existing')
+                            ->hiddenLabel()
+                            ->options([self::REFUSE => '作成しない（中止する）', self::APPEND => '既存の請求書に追加する'])
+                            ->required(),
+                    ]),
+                    DatePicker::make('invoiced_on')->label('請求日'),
+                ])
                 ->modalSubmitActionLabel('作成する')
-                ->schema([DatePicker::make('invoiced_on')->label('請求日')])
-                ->action(fn (Collection $records, array $data) => self::onRecords($records, '請求書レコードの作成が完了しました',
-                    fn (Collection $sales): array => app(InvoiceIssuer::class)->issue($sales, filled($data['invoiced_on'] ?? null) ? CarbonImmutable::parse((string) $data['invoiced_on']) : null)))
+                ->modalCancelActionLabel('キャンセル')
+                ->action(function (Collection $records, array $data): void {
+                    $invoicedOn = filled($data['invoiced_on'] ?? null) ? CarbonImmutable::parse((string) $data['invoiced_on']) : null;
+                    self::onRecords($records, '請求書レコードの作成が完了しました', fn (Collection $sales): array => ($data['existing'] ?? null) === self::APPEND
+                        ? app(InvoiceIssuer::class)->issueOrAppend($sales, $invoicedOn)
+                        : app(InvoiceIssuer::class)->issue($sales, $invoicedOn));
+                })
                 ->deselectRecordsAfterCompletion(),
             self::onCheckedRows(Action::make('createAdHocInvoices'))
                 ->label('随時請求書レコード作成')
@@ -197,39 +236,16 @@ final class ListSales extends AppListRecords
     }
 
     /**
-     * The list buttons of 06_SalesEntry.bundle.js, for administrators, on the checked rows: 【新】選択して納品書レコード作成 and
-     * 【新】選択して請求書レコード作成 — per customer onto the document one of the sales is already on, else a new one
-     * (issueOrAppend()) — and 削除: the sales deleted after two confirmations, their rows going from the delivery notes and
-     * invoices with them (Sale::deleting).
+     * The list button of 06_SalesEntry.bundle.js, for administrators, on the checked rows: 削除 — the sales deleted after two
+     * confirmations, their rows going from the delivery notes and invoices with them (Sale::deleting). (Its 【新】選択して
+     * 納品書 / 請求書レコード作成 are part of 選択して納品書 / 請求書レコード作成, which ask what to do with sales already on a
+     * document.)
      *
      * @return list<Action>
      */
     private function scriptActions(): array
     {
         return [
-            MenuButtons::withCheckedCount(self::onCheckedRows(Action::make('appendDeliveryNotes')))
-                ->label('【新】選択して納品書レコード作成')
-                ->icon(Heroicon::OutlinedDocumentPlus)
-                ->visible(fn (): bool => SaleForm::isAdministrator())
-                ->requiresConfirmation()
-                ->modalHeading(fn (Action $action): string => '選択された'.$action->getSelectedRecords()->count().'件の売上データから、顧客ごとに納品書データが作成されます。')
-                ->modalSubmitActionLabel('OK')
-                ->modalCancelActionLabel('キャンセル')
-                ->action(fn (Collection $records) => self::onScriptRecords($records, '納品書レコードの作成が完了しました。', '10. 納品書管理(売上)アプリから確認してください。',
-                    fn (Collection $sales): array => app(DeliveryNoteIssuer::class)->issueOrAppend($sales)))
-                ->deselectRecordsAfterCompletion(),
-            MenuButtons::withCheckedCount(self::onCheckedRows(Action::make('appendInvoices')))
-                ->label('【新】選択して請求書レコード作成')
-                ->icon(Heroicon::OutlinedBanknotes)
-                ->visible(fn (): bool => SaleForm::isAdministrator())
-                ->modalHeading(fn (Action $action): string => '選択された'.$action->getSelectedRecords()->count().'件の売上データから、顧客ごとに請求書データが作成されます。')
-                ->modalWidth('md')
-                ->modalSubmitActionLabel('OK')
-                ->modalCancelActionLabel('キャンセル')
-                ->schema([DatePicker::make('invoiced_on')->label('請求日')])
-                ->action(fn (Collection $records, array $data) => self::onScriptRecords($records, '請求書レコードの作成が完了しました。', '同時に入金管理アプリにも新規レコードを追加しています。詳細は各アプリから確認してください。',
-                    fn (Collection $sales): array => app(InvoiceIssuer::class)->issueOrAppend($sales, filled($data['invoiced_on'] ?? null) ? CarbonImmutable::parse((string) $data['invoiced_on']) : null)))
-                ->deselectRecordsAfterCompletion(),
             self::onCheckedRows(Action::make('deleteSales'))
                 ->label('削除')
                 ->icon(Heroicon::OutlinedTrash)
@@ -287,6 +303,23 @@ final class ListSales extends AppListRecords
 
     private const ANY_CLOSING_DAY = '指定なし';
 
+    /** 選択して納品書 / 請求書レコード作成, ticked sales already on such a document: refuse (nothing is created) or add to it. */
+    private const REFUSE = 'refuse';
+
+    private const APPEND = 'append';
+
+    /** @return Collection<int, Sale> the ticked sales already on a 請求書 */
+    private static function invoicedOf(Action $action): Collection
+    {
+        return new Collection($action->getSelectedRecords()->filter(fn (mixed $sale): bool => $sale instanceof Sale && $sale->invoice_id !== null)->values()->all());
+    }
+
+    /** @return Collection<int, Sale> the ticked sales already on a 納品書 */
+    private static function deliveredOf(Action $action): Collection
+    {
+        return new Collection($action->getSelectedRecords()->filter(fn (mixed $sale): bool => $sale instanceof Sale && $sale->delivery_note_id !== null)->values()->all());
+    }
+
     private const LOCK = '編集不可にする';
 
     private const UNLOCK = '編集可能にする';
@@ -314,28 +347,6 @@ final class ListSales extends AppListRecords
         }
 
         self::run($done, fn (): array => $create($records->whereInstanceOf(Sale::class)->values()));
-    }
-
-    /**
-     * A 【新】 button: the legacy messages of the script, 「完了」 with where to look, else why it was refused.
-     *
-     * @param  Collection<int, Model>  $records
-     * @param  callable(Collection<int, Sale>): array<mixed>  $create
-     */
-    private static function onScriptRecords(Collection $records, string $done, string $where, callable $create): void
-    {
-        if ($records->isEmpty()) {
-            Notification::make()->warning()->title('レコードを選択してください。')->send();
-
-            return;
-        }
-
-        try {
-            $create($records->whereInstanceOf(Sale::class)->values());
-            Notification::make()->success()->title($done)->body($where)->send();
-        } catch (SalesActionNotAllowed $exception) {
-            Notification::make()->danger()->title($exception->getMessage())->persistent()->send();
-        }
     }
 
     /** @param  callable(): array<mixed>  $create */

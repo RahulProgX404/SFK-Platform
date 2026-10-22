@@ -22,7 +22,8 @@
                 </x-slot>
                 <x-filament::dropdown.list>
                     @foreach ($chrome['settings_menu'] as $item)
-                        <x-filament::dropdown.list.item tag="a" :href="$item['url']">{{ $item['label'] }}</x-filament::dropdown.list.item>
+                        <x-filament::dropdown.list.item tag="a"
+                            :href="$item['url']">{{ $item['label'] }}</x-filament::dropdown.list.item>
                     @endforeach
                 </x-filament::dropdown.list>
             </x-filament::dropdown>

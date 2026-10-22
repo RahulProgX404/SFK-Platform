@@ -340,7 +340,7 @@ it('shows the payables, takes only 消費税端数調整 by hand and sums the li
 
     // after the supplier's terms changed, 一括更新 / 再集計 recalculate
     $this->supplier->update(['supplier_tax_mode' => '内']);
-    Livewire::test(ListPayables::class)->callAction('refreshPayables')->assertNotified('買掛を更新しました（1仕入先）');
+    Livewire::test(ListPayables::class)->callAction('refreshPayables')->assertNotified('買掛を更新しました（1件・1仕入先）');
     expect($october->fresh()->month_total)->toBe(10000);
     Livewire::test(ViewPayable::class, ['record' => $october->getRouteKey()])->callAction(TestAction::make('recalculate'))->assertNotified('再集計しました');
 
@@ -420,7 +420,7 @@ it('has the legacy list buttons of 05 for administrators (Customine 05 pages 6 /
     Livewire::test(ListPurchases::class)->assertActionHidden('numberPurchases')->assertDontSee('csv一括読み込み後');
 });
 
-it('previews a month with 「(新) 前月未作成」 without saving, and brings the list up to date with 「[新]一括更新」 (23_AccountPayableManagement.bundle.js)', function () {
+it('previews a month with 「(新) 前月未作成」 without saving, and brings the list up to date with 一括更新 (23_AccountPayableManagement.bundle.js)', function () {
     Purchase::query()->create(['supplier_id' => $this->supplier->id, 'purchased_on' => '2026-10-05', 'product_name' => 'クラフト紙', 'amount' => 10000]);
     $payment = Payment::query()->create(['paid_on' => '2026-11-25']);
     $payment->lines()->create(['supplier_id' => $this->supplier->id, 'amount' => 4000]);
@@ -428,7 +428,8 @@ it('previews a month with 「(新) 前月未作成」 without saving, and brings
     $this->actingAs($this->admin);
 
     Livewire::test(ListPayables::class)
-        ->assertSeeInOrder(['前月未作成一括作成', '(新) 前月未作成', '[新]一括更新'])
+        ->assertSeeInOrder(['一括更新', '前月未作成一括作成', '(新) 前月未作成'])
+        ->assertDontSee('[新]一括更新')
         ->callAction('previewMonth', data: ['year' => '2026', 'month' => '11'])
         ->assertActionMounted('payablePreviewResult')
         ->assertMountedActionModalSee(['2026年11月 計算結果（テスト表示）', 'これはテスト表示です。実際のレコードは作成・更新されていません。',
@@ -441,9 +442,11 @@ it('previews a month with 「(新) 前月未作成」 without saving, and brings
         ->callAction('previewMonth', data: ['year' => '2026', 'month' => '10'])
         ->assertMountedActionModalSee(['2026年10月 計算結果（テスト表示）', '更新（再集計）', '材料仕入', '¥10,000']);
 
-    // [新]一括更新: the records of the list (先月買掛一覧: 2026年10月) recalculated
+    // 一括更新 (with 「[新]一括更新」): the records of the list (先月買掛一覧: 2026年10月) recalculated
     Livewire::test(ListPayables::class)
-        ->callAction('refreshListedPayables')
-        ->assertNotified('更新処理が完了しました。（1件）');
+        ->mountAction('refreshPayables')
+        ->assertMountedActionModalSee('現在表示されている一覧のレコードを最新の状態に更新しますか？（1件）')
+        ->callMountedAction()
+        ->assertNotified('買掛を更新しました（1件・1仕入先）');
     expect(PayableMonth::query()->where('year_month', '2026-10')->sole()->purchase_amount)->toBe(10000);
 });

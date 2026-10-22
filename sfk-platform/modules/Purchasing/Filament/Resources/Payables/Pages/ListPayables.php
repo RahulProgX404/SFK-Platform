@@ -25,12 +25,11 @@ use Modules\Purchasing\Models\PayableMonth;
 
 /**
  * List of 23. 買掛管理 with 合計 on top of the table (legacy Customine 23買掛 page 1: the sums of the ledger columns of
- * the list as filtered and searched). The legacy list buttons for administrators: 一括更新 (Customine 23買掛): the
- * payables of the suppliers in the list are recalculated — needed only after
- * a supplier's 消費税区分 / 端数区分 changed, as purchases and payments recalculate them on every save — and
+ * the list as filtered and searched). The legacy list buttons for administrators: 一括更新 (Customine 23買掛 page 11 and
+ * 「[新]一括更新」 of the legacy JS, one button): the payables of the suppliers in the list are recalculated — needed only
+ * after a supplier's 消費税区分 / 端数区分 changed, as purchases and payments recalculate them on every save — and
  * 当月未作成一括作成 / 前月未作成一括作成 (Customine 23買掛 pages 9 / 10): the month's missing records of every supplier
- * with a ledger, for the months nothing was saved in; then 「(新) 前月未作成」 and 「[新]一括更新」 of the legacy JS
- * (scriptActions()).
+ * with a ledger, for the months nothing was saved in; then 「(新) 前月未作成」 of the legacy JS (scriptActions()).
  */
 final class ListPayables extends AppListRecords
 {
@@ -101,20 +100,21 @@ final class ListPayables extends AppListRecords
             Action::make('refreshPayables')
                 ->label('一括更新')
                 ->icon(Heroicon::OutlinedArrowPath)
-                ->visible(fn (): bool => auth()->user() instanceof User && auth()->user()->user_type->isAdministrator())
+                ->visible(fn (): bool => self::isAdministrator())
                 ->requiresConfirmation()
-                ->modalHeading('一覧の買掛を最新の状態に更新しますか？')
+                ->modalHeading(fn (): string => '現在表示されている一覧のレコードを最新の状態に更新しますか？（'.$this->listedPayableCount().'件）')
                 ->modalSubmitActionLabel('更新する')
                 ->modalCancelActionLabel('キャンセル')
                 ->action(function (): void {
                     $query = $this->getFilteredTableQuery();
                     $suppliers = $query instanceof Builder ? $query->toBase()->reorder()->distinct()->pluck('payable_months.supplier_id')->all() : [];
+                    $count = $this->listedPayableCount();
+
                     $ledger = app(PayableLedger::class);
                     foreach ($suppliers as $supplierId) {
                         $ledger->refresh((int) $supplierId);
                     }
-
-                    Notification::make()->success()->title('買掛を更新しました（'.count($suppliers).'仕入先）')->send();
+                    Notification::make()->success()->title('買掛を更新しました（'.$count.'件・'.count($suppliers).'仕入先）')->send();
                 }),
             $this->createMonthAction('createCurrentMonth', '当月未作成一括作成', YearMonth::fromDate(CarbonImmutable::now())),
             $this->createMonthAction('createPreviousMonth', '前月未作成一括作成', YearMonth::fromDate(CarbonImmutable::now()->startOfMonth()->subMonth())),
@@ -123,9 +123,8 @@ final class ListPayables extends AppListRecords
     }
 
     /**
-     * The list buttons of 23_AccountPayableManagement.bundle.js, for administrators: 「(新) 前月未作成」 — a chosen month,
-     * then what 前月未作成一括作成 would write for it, nothing saved (PayablePreview) — and 「[新]一括更新」 — the records
-     * of the list brought up to date (the ledger of their suppliers recalculated).
+     * The list button of 23_AccountPayableManagement.bundle.js, for administrators: 「(新) 前月未作成」 — a chosen month,
+     * then what 前月未作成一括作成 would write for it, nothing saved (PayablePreview). (Its 「[新]一括更新」 is 一括更新.)
      *
      * @return list<Action>
      */
@@ -154,27 +153,14 @@ final class ListPayables extends AppListRecords
                 ->action(fn (array $data) => $this->replaceMountedAction('payablePreviewResult', [
                     'month' => YearMonth::of((int) $data['year'], (int) $data['month'])->key(),
                 ])),
-            Action::make('refreshListedPayables')
-                ->label('[新]一括更新')
-                ->icon(Heroicon::OutlinedArrowPathRoundedSquare)
-                ->visible(fn (): bool => self::isAdministrator())
-                ->requiresConfirmation()
-                ->modalHeading('現在表示されている一覧のレコードを最新の状態に更新します。')
-                ->modalDescription('*前月分が未作成のものがある場合は正しく更新されません。')
-                ->modalSubmitActionLabel('OK')
-                ->modalCancelActionLabel('キャンセル')
-                ->action(function (): void {
-                    $query = $this->getFilteredTableQuery();
-                    $suppliers = $query instanceof Builder ? $query->toBase()->reorder()->distinct()->pluck('payable_months.supplier_id')->all() : [];
-                    $count = $query instanceof Builder ? $query->toBase()->reorder()->count() : 0;
-
-                    $ledger = app(PayableLedger::class);
-                    foreach ($suppliers as $supplierId) {
-                        $ledger->refresh((int) $supplierId);
-                    }
-                    Notification::make()->success()->title('更新処理が完了しました。（'.$count.'件）')->send();
-                }),
         ];
+    }
+
+    private function listedPayableCount(): int
+    {
+        $query = $this->getFilteredTableQuery();
+
+        return $query instanceof Builder ? $query->toBase()->reorder()->count() : 0;
     }
 
     /** 「(新) 前月未作成」, second step: 「YYYY年MM月 計算結果（テスト表示）」. */

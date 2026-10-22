@@ -384,11 +384,6 @@ abstract class AppListRecords extends ListRecords
         return RecordFilter::fromArray($this->appFilter ?? $this->currentView()->filter, $schema->filterTypes(), $schema->sortableFields());
     }
 
-    public function isFiltered(): bool
-    {
-        return $this->activeFilter()->hasConditions();
-    }
-
     /**
      * Static data of the 絞り込む dialog (core::filament.app-filter).
      *
