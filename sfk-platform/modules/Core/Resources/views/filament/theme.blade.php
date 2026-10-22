@@ -890,6 +890,105 @@
         }
     }
 
+    /* a notice inside a dialog (e.g. 「これはテスト表示です」): white box, red rule on the left */
+    .sfk-notice {
+        display: flex;
+        align-items: flex-start;
+        gap: .5rem;
+        margin: 0;
+        padding: .5rem .75rem;
+        background: #ffffff;
+        border: 1px solid var(--kt-border);
+        border-left: 3px solid var(--kt-red);
+        color: var(--kt-text);
+        font-size: .8125rem;
+        line-height: 1.6;
+    }
+
+    .sfk-notice-icon {
+        flex: none;
+        width: 1.125rem;
+        height: 1.125rem;
+        margin-top: .125rem;
+        color: var(--kt-red);
+    }
+
+    /* a read-only table inside a dialog, in the look of the app lists (grey header, black bold labels, ruled cells) */
+    .sfk-data-table-wrap {
+        max-height: 60vh;
+        overflow: auto;
+        border: 1px solid var(--kt-border);
+    }
+
+    .sfk-data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: .8125rem;
+        white-space: nowrap;
+    }
+
+    .sfk-data-table th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        padding: .5rem .75rem;
+        background: var(--kt-header);
+        border-bottom: 1px solid var(--kt-border);
+        border-inline-end: 1px solid var(--kt-border);
+        color: var(--kt-label);
+        font-weight: 700;
+        text-align: left;
+    }
+
+    .sfk-data-table td {
+        padding: .5rem .75rem;
+        border-bottom: 1px solid var(--kt-border);
+        border-inline-end: 1px solid #f0f2f3;
+        color: var(--kt-text);
+    }
+
+    .sfk-data-table th:last-child,
+    .sfk-data-table td:last-child {
+        border-inline-end: 0;
+    }
+
+    .sfk-data-table .is-number {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .sfk-data-table tbody tr:hover>td {
+        background: var(--kt-blue-soft);
+    }
+
+    /* a preview dialog: notice, the counts per kind, the table */
+    .sfk-preview {
+        display: grid;
+        gap: .75rem;
+    }
+
+    .sfk-preview-counts {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .375rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        font-size: .8125rem;
+    }
+
+    .sfk-preview-counts li {
+        padding: .25rem .625rem;
+        background: var(--kt-normal);
+        border: 1px solid var(--kt-border);
+        color: var(--kt-text);
+    }
+
+    .sfk-preview-counts strong {
+        color: var(--kt-blue-dark);
+        font-variant-numeric: tabular-nums;
+    }
+
     .sfk-app-toolbar {
         display: flex;
         flex-wrap: wrap;

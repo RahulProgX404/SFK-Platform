@@ -7,13 +7,17 @@ namespace Modules\Purchasing\Filament\Resources\Payables\Pages;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Grid;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Livewire;
 use Modules\Core\Domain\Calendar\YearMonth;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Purchasing\Application\Payables\PayableLedger;
+use Modules\Purchasing\Application\Payables\PayablePreview;
 use Modules\Purchasing\Filament\Resources\Payables\PayableLayout;
 use Modules\Purchasing\Filament\Resources\Payables\PayableResource;
 use Modules\Purchasing\Filament\Resources\Payables\Tables\PayablesTable;
@@ -21,11 +25,12 @@ use Modules\Purchasing\Models\PayableMonth;
 
 /**
  * List of 23. 買掛管理 with 合計 on top of the table (legacy Customine 23買掛 page 1: the sums of the ledger columns of
- * the list as filtered and searched). The legacy list buttons for administrators: 一括更新 (legacy 「[新]一括更新」 of
- * 23_AccountPayableManagement.bundle.js): the payables of the suppliers in the list are recalculated — needed only after
+ * the list as filtered and searched). The legacy list buttons for administrators: 一括更新 (Customine 23買掛): the
+ * payables of the suppliers in the list are recalculated — needed only after
  * a supplier's 消費税区分 / 端数区分 changed, as purchases and payments recalculate them on every save — and
  * 当月未作成一括作成 / 前月未作成一括作成 (Customine 23買掛 pages 9 / 10): the month's missing records of every supplier
- * with a ledger, for the months nothing was saved in.
+ * with a ledger, for the months nothing was saved in; then 「(新) 前月未作成」 and 「[新]一括更新」 of the legacy JS
+ * (scriptActions()).
  */
 final class ListPayables extends AppListRecords
 {
@@ -113,7 +118,87 @@ final class ListPayables extends AppListRecords
                 }),
             $this->createMonthAction('createCurrentMonth', '当月未作成一括作成', YearMonth::fromDate(CarbonImmutable::now())),
             $this->createMonthAction('createPreviousMonth', '前月未作成一括作成', YearMonth::fromDate(CarbonImmutable::now()->startOfMonth()->subMonth())),
+            ...$this->scriptActions(),
         ];
+    }
+
+    /**
+     * The list buttons of 23_AccountPayableManagement.bundle.js, for administrators: 「(新) 前月未作成」 — a chosen month,
+     * then what 前月未作成一括作成 would write for it, nothing saved (PayablePreview) — and 「[新]一括更新」 — the records
+     * of the list brought up to date (the ledger of their suppliers recalculated).
+     *
+     * @return list<Action>
+     */
+    private function scriptActions(): array
+    {
+        $year = CarbonImmutable::now()->year;
+
+        return [
+            Action::make('previewMonth')
+                ->label('(新) 前月未作成')
+                ->icon(Heroicon::OutlinedEye)
+                ->visible(fn (): bool => self::isAdministrator())
+                ->modalHeading('前月未作成一括作成')
+                ->modalDescription('一括作成する対象の年月を選択してください。選択した年月の買掛レコード未作成分を一括作成します。')
+                ->modalWidth('md')
+                ->modalSubmitActionLabel('続行')
+                ->modalCancelActionLabel('キャンセル')
+                ->schema([
+                    Grid::make(2)->schema([
+                        Select::make('year')->label('年')->placeholder('-----')->native(false)->required()
+                            ->options(collect(range($year + 1, $year - 3))->mapWithKeys(fn (int $y): array => [$y => $y.'年'])->all()),
+                        Select::make('month')->label('月')->placeholder('-----')->native(false)->required()
+                            ->options(collect(range(1, 12))->mapWithKeys(fn (int $m): array => [$m => $m.'月'])->all()),
+                    ]),
+                ])
+                ->action(fn (array $data) => $this->replaceMountedAction('payablePreviewResult', [
+                    'month' => YearMonth::of((int) $data['year'], (int) $data['month'])->key(),
+                ])),
+            Action::make('refreshListedPayables')
+                ->label('[新]一括更新')
+                ->icon(Heroicon::OutlinedArrowPathRoundedSquare)
+                ->visible(fn (): bool => self::isAdministrator())
+                ->requiresConfirmation()
+                ->modalHeading('現在表示されている一覧のレコードを最新の状態に更新します。')
+                ->modalDescription('*前月分が未作成のものがある場合は正しく更新されません。')
+                ->modalSubmitActionLabel('OK')
+                ->modalCancelActionLabel('キャンセル')
+                ->action(function (): void {
+                    $query = $this->getFilteredTableQuery();
+                    $suppliers = $query instanceof Builder ? $query->toBase()->reorder()->distinct()->pluck('payable_months.supplier_id')->all() : [];
+                    $count = $query instanceof Builder ? $query->toBase()->reorder()->count() : 0;
+
+                    $ledger = app(PayableLedger::class);
+                    foreach ($suppliers as $supplierId) {
+                        $ledger->refresh((int) $supplierId);
+                    }
+                    Notification::make()->success()->title('更新処理が完了しました。（'.$count.'件）')->send();
+                }),
+        ];
+    }
+
+    /** 「(新) 前月未作成」, second step: 「YYYY年MM月 計算結果（テスト表示）」. */
+    public function payablePreviewResultAction(): Action
+    {
+        $month = fn (array $arguments): YearMonth => YearMonth::parse((string) ($arguments['month'] ?? ''));
+
+        return Action::make('payablePreviewResult')
+            ->visible(fn (): bool => self::isAdministrator())
+            ->modalHeading(fn (array $arguments): string => $month($arguments)->label().' 計算結果（テスト表示）')
+            ->modalContent(fn (array $arguments): View => view('purchasing::filament.payable-preview', [
+                'month' => $month($arguments),
+                'rows' => app(PayablePreview::class)->forMonth($month($arguments)),
+            ]))
+            ->modalWidth('7xl')
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel('OK');
+    }
+
+    private static function isAdministrator(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && $user->user_type->isAdministrator();
     }
 
     /** 当月 / 前月未作成一括作成: the missing records of the month, for every supplier with a ledger. */

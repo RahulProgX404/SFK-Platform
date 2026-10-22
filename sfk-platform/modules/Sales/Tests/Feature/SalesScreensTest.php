@@ -50,6 +50,7 @@ use Modules\Sales\Filament\Resources\Receivables\Pages\ViewCycleReceivable;
 use Modules\Sales\Filament\Resources\Receivables\Pages\ViewReceivable;
 use Modules\Sales\Filament\Resources\Receivables\ReceivableResource;
 use Modules\Sales\Filament\Resources\Sales\Pages\CreateSale;
+use Modules\Sales\Filament\Resources\Sales\Pages\EditSale;
 use Modules\Sales\Filament\Resources\Sales\Pages\ListSales;
 use Modules\Sales\Filament\Resources\Sales\Pages\ViewSale;
 use Modules\Sales\Filament\Resources\Sales\SaleResource;
@@ -449,4 +450,120 @@ it('makes the delivery notes of a period from 期間指定から納品レコー�
     // the record buttons are buttons of the record page
     Livewire::test(ViewSale::class, ['record' => $sale->getRouteKey()])
         ->assertSeeInOrder(['納品書発行あり', '納品レコード更新', '請求レコード更新', 'ボタンの説明', '納品書発行あり', 'このレコードのみの納品書を発行します。']);
+});
+
+it('adds the checked sales to the note or invoice one of them is on with the 【新】 buttons of 06_SalesEntry.bundle.js', function () {
+    $this->actingAs($this->admin); // the default view lists the sales one created
+    $first = screenSale($this->customer);
+    app(DeliveryNoteIssuer::class)->issue([$first]);
+    $note = DeliveryNote::query()->sole();
+    $second = screenSale($this->customer, ['delivery_due_on' => '2026-10-08', 'product_name' => '角2封筒']);
+
+    Livewire::test(ListSales::class)
+        ->assertSeeInOrder(['編集制限', '【新】選択して納品書レコード作成', 'sfk-menu-badge', '【新】選択して請求書レコード作成', 'sfk-menu-badge', '削除'], false)
+        ->callAction('appendDeliveryNotes')
+        ->assertNotified('レコードを選択してください。')
+        ->set('selectedTableRecords', [(string) $first->id, (string) $second->id])
+        ->callAction('appendDeliveryNotes')
+        ->assertNotified('納品書レコードの作成が完了しました。');
+
+    // the second sale joined the note of the first (no new note), its row added at the end
+    expect(DeliveryNote::query()->count())->toBe(1)
+        ->and($second->fresh()->delivery_note_id)->toBe($note->id)
+        ->and($note->lines()->orderBy('sort')->pluck('product_name')->all())->toBe(['長3封筒', '角2封筒'])
+        ->and($note->fresh()->subtotal)->toBe(20000);
+
+    // one customer's sales on two notes are refused
+    $other = screenSale($this->customer);
+    app(DeliveryNoteIssuer::class)->issue([$other]);
+    Livewire::test(ListSales::class)
+        ->set('selectedTableRecords', [(string) $first->id, (string) $other->id])
+        ->callAction('appendDeliveryNotes')
+        ->assertNotified('売上先「株式会社得意先」のレコードに、異なる「納品書番号」が混在しています：'.$note->number.'、'.$other->fresh()->deliveryNote?->number.'。同じ売上先では同じ納品書番号のレコードのみ選択してください。');
+
+    // invoices: every sale needs a note; then onto a new invoice, and a later sale onto that invoice
+    $undelivered = screenSale($this->customer);
+    Livewire::test(ListSales::class)
+        ->set('selectedTableRecords', [(string) $first->id, (string) $undelivered->id])
+        ->callAction('appendInvoices')
+        ->assertNotified('納品書番号が未設定のレコードが 1 件あります。請求書を作成するには、すべての選択レコードに納品書番号が必要です。（未設定の売上No: '.$undelivered->sales_number.'）')
+        ->set('selectedTableRecords', [(string) $first->id])
+        ->callAction('appendInvoices', data: ['invoiced_on' => '2026-10-20'])
+        ->assertNotified('請求書レコードの作成が完了しました。')
+        ->set('selectedTableRecords', [(string) $first->id, (string) $second->id])
+        ->callAction('appendInvoices')
+        ->assertNotified('請求書レコードの作成が完了しました。');
+
+    $invoice = Invoice::query()->sole();
+    expect($invoice->invoiced_on?->toDateString())->toBe('2026-10-20')
+        ->and($invoice->receipt)->not->toBeNull()
+        ->and($invoice->lines()->orderBy('sort')->pluck('product_name')->all())->toBe(['長3封筒', '角2封筒'])
+        ->and($second->fresh()->invoice_id)->toBe($invoice->id);
+});
+
+it('deletes the checked sales after two confirmations with 削除 of 06_SalesEntry.bundle.js, their rows going from the note', function () {
+    $this->actingAs($this->admin); // the default view lists the sales one created
+    $sale = screenSale($this->customer);
+    $kept = screenSale($this->customer, ['product_name' => '角2封筒']);
+    app(DeliveryNoteIssuer::class)->issue([$sale, $kept]);
+    $note = DeliveryNote::query()->sole();
+
+    Livewire::test(ListSales::class)
+        ->set('selectedTableRecords', [(string) $sale->id])
+        ->mountAction('deleteSales')
+        ->assertMountedActionModalSee('選択された1件の売上データに関連する売上明細は、対応する納品書および請求書データから削除されます。')
+        ->callMountedAction()
+        ->assertActionMounted('confirmDeleteSales')
+        ->assertMountedActionModalSee('この操作は取り消せません。実行してもよろしいですか？')
+        ->callMountedAction()
+        ->assertNotified('選択されたレコードの削除が完了しました。');
+
+    expect(Sale::query()->whereKey($sale->id)->exists())->toBeFalse()
+        ->and($note->lines()->pluck('product_name')->all())->toBe(['角2封筒'])
+        ->and($note->fresh()->subtotal)->toBe(10000);
+
+    // not for employees, even with 削除 on the app
+    $app = BusinessApp::query()->where('code', 'sales-entry')->sole();
+    $app->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true, AppAbility::Delete->column() => true]);
+    $employee = grantDashboards(User::factory()->create(), 'erp');
+    $app->space?->users()->attach($employee);
+    $this->actingAs($employee);
+    Livewire::test(ListSales::class)->assertActionHidden('deleteSales')->assertActionHidden('appendDeliveryNotes')->assertActionHidden('appendInvoices');
+});
+
+it('writes a changed sale address to its delivery note when an administrator saves (AutoReflectSalesDeliveryAddress.bundle.js)', function () {
+    $sale = screenSale($this->customer);
+    app(DeliveryNoteIssuer::class)->issue([$sale]);
+    $note = DeliveryNote::query()->sole();
+    expect($note->address)->toBe('大阪市北区1-1');
+    $this->actingAs($this->admin);
+
+    Livewire::test(EditSale::class, ['record' => $sale->getRouteKey()])
+        ->fillForm(['other_address' => ['する'], 'manual_postal_code' => '100-0001', 'manual_address' => '東京都千代田区1-1'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($note->fresh()->only(['postal_code', 'address']))->toBe(['postal_code' => '100-0001', 'address' => '東京都千代田区1-1']);
+
+    // a note without an address is left alone
+    $note->update(['address' => null]);
+    Livewire::test(EditSale::class, ['record' => $sale->getRouteKey()])
+        ->fillForm(['manual_address' => '東京都港区2-2'])
+        ->call('save');
+    expect($note->fresh()->address)->toBeNull();
+});
+
+it('brings the listed 23-2 records up to date with 「[新]一括更新」, not on 売掛一覧 (23-2_AccountsReceivableManagement.bundle.js)', function () {
+    screenInvoice($this->customer);
+    $this->actingAs($this->admin);
+
+    Livewire::test(ListReceivables::class)->assertActionDoesNotExist('refreshListedReceivables');
+
+    Livewire::test(ListCycleReceivables::class)
+        ->set('listView', salesView('receivable-cycle', '売掛一覧'))
+        ->mountAction('refreshListedReceivables')
+        ->assertNotified('売掛一覧はレコード数が多いため一覧条件を変更の上実行してください。')
+        ->set('listView', salesView('receivable-cycle', '売掛一覧 - 20日締'))
+        ->callAction('refreshListedReceivables')
+        ->assertNotified('更新が完了しました。（'.ReceivableMonth::query()->ofBasis(ReceivableBasis::Cycle)->count().'件）');
 });

@@ -52,8 +52,10 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   `->selectable()`), 「レコード詳細メニューの上側」 → `menuActions()` of the record page (buttons before 編集). A legacy
   「メニュー位置に文字を表示する」 text goes in `menuHelp()` as button label => explanation (the collapsible 「ボタンの説明」
   panel, shown to the users the legacy text was shown to). Core draws the buttons as the app's button bar (MenuButtons,
-  core::filament.app-menu: icon + label, checked-row buttons behind 「N件選択」); give each one an icon. Do not hide
-  legacy buttons in 「…」 or in bulk actions.
+  core::filament.app-menu: icon + label; a checked-row button may carry a live 「N件」 badge via
+  `MenuButtons::withCheckedCount()`); give each one an icon. Do not hide legacy buttons in 「…」 or in bulk actions.
+  Buttons of the legacy JavaScript (`../js-customization/<app>/`) are legacy buttons too: keep their labels, including
+  the 【新】 / [新] / (新) trial ones, as separate buttons next to the Customine ones (after them, in the script's order).
 - App lists (Core, automatic): search box on the left, one horizontal scroll with its bar at the end of the table (and a synced copy fixed at the bottom of the screen while the end of the table is out of view),
   表示件数 20–300 per user, and every column sorts on a header click (昇順 ⇄ 降順). Database columns become sortable by
   themselves; give computed columns (state from relations or flags) `->sortable(query: …)`.

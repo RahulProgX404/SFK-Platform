@@ -9,6 +9,7 @@ use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
+use Filament\Support\Exceptions\Cancel;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Livewire;
@@ -30,7 +31,8 @@ use Modules\Sales\Models\ReceivableMonth;
  * - the legacy list buttons for administrators: 一括更新 — the months of the customers in the list recalculated (23 page 6, 23-2 page 8) —
  *   and 当月未作成一括登録 / 前月未作成一括登録 — the month's missing records created for every customer with a ledger
  *   (23 pages 4 / 5, 23-2 pages 6 / 7 for the customers of a chosen 締日). The ledger creates the months while a balance is
- *   open (BR-AR-05) whenever a sale or receipt is saved; these actions catch up the months nothing was saved in.
+ *   open (BR-AR-05) whenever a sale or receipt is saved; these actions catch up the months nothing was saved in;
+ * - 23-2 only: 「[新]一括更新」 of the legacy JS (scriptRefreshAction()).
  */
 abstract class ListReceivableMonths extends AppListRecords
 {
@@ -121,7 +123,56 @@ abstract class ListReceivableMonths extends AppListRecords
                 }),
             $this->createMonthAction('createCurrentMonth', '当月未作成一括登録', YearMonth::fromDate(CarbonImmutable::now())),
             $this->createMonthAction('createPreviousMonth', '前月未作成一括登録', YearMonth::fromDate(CarbonImmutable::now()->startOfMonth()->subMonth())),
+            ...($this->basis() === ReceivableBasis::Cycle ? [$this->scriptRefreshAction()] : []),
         ];
+    }
+
+    /**
+     * 23-2: 「[新]一括更新」 of 23-2_AccountsReceivableManagement.bundle.js (administrators): the records of the list brought
+     * up to date (前月売掛残, 当月入金額, the sales per rate — the ledger of their customers recalculated), refused on the
+     * view 売掛一覧 (too many records) and on an empty list.
+     */
+    private function scriptRefreshAction(): Action
+    {
+        return Action::make('refreshListedReceivables')
+            ->label('[新]一括更新')
+            ->icon(Heroicon::OutlinedArrowPathRoundedSquare)
+            ->visible(fn (): bool => self::isAdministrator())
+            ->mountUsing(function (): void {
+                if ($this->currentView()->name === '売掛一覧') {
+                    Notification::make()->warning()->title('売掛一覧はレコード数が多いため一覧条件を変更の上実行してください。')->send();
+
+                    throw new Cancel;
+                }
+                if ($this->listedReceivableCount() === 0) {
+                    Notification::make()->warning()->title('処理可能なレコードが存在しません。一覧の条件設定を確認してください。')->send();
+
+                    throw new Cancel;
+                }
+            })
+            ->requiresConfirmation()
+            ->modalHeading(fn (): string => '現在の一覧に表示されているレコードをすべて最新の状態に更新します。（'.$this->listedReceivableCount().'件）よろしいですか？')
+            ->modalDescription('*レコード未作成月があると正確な更新ができない可能性があります。*未作成のレコードがある場合は先に作成してください。')
+            ->modalSubmitActionLabel('OK')
+            ->modalCancelActionLabel('キャンセル')
+            ->action(function (): void {
+                $query = $this->getFilteredTableQuery();
+                $customers = $query instanceof Builder ? $query->toBase()->reorder()->distinct()->pluck('receivable_months.customer_id')->all() : [];
+                $count = $this->listedReceivableCount();
+
+                $ledger = app(ReceivableLedger::class);
+                foreach ($customers as $customerId) {
+                    $ledger->refresh((int) $customerId);
+                }
+                Notification::make()->success()->title('更新が完了しました。（'.$count.'件）')->send();
+            });
+    }
+
+    private function listedReceivableCount(): int
+    {
+        $query = $this->getFilteredTableQuery();
+
+        return $query instanceof Builder ? $query->toBase()->reorder()->count() : 0;
     }
 
     /** 当月 / 前月未作成一括登録: the missing records of the month, for the customers with a ledger (of the chosen 締日 on 23-2). */

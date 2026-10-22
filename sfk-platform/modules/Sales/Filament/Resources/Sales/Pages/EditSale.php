@@ -6,12 +6,15 @@ namespace Modules\Sales\Filament\Resources\Sales\Pages;
 
 use Filament\Actions\Action;
 use Modules\Core\Filament\AppPages\AppEditRecord;
+use Modules\Sales\Application\Documents\DeliveryAddressSync;
 use Modules\Sales\Filament\Resources\Sales\SaleResource;
+use Modules\Sales\Filament\Resources\Sales\Schemas\SaleForm;
 use Modules\Sales\Models\Sale;
 
 /**
  * Editing a sale of 06. 売上入力 (save checks of ChecksSale). When 売上数量 / 売上単価 / 売上金額 of a sale already on a
- * delivery note or invoice change, 保存 asks first: the documents are not updated (legacy Customine 06 page 16, BR-SA-15).
+ * delivery note or invoice change, 保存 asks first: the documents are not updated (legacy Customine 06 page 16, BR-SA-15) —
+ * except the address of the delivery note, which follows the sale's when an administrator saves (DeliveryAddressSync).
  *
  * @property Sale $record
  */
@@ -72,6 +75,16 @@ final class EditSale extends AppEditRecord
     protected function beforeSave(): void
     {
         $this->checkSale($this->record->id);
+    }
+
+    /** The changed address goes to the sale's delivery note (AutoReflectSalesDeliveryAddress.bundle.js, administrators). */
+    protected function afterSave(): void
+    {
+        parent::afterSave();
+
+        if (SaleForm::isAdministrator()) {
+            app(DeliveryAddressSync::class)->reflect($this->record->refresh());
+        }
     }
 
     /**

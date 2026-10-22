@@ -416,3 +416,31 @@ it('has the legacy list buttons of 05 for administrators (Customine 05 pages 6 /
     $this->actingAs($employee);
     Livewire::test(ListPurchases::class)->assertActionHidden('numberPurchases')->assertDontSee('csv一括読み込み後');
 });
+
+it('previews a month with 「(新) 前月未作成」 without saving, and brings the list up to date with 「[新]一括更新」 (23_AccountPayableManagement.bundle.js)', function () {
+    Purchase::query()->create(['supplier_id' => $this->supplier->id, 'purchased_on' => '2026-10-05', 'product_name' => 'クラフト紙', 'amount' => 10000]);
+    $payment = Payment::query()->create(['paid_on' => '2026-11-25']);
+    $payment->lines()->create(['supplier_id' => $this->supplier->id, 'amount' => 4000]);
+    PayableMonth::query()->where('supplier_id', $this->supplier->id)->where('year_month', '2026-11')->delete(); // a month nothing was saved in
+    $this->actingAs($this->admin);
+
+    Livewire::test(ListPayables::class)
+        ->assertSeeInOrder(['前月未作成一括作成', '(新) 前月未作成', '[新]一括更新'])
+        ->callAction('previewMonth', data: ['year' => '2026', 'month' => '11'])
+        ->assertActionMounted('payablePreviewResult')
+        ->assertMountedActionModalSee(['2026年11月 計算結果（テスト表示）', 'これはテスト表示です。実際のレコードは作成・更新されていません。',
+            '新規作成（繰越）', '1', '件', '紙商事', '¥11,000', '¥4,000', '¥7,000']);
+    expect(PayableMonth::query()->where('supplier_id', $this->supplier->id)->where('year_month', '2026-11')->exists())->toBeFalse();
+
+    // a stored month that differs from its purchases and payments is shown as an update
+    PayableMonth::query()->where('year_month', '2026-10')->update(['purchase_amount' => 1]);
+    Livewire::test(ListPayables::class)
+        ->callAction('previewMonth', data: ['year' => '2026', 'month' => '10'])
+        ->assertMountedActionModalSee(['2026年10月 計算結果（テスト表示）', '更新（再集計）', '材料仕入', '¥10,000']);
+
+    // [新]一括更新: the records of the list (先月買掛一覧: 2026年10月) recalculated
+    Livewire::test(ListPayables::class)
+        ->callAction('refreshListedPayables')
+        ->assertNotified('更新処理が完了しました。（1件）');
+    expect(PayableMonth::query()->where('year_month', '2026-10')->sole()->purchase_amount)->toBe(10000);
+});

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Purchasing\Application\Payables;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Domain\Calendar\YearMonth;
 use Modules\Core\Domain\Money\RoundingMode;
@@ -37,18 +38,7 @@ final class PayableLedger
         $today ??= CarbonImmutable::now();
         DB::transaction(function () use ($supplier, $today): void {
             $existing = PayableMonth::query()->where('supplier_id', $supplier->id)->lockForUpdate()->get()->keyBy('year_month');
-            $adjustments = $existing->filter(fn (PayableMonth $month): bool => $month->tax_adjustment !== 0)
-                ->map(fn (PayableMonth $month): int => $month->tax_adjustment)
-                ->all();
-
-            $months = PayableRoll::months(
-                $this->purchases($supplier),
-                $this->payments($supplier->id),
-                $adjustments,
-                $supplier->supplier_tax_mode,
-                RoundingMode::fromLabel($supplier->supplier_rounding?->value),
-                YearMonth::fromDate($today),
-            );
+            $months = $this->months($supplier, $existing, $today);
 
             foreach ($months as $key => $figures) {
                 $values = [...$figures, 'month_start' => YearMonth::parse($key)->firstDay()->toDateString()];
@@ -68,6 +58,38 @@ final class PayableLedger
                 PayableMonth::query()->where('supplier_id', $supplier->id)->whereIn('year_month', $stale)->delete();
             }
         });
+    }
+
+    /**
+     * The months refresh() would write for the supplier, nothing saved (the preview of 23. 買掛管理).
+     *
+     * @return array<string, array<string, int>> YYYY-MM => the figures of payable_months
+     */
+    public function calculate(Partner $supplier, ?CarbonImmutable $today = null): array
+    {
+        $existing = PayableMonth::query()->where('supplier_id', $supplier->id)->get()->keyBy('year_month');
+
+        return $this->months($supplier, $existing, $today ?? CarbonImmutable::now());
+    }
+
+    /**
+     * @param  Collection<string, PayableMonth>  $existing  the supplier's months by YYYY-MM (their 消費税端数調整 kept)
+     * @return array<string, array<string, int>>
+     */
+    private function months(Partner $supplier, Collection $existing, CarbonImmutable $today): array
+    {
+        $adjustments = $existing->filter(fn (PayableMonth $month): bool => $month->tax_adjustment !== 0)
+            ->map(fn (PayableMonth $month): int => $month->tax_adjustment)
+            ->all();
+
+        return PayableRoll::months(
+            $this->purchases($supplier),
+            $this->payments($supplier->id),
+            $adjustments,
+            $supplier->supplier_tax_mode,
+            RoundingMode::fromLabel($supplier->supplier_rounding?->value),
+            YearMonth::fromDate($today),
+        );
     }
 
     /** @return array<string, array<string, int>> */

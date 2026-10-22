@@ -13,6 +13,7 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Modules\Core\Domain\Billing\ClosingDay;
 use Modules\Core\Filament\AppPages\AppListRecords;
@@ -191,7 +192,82 @@ final class ListSales extends AppListRecords
                     Notification::make()->success()->title($data['operation'] === self::LOCK ? '編集を不可にしました' : '編集を可能にしました')->send();
                 })
                 ->deselectRecordsAfterCompletion(),
+            ...$this->scriptActions(),
         ];
+    }
+
+    /**
+     * The list buttons of 06_SalesEntry.bundle.js, for administrators, on the checked rows: 【新】選択して納品書レコード作成 and
+     * 【新】選択して請求書レコード作成 — per customer onto the document one of the sales is already on, else a new one
+     * (issueOrAppend()) — and 削除: the sales deleted after two confirmations, their rows going from the delivery notes and
+     * invoices with them (Sale::deleting).
+     *
+     * @return list<Action>
+     */
+    private function scriptActions(): array
+    {
+        return [
+            MenuButtons::withCheckedCount(self::onCheckedRows(Action::make('appendDeliveryNotes')))
+                ->label('【新】選択して納品書レコード作成')
+                ->icon(Heroicon::OutlinedDocumentPlus)
+                ->visible(fn (): bool => SaleForm::isAdministrator())
+                ->requiresConfirmation()
+                ->modalHeading(fn (Action $action): string => '選択された'.$action->getSelectedRecords()->count().'件の売上データから、顧客ごとに納品書データが作成されます。')
+                ->modalSubmitActionLabel('OK')
+                ->modalCancelActionLabel('キャンセル')
+                ->action(fn (Collection $records) => self::onScriptRecords($records, '納品書レコードの作成が完了しました。', '10. 納品書管理(売上)アプリから確認してください。',
+                    fn (Collection $sales): array => app(DeliveryNoteIssuer::class)->issueOrAppend($sales)))
+                ->deselectRecordsAfterCompletion(),
+            MenuButtons::withCheckedCount(self::onCheckedRows(Action::make('appendInvoices')))
+                ->label('【新】選択して請求書レコード作成')
+                ->icon(Heroicon::OutlinedBanknotes)
+                ->visible(fn (): bool => SaleForm::isAdministrator())
+                ->modalHeading(fn (Action $action): string => '選択された'.$action->getSelectedRecords()->count().'件の売上データから、顧客ごとに請求書データが作成されます。')
+                ->modalWidth('md')
+                ->modalSubmitActionLabel('OK')
+                ->modalCancelActionLabel('キャンセル')
+                ->schema([DatePicker::make('invoiced_on')->label('請求日')])
+                ->action(fn (Collection $records, array $data) => self::onScriptRecords($records, '請求書レコードの作成が完了しました。', '同時に入金管理アプリにも新規レコードを追加しています。詳細は各アプリから確認してください。',
+                    fn (Collection $sales): array => app(InvoiceIssuer::class)->issueOrAppend($sales, filled($data['invoiced_on'] ?? null) ? CarbonImmutable::parse((string) $data['invoiced_on']) : null)))
+                ->deselectRecordsAfterCompletion(),
+            self::onCheckedRows(Action::make('deleteSales'))
+                ->label('削除')
+                ->icon(Heroicon::OutlinedTrash)
+                ->visible(fn (): bool => SaleForm::isAdministrator() && SaleResource::canDeleteAny())
+                ->requiresConfirmation()
+                ->modalIcon(Heroicon::OutlinedTrash)
+                ->color('danger')
+                ->modalHeading(fn (Action $action): string => '選択された'.$action->getSelectedRecords()->count().'件の売上データに関連する売上明細は、対応する納品書および請求書データから削除されます。')
+                ->modalSubmitActionLabel('削除')
+                ->modalCancelActionLabel('キャンセル')
+                ->action(fn (Collection $records) => $this->replaceMountedAction('confirmDeleteSales', ['ids' => $records->modelKeys()])),
+        ];
+    }
+
+    /** 削除, second step: 「この操作は取り消せません」, then the sales the user may delete are deleted. */
+    public function confirmDeleteSalesAction(): Action
+    {
+        return Action::make('confirmDeleteSales')
+            ->visible(fn (): bool => SaleForm::isAdministrator())
+            ->requiresConfirmation()
+            ->color('danger')
+            ->modalHeading('確認')
+            ->modalDescription('この操作は取り消せません。実行してもよろしいですか？')
+            ->modalSubmitActionLabel('OK')
+            ->modalCancelActionLabel('キャンセル')
+            ->action(function (array $arguments): void {
+                $ids = array_map(intval(...), (array) ($arguments['ids'] ?? []));
+                DB::transaction(function () use ($ids): void {
+                    foreach (Sale::query()->whereKey($ids)->get() as $sale) {
+                        if (SaleResource::canDelete($sale)) {
+                            $sale->delete();
+                        }
+                    }
+                });
+
+                $this->deselectAllTableRecords();
+                Notification::make()->success()->title('選択されたレコードの削除が完了しました。')->send();
+            });
     }
 
     /**
@@ -238,6 +314,28 @@ final class ListSales extends AppListRecords
         }
 
         self::run($done, fn (): array => $create($records->whereInstanceOf(Sale::class)->values()));
+    }
+
+    /**
+     * A 【新】 button: the legacy messages of the script, 「完了」 with where to look, else why it was refused.
+     *
+     * @param  Collection<int, Model>  $records
+     * @param  callable(Collection<int, Sale>): array<mixed>  $create
+     */
+    private static function onScriptRecords(Collection $records, string $done, string $where, callable $create): void
+    {
+        if ($records->isEmpty()) {
+            Notification::make()->warning()->title('レコードを選択してください。')->send();
+
+            return;
+        }
+
+        try {
+            $create($records->whereInstanceOf(Sale::class)->values());
+            Notification::make()->success()->title($done)->body($where)->send();
+        } catch (SalesActionNotAllowed $exception) {
+            Notification::make()->danger()->title($exception->getMessage())->persistent()->send();
+        }
     }
 
     /** @param  callable(): array<mixed>  $create */

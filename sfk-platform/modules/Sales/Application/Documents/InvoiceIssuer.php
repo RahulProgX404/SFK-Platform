@@ -17,8 +17,8 @@ use Modules\Sales\Models\ReceivableMonth;
 use Modules\Sales\Models\Sale;
 
 /**
- * Creates 請求書 from delivered sales (BR-SA-09; legacy Customine 06 pages 9 / 13 and 【新】選択して請求書レコード作成 of
- * 06_SalesEntry.bundle.js): one statement invoice per customer, its rows the customer's sales in order of 納品予定日
+ * Creates 請求書 from delivered sales (BR-SA-09; legacy Customine 06 pages 9 / 13, and 【新】選択して請求書レコード作成 of
+ * 06_SalesEntry.bundle.js — issueOrAppend()): one statement invoice per customer, its rows the customer's sales in order of 納品予定日
  * (日付 = 納品予定日, 伝票No = 納品書番号), numbered from the invoice sequence.
  *
  * - issue(): only sales already on a delivery note, not yet invoiced and not 随時請求. 請求日付 is the given date, else by
@@ -50,6 +50,59 @@ final class InvoiceIssuer
             'invoiced_on' => $invoiceDate ?? BillingCycle::defaultInvoiceDate($first->effectiveClosingDay(), $today),
             'closing_day' => $first->effectiveClosingDay()?->value,
         ], withBalances: true);
+    }
+
+    /**
+     * 【新】選択して請求書レコード作成 (06_SalesEntry.bundle.js): every sale must be on a delivery note and none 随時請求;
+     * per customer, the sales go on the invoice one of them is already on (the rows missing there added at the end), else
+     * on a new invoice as issue() makes it (CustomerDocuments).
+     *
+     * @param  iterable<Sale>  $sales
+     * @return list<Invoice> the invoices created or added to
+     */
+    public function issueOrAppend(iterable $sales, ?CarbonImmutable $invoiceDate = null, ?CarbonImmutable $today = null): array
+    {
+        $sales = new Collection(is_array($sales) ? $sales : iterator_to_array($sales));
+        if ($sales->isEmpty()) {
+            throw new SalesActionNotAllowed('売上レコードを選択してください。');
+        }
+
+        $undelivered = $sales->filter(fn (Sale $sale): bool => $sale->delivery_note_id === null);
+        if ($undelivered->isNotEmpty()) {
+            throw new SalesActionNotAllowed('納品書番号が未設定のレコードが '.$undelivered->count().' 件あります。請求書を作成するには、すべての選択レコードに納品書番号が必要です。（未設定の売上No: '
+                .$undelivered->pluck('sales_number')->implode('、').'）');
+        }
+
+        $adHoc = $sales->filter(fn (Sale $sale): bool => $sale->isAdHoc());
+        if ($adHoc->isNotEmpty()) {
+            throw new SalesActionNotAllowed('随時請求の売上レコードが選択されています。随時請求分は別途ボタンから実行してください。（随時請求の売上No: '
+                .$adHoc->pluck('sales_number')->implode('、').'）');
+        }
+
+        $groups = CustomerDocuments::of($sales->load(['customer', 'assignees', 'order', 'deliveryNote', 'invoice']), 'invoice');
+        $today ??= CarbonImmutable::today();
+
+        return DB::transaction(fn (): array => array_map(function (array $group) use ($invoiceDate, $today): Invoice {
+            $invoice = $group['document'];
+            if (! $invoice instanceof Invoice) {
+                /** @var Sale $first */
+                $first = $group['sales']->first();
+
+                return $this->invoiceFor($group['sales'], [
+                    'invoiced_on' => $invoiceDate ?? BillingCycle::defaultInvoiceDate($first->effectiveClosingDay(), $today),
+                    'closing_day' => $first->effectiveClosingDay()?->value,
+                ], withBalances: true);
+            }
+
+            $sort = (int) $invoice->lines()->max('sort');
+            foreach (CustomerDocuments::missingRows($invoice, $group['sales']) as $sale) {
+                $invoice->lines()->create([...DeliveryNoteIssuer::lineOf($sale), 'slip_number' => $sale->deliveryNote?->number, 'sort' => ++$sort]);
+            }
+            $invoice->refreshTotals();
+            Sale::query()->whereKey($group['sales']->pluck('id')->all())->update(['invoice_id' => $invoice->id]);
+
+            return $invoice;
+        }, $groups));
     }
 
     /**
