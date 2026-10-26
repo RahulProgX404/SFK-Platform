@@ -1,5 +1,5 @@
 {{--
-    Alpine components of the app lists, rendered in <head> of every panel by BasePanelProvider:
+    Alpine components of the app lists, in the cached panel script (Modules\Core\Filament\Support\ThemeAssets):
     - sfkAppFilter: the 絞り込む dialog (core::filament.app-filter). The funnel opens it with the list's current content
       (AppListRecords::appFilterState()); 適用 / 保存 go to applyAppFilter / saveAppFilter.
     - sfkViewEditor: the 一覧 screen of アプリの設定 (core::filament.app-list-views); 保存 goes to saveView.
@@ -278,12 +278,19 @@
             viewName: '',
             saveError: null,
             wire: null,
+            loaded: false,
 
             init() {
                 this.wire = this.$wire
             },
 
-            open(state) {
+            async open(state) {
+                // the fields and choices come from the list page on the first opening
+                if (! this.loaded) {
+                    this.config = await this.wire.filterDialog()
+                    this.loaded = true
+                }
+
                 this.load(state || {})
                 this.isOpen = true
                 this.$nextTick(() => document.querySelector('.sfk-filter-dialog .sfk-filter-field')?.focus())

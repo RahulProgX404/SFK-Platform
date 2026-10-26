@@ -161,7 +161,7 @@ final class InvoiceLayout
      */
     private static function recentInvoices(Invoice $invoice): array
     {
-        $invoices = Invoice::query()->where('customer_id', $invoice->customer_id)->whereKeyNot($invoice->id)
+        $invoices = InvoiceResource::onlyVisible(Invoice::query())->where('customer_id', $invoice->customer_id)->whereKeyNot($invoice->id)
             ->orderByDesc('invoiced_on')->orderByDesc('id')->limit(5)->get();
 
         return [

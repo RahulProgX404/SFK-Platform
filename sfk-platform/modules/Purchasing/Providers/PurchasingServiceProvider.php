@@ -41,7 +41,7 @@ final class PurchasingServiceProvider extends ModuleServiceProvider
 
         // 仕入履歴 on a 04. 受注入力 record: its purchases, newest first (legacy related list, 5 rows)
         $this->app->make(RelatedLists::class)->provide('orders.purchase_history', fn (Model $order): array => PurchaseRows::of(
-            Purchase::query()->with('supplier')->where('order_id', $order->getKey())->orderByDesc('id')->limit(5)->get(),
+            PurchaseResource::onlyVisible(Purchase::query())->with('supplier')->where('order_id', $order->getKey())->orderByDesc('id')->limit(5)->get(),
             ['purchased_on', 'purchase_number', 'supplier_id', 'product_name', 'unit_price', 'quantity', 'amount', 'cutting_amount', 'plate_amount',
                 'stored_plate_amount', 'spot_color_amount'],
             PurchaseResource::class,

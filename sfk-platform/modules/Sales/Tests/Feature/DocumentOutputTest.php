@@ -413,3 +413,17 @@ it('rewrites an uploaded PDF the reader cannot open (compressed cross-references
     expect($template->pages)->toBe([['width' => 210, 'height' => 297]])
         ->and(OutputPlacement::ListChecked->isList())->toBeTrue();
 });
+
+it('lists another app\'s records on a page only as far as the viewer may see them (related lists)', function () {
+    documentNote('株式会社得意先');
+    $outsider = grantDashboards(User::factory()->create(), 'erp');
+
+    $this->actingAs($outsider);
+    expect(DeliveryNoteResource::onlyVisible(DeliveryNote::query())->count())->toBe(0);
+
+    $this->actingAs(documentsEmployee($this->documents));
+    expect(DeliveryNoteResource::onlyVisible(DeliveryNote::query())->count())->toBe(1);
+
+    $this->actingAs($this->admin);
+    expect(DeliveryNoteResource::onlyVisible(DeliveryNote::query())->count())->toBe(1);
+});

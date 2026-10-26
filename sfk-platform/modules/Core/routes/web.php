@@ -5,7 +5,12 @@ use Modules\Core\Http\Controllers\DocumentController;
 use Modules\Core\Http\Controllers\LoginController;
 use Modules\Core\Http\Controllers\PasswordController;
 use Modules\Core\Http\Controllers\PortalController;
+use Modules\Core\Http\Controllers\ThemeAssetController;
 use Modules\Core\Http\Middleware\EnsurePasswordIsChanged;
+
+// The panels' stylesheet and script (versioned, kept by the browser).
+Route::get('core/theme.css', [ThemeAssetController::class, 'css'])->name('core.theme.css');
+Route::get('core/theme.js', [ThemeAssetController::class, 'js'])->name('core.theme.js');
 
 // Platform entry: the site root opens the dashboard selection portal (guests go to the login page).
 Route::redirect('/', '/portal')->name('home');
@@ -30,7 +35,8 @@ Route::middleware('auth')->group(function (): void {
 });
 
 // 帳票出力 of the apps (PDF files; the app screens put the buttons and settings around them).
-Route::middleware(['auth', EnsurePasswordIsChanged::class])->prefix('documents')->name('core.documents.')->group(function (): void {
+// Making PDFs is heavy: at most 30 files a minute per user.
+Route::middleware(['auth', EnsurePasswordIsChanged::class, 'throttle:30,1'])->prefix('documents')->name('core.documents.')->group(function (): void {
     Route::get('templates/{template}/background', [DocumentController::class, 'background'])->name('background');
     Route::match(['get', 'post'], 'templates/{template}/preview', [DocumentController::class, 'preview'])->name('preview');
     Route::get('outputs/{output}/records/{record}', [DocumentController::class, 'record'])->name('record');

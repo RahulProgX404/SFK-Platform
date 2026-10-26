@@ -13,6 +13,9 @@ use RuntimeException;
  *  1. it is a kernel module (always), or its switch is on — `config('modules.enabled.<slug>')`
  *     (env MODULE_<SLUG>_ENABLED) overrides the manifest's "enabled" default; and
  *  2. every module listed in "depends_on" exists and is enabled.
+ *
+ * With a cache file (`php artisan module:cache`, also run by `php artisan optimize`) the modules are read from it:
+ * no module.json is opened and no folder is checked on a request.
  */
 final class ModuleManager
 {
@@ -27,10 +30,12 @@ final class ModuleManager
 
     /**
      * @param  array<string, bool>  $overrides  slug => enabled
+     * @param  string|null  $cachePath  the cached modules (export()), used when the file exists
      */
     public function __construct(
         private readonly string $modulesPath,
         private readonly array $overrides = [],
+        private readonly ?string $cachePath = null,
     ) {}
 
     /** @return array<string, Module> all discovered modules keyed by slug */
@@ -92,8 +97,39 @@ final class ModuleManager
         return $this->modulesPath;
     }
 
+    public function cachePath(): ?string
+    {
+        return $this->cachePath;
+    }
+
+    /**
+     * Every module read from the module folders (not from the cache), as the cache file stores them.
+     *
+     * @return list<array{manifest: array<string, mixed>, path: string, parts: list<string>}>
+     */
+    public function export(): array
+    {
+        return array_values(array_map(fn (Module $module): array => $module->toCache(), $this->scan()));
+    }
+
     /** @return array<string, Module> */
     private function discover(): array
+    {
+        if ($this->cachePath !== null && is_file($this->cachePath)) {
+            $modules = [];
+            foreach ((array) require $this->cachePath as $cached) {
+                $module = Module::fromManifest($cached['manifest'], $cached['path'], $cached['parts']);
+                $modules[$module->slug] = $module;
+            }
+
+            return $modules;
+        }
+
+        return $this->scan();
+    }
+
+    /** @return array<string, Module> */
+    private function scan(): array
     {
         $modules = [];
 

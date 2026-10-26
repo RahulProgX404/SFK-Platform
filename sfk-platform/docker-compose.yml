@@ -20,6 +20,8 @@ x-app: &app
     # Compiled Blade views on the container's own filesystem: Filament renders hundreds of small views per
     # page, and reading each one through the host file sharing is slow. Recompiled after a container restart.
     VIEW_COMPILED_PATH: /tmp/views
+    # no file check per rendered view (hundreds per page): docker/php/dev-watch.sh clears them when a .blade.php changes
+    VIEW_CHECK_CACHE_TIMESTAMPS: "false"
     # Route cache and Filament's component cache, same reason; built and kept current by docker/php/dev-watch.sh.
     APP_ROUTES_CACHE: /tmp/cache/routes.php
     FILAMENT_CACHE_PATH: /tmp/cache/filament

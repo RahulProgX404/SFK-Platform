@@ -21,6 +21,7 @@ use Modules\Sales\Domain\Receivables\ReceivableBasis;
 use Modules\Sales\Filament\Resources\Receipts\ReceiptResource;
 use Modules\Sales\Filament\Resources\Sales\SaleResource;
 use Modules\Sales\Filament\SalesFormat;
+use Modules\Sales\Models\Receipt;
 use Modules\Sales\Models\ReceiptLine;
 use Modules\Sales\Models\ReceivableMonth;
 use Modules\Sales\Models\Sale;
@@ -137,9 +138,9 @@ final class ReceivableLayout
      */
     private static function otherMonths(ReceivableMonth $month, ReceivableBasis $basis): array
     {
-        $months = ReceivableMonth::query()->ofBasis($basis)->where('customer_id', $month->customer_id)->orderByDesc('year_month')->limit(5)->get();
-        $figures = ['previous_balance', 'received', 'net_balance', 'sales_amount', 'tax_amount', 'month_total', 'closing_balance'];
         $resource = $basis === ReceivableBasis::Cycle ? CycleReceivableResource::class : ReceivableResource::class;
+        $months = $resource::onlyVisible(ReceivableMonth::query()->ofBasis($basis))->where('customer_id', $month->customer_id)->orderByDesc('year_month')->limit(5)->get();
+        $figures = ['previous_balance', 'received', 'net_balance', 'sales_amount', 'tax_amount', 'month_total', 'closing_balance'];
 
         return [
             'title' => self::label('other_months', $basis),
@@ -161,7 +162,7 @@ final class ReceivableLayout
     private static function monthSales(ReceivableMonth $month): array
     {
         $yearMonth = YearMonth::parse($month->year_month);
-        $sales = Sale::query()->with('order')->where('customer_id', $month->customer_id)
+        $sales = SaleResource::onlyVisible(Sale::query())->with('order')->where('customer_id', $month->customer_id)
             ->when(
                 $month->basis === ReceivableBasis::Cycle,
                 fn ($query) => $query->where('billing_month', $month->year_month),
@@ -203,6 +204,7 @@ final class ReceivableLayout
         // a 月度 takes rows from the end of the previous month at most
         $lines = ReceiptLine::query()->with('receipt.invoice')
             ->whereHas('receipt', fn ($query) => $query->where('customer_id', $month->customer_id))
+            ->whereIn('receipt_id', ReceiptResource::onlyVisible(Receipt::query())->select('receipts.id'))
             ->whereBetween('received_on', [$yearMonth->previous()->firstDay()->toDateString(), $yearMonth->lastDay()->toDateString()])
             ->orderBy('received_on')->orderBy('id')->get()
             ->filter(fn (ReceiptLine $line): bool => $line->received_on !== null && ($month->basis === ReceivableBasis::Cycle

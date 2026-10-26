@@ -29,9 +29,9 @@ abstract class ModuleServiceProvider extends ServiceProvider
 
     final public function register(): void
     {
-        $config = $this->module()->path('Config/config.php');
-        if (is_file($config)) {
-            $this->mergeConfigFrom($config, $this->slug);
+        $module = $this->module();
+        if ($module->has('Config/config.php')) {
+            $this->mergeConfigFrom($module->path('Config/config.php'), $this->slug);
         }
 
         $this->registerModule();
@@ -41,28 +41,29 @@ abstract class ModuleServiceProvider extends ServiceProvider
     {
         $module = $this->module();
 
-        if (is_dir($migrations = $module->path('Database/Migrations'))) {
-            $this->loadMigrationsFrom($migrations);
+        // the module's parts are known (Module::$parts, cached by module:cache): no look at the disk per request
+        if ($module->has('Database/Migrations')) {
+            $this->loadMigrationsFrom($module->path('Database/Migrations'));
         }
 
-        if (is_dir($views = $module->path('Resources/views'))) {
-            $this->loadViewsFrom($views, $this->slug);
+        if ($module->has('Resources/views')) {
+            $this->loadViewsFrom($module->path('Resources/views'), $this->slug);
         }
 
-        if (is_dir($lang = $module->path('Resources/lang'))) {
-            $this->loadTranslationsFrom($lang, $this->slug);
+        if ($module->has('Resources/lang')) {
+            $this->loadTranslationsFrom($module->path('Resources/lang'), $this->slug);
         }
 
         if (! $this->app->routesAreCached()) {
-            if (is_file($web = $module->path('routes/web.php'))) {
-                Route::middleware('web')->group($web);
+            if ($module->has('routes/web.php')) {
+                Route::middleware('web')->group($module->path('routes/web.php'));
             }
 
-            if (is_file($api = $module->path('routes/api.php'))) {
+            if ($module->has('routes/api.php')) {
                 Route::middleware('api')
                     ->prefix('api/'.$this->slug)
                     ->name($this->slug.'.api.')
-                    ->group($api);
+                    ->group($module->path('routes/api.php'));
             }
         }
 

@@ -269,7 +269,7 @@ final class PurchaseLayout
     {
         $purchases = $purchase->order_id === null
             ? collect()
-            : Purchase::query()->with('supplier')->where('order_id', $purchase->order_id)->whereKeyNot($purchase->id)
+            : PurchaseResource::onlyVisible(Purchase::query())->with('supplier')->where('order_id', $purchase->order_id)->whereKeyNot($purchase->id)
                 ->whereDate('purchased_on', '<=', now()->toDateString())->orderByDesc('id')->get();
 
         return [

@@ -18,10 +18,14 @@
 
 $modulesPath = base_path('modules');
 
-$enabled = [];
-foreach (glob($modulesPath.'/*/module.json') ?: [] as $manifestFile) {
-    $slug = json_decode((string) file_get_contents($manifestFile), true)['slug'] ?? null;
+// the slugs: from the module cache (php artisan module:cache) when there is one, else from the manifests
+$moduleCache = base_path('bootstrap/cache/modules.php');
+$slugs = is_file($moduleCache)
+    ? array_map(fn (array $module): mixed => $module['manifest']['slug'] ?? null, (array) require $moduleCache)
+    : array_map(fn (string $file): mixed => json_decode((string) file_get_contents($file), true)['slug'] ?? null, glob($modulesPath.'/*/module.json') ?: []);
 
+$enabled = [];
+foreach ($slugs as $slug) {
     if (! is_string($slug)) {
         continue;
     }

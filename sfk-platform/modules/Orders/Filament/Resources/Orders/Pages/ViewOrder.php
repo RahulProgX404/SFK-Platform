@@ -112,7 +112,8 @@ final class ViewOrder extends AppViewRecord
             return ['total' => 0, 'orders' => new Collection, 'page' => 1, 'pages' => 1, 'from' => 0, 'to' => 0];
         }
 
-        $query = Order::query()
+        // only the orders the user may see (レコードのアクセス権)
+        $query = OrderResource::onlyVisible(Order::query())
             ->whereKeyNot($this->record->getKey())
             ->when(trim($this->pastCustomer) !== '', fn (Builder $q) => $q->whereHas('customer', fn (Builder $c) => $c->whereLike('name', '%'.trim($this->pastCustomer).'%')))
             ->when(trim($this->pastProduct) !== '', fn (Builder $q) => $q->whereLike('product_name', '%'.trim($this->pastProduct).'%'))

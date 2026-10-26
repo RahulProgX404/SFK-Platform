@@ -14,7 +14,14 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
 - Tax via `Modules\Core\Domain\Tax\TaxRate`; billing cycle via `Modules\Core\Domain\Billing\BillingCycle`.
 - Document numbers via `Modules\Core\Application\Numbering\DocumentNumberGenerator` inside the save transaction.
 - Derive aggregates (job cost, AR/AP, stock) from source rows. Do not keep incrementing totals.
-- Real foreign keys + unique constraints; no string join keys.
+- Real foreign keys + unique constraints; no string join keys. Every foreign key column gets an index (`->index()`;
+  PostgreSQL does not add one) — `DatabaseIndexTest` fails otherwise.
+- Records of an app shown on another screen (related lists, 履歴 sections, searches) are read through
+  `<Resource>::onlyVisible(<Model>::query())`, so app permissions and レコードのアクセス権 apply — never a bare
+  `Model::query()` for what the user sees.
+- Speed: nothing large goes into every page — panel CSS / JS live in the theme views served as one cached file
+  (`ThemeAssets`), big data of a dialog is fetched when it opens (e.g. 絞り込む). Modules are cached
+  (`php artisan module:cache`, part of `optimize`); a new conventional folder in a module needs it rebuilt.
 - No user names/emails in code; use the ユーザー種別 `user_type` (`super_admin` / `admin` / `employee`) for system rights and
   user / 従業員カテゴリ dashboards (`Modules\Core\Access\DashboardAccess`) for panel access. There are no roles and no
   organizations; never gate features on a category or 役職 name.

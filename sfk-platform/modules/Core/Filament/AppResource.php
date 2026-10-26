@@ -166,6 +166,28 @@ abstract class AppResource extends Resource
         return $app === null ? $query : RecordAccess::scope($query, $user, $app, static::filterFieldMap());
     }
 
+    /**
+     * The app's records the signed-in user may see, for lists of them on other screens (related records, 履歴 sections,
+     * searches): app permissions and レコードのアクセス権 apply, and there is nothing without 閲覧 — as the related lists
+     * of the legacy system showed only the records the viewer may see.
+     *
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query  a query of the app's model
+     * @return Builder<TModel>
+     */
+    public static function onlyVisible(Builder $query): Builder
+    {
+        if (! static::canViewAny()) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        // through getEloquentQuery(): the app's own narrowing (overrides included) and the レコードのアクセス権
+        $key = $query->getModel()->getQualifiedKeyName();
+
+        return $query->whereIn($key, static::getEloquentQuery()->select($key));
+    }
+
     /** Whether the レコードのアクセス権 allow the right (RecordAccess::VIEW / EDIT / DELETE) on the record. */
     public static function recordAllows(Model $record, string $right): bool
     {

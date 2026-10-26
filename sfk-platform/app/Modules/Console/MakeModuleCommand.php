@@ -84,6 +84,9 @@ final class MakeModuleCommand extends Command
             $files->put($destination, str_replace(array_keys($replacements), array_values($replacements), $stub->getContents()));
         }
 
+        // the cached modules do not know the new one yet
+        $this->callSilently('module:clear');
+
         $this->components->info("Module [{$name}] created in modules/{$name} ({$type->value}).");
         $this->line('Next steps:');
         $this->line('  1. php artisan migrate');

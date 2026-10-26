@@ -19,6 +19,7 @@ use Modules\Core\Domain\Apps\PermissionSubject;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\DashboardSettings\Resources\AppSettings\Pages\EditFieldPermissions;
 use Modules\Core\Filament\DashboardSettings\Resources\AppSettings\Pages\EditRecordPermissions;
+use Modules\Core\Filament\Support\ThemeAssets;
 use Modules\Core\Models\BusinessApp;
 use Modules\Core\Models\RecordComment;
 use Modules\Core\Models\RecordVersion;
@@ -119,7 +120,13 @@ it('creates a partner like the legacy form and shows the saved record', function
         ->and($partner->updated_by)->toBe($this->admin->id);
 });
 
-/** CSS of a page without whitespace, so rules are found however the theme is formatted. */
+/** The stylesheet of the panels (ThemeAssets: core::filament.theme). */
+function themeCss(): string
+{
+    return ThemeAssets::bundle()['css'];
+}
+
+/** CSS without whitespace, so rules are found however the theme is formatted. */
 function compactCss(string $css): string
 {
     return (string) preg_replace('/\s+/', '', $css);
@@ -254,7 +261,7 @@ it('puts 編集, 再利用 and 「…」 (印刷 / 削除) on the right of the r
         ->and(strpos($toolbar, 'レコードを編集する'))->toBeLessThan(strpos($toolbar, 'レコードを再利用する'))
         ->and(strpos($toolbar, 'レコードを再利用する'))->toBeLessThan(strpos($toolbar, 'その他の操作'))
         ->and(strpos($toolbar, 'その他の操作'))->toBeLessThan(strpos($toolbar, 'レコードの移動'))
-        ->and(compactCss($html))->toContain(compactCss('*, *::before, *::after { border-radius: 0 !important; }'));
+        ->and(compactCss(themeCss()))->toContain(compactCss('*, *::before, *::after { border-radius: 0 !important; }'));
 });
 
 it('hides the pencil and 削除する from employees who may only view', function () {
@@ -392,10 +399,10 @@ it('puts the paging right of the search box and shows table headers and field na
     expect($header)->not->toContain('sfk-app-pager')
         ->and($toolbar)->toContain('1 - 1（1件中）')
         ->and(strpos($toolbar, 'fi-ta-search-field'))->toBeLessThan(strpos($toolbar, 'sfk-app-pager'))
-        ->and($html)->toContain('--kt-label: #000000;')
-        ->and($html)->toContain('.fi-ta-header-cell {'."\n".'        color: var(--kt-label);')
-        ->and(compactCss($html))->toContain(compactCss('.kt-record .fi-in-entry-label { font-size: .875rem; font-weight: 400; color: var(--kt-label); }'))
-        ->and(compactCss($html))->toContain(compactCss('.fi-fo-field-label-content { font-size: .9375rem; color: var(--kt-label); }'));
+        ->and(themeCss())->toContain('--kt-label: #000000;')
+        ->and(themeCss())->toContain('.fi-ta-header-cell {'."\n".'        color: var(--kt-label);')
+        ->and(compactCss(themeCss()))->toContain(compactCss('.kt-record .fi-in-entry-label { font-size: .875rem; font-weight: 400; color: var(--kt-label); }'))
+        ->and(compactCss(themeCss()))->toContain(compactCss('.fi-fo-field-label-content { font-size: .9375rem; color: var(--kt-label); }'));
 });
 
 it('shows no column of the list in bold, 取引先名 included', function () {
@@ -406,7 +413,8 @@ it('shows no column of the list in bold, 取引先名 included', function () {
     expect(Livewire::test(ListPartners::class)->instance()->getTable()->getColumn('name')->getWeight())->toBeNull();
 
     $html = $this->get('/erp/partners')->assertOk()->assertDontSee('fi-font-semibold', false)->getContent();
-    expect(compactCss($html))->toContain(compactCss('.fi-ta-table>tbody td, .fi-ta-table>tbody td * { font-weight: 400 !important; }'));
+    expect($html)->toContain(e(route('core.theme.css', ['v' => ThemeAssets::bundle()['version']])))
+        ->and(compactCss(themeCss()))->toContain(compactCss('.fi-ta-table>tbody td, .fi-ta-table>tbody td * { font-weight: 400 !important; }'));
 });
 
 it('pages through the list 100 records at a time', function () {
@@ -805,8 +813,10 @@ it('keeps the horizontal scroll of the list at the bottom of the screen while th
     $this->get('/erp/partners')
         ->assertOk()
         ->assertSee('x-data="sfkListScrollbar"', false)
-        ->assertSee("Alpine.data('sfkListScrollbar'", false)
-        ->assertSee('.sfk-list-scroll {', false);
+        ->assertSee(e(route('core.theme.js', ['v' => ThemeAssets::bundle()['version']])), false);
+
+    expect(ThemeAssets::bundle()['js'])->toContain("Alpine.data('sfkListScrollbar'")
+        ->and(themeCss())->toContain('.sfk-list-scroll {');
 });
 
 it('offers 200 and 300 件 in 表示件数', function () {
@@ -822,9 +832,10 @@ it('offers 200 and 300 件 in 表示件数', function () {
 it('puts the search box on the left and one horizontal scroll at the end of the list', function () {
     $this->actingAs($this->admin);
 
-    $html = compactCss($this->get('/erp/partners')->assertOk()->getContent());
-    expect($html)->toContain(compactCss('.sfk-app-page-list .fi-ta-header-toolbar>:not(.fi-ta-actions) { order: -1; margin-inline-start: 0; }'))
-        ->and($html)->toContain(compactCss('.sfk-app-page-list .fi-ta-main { overflow-x: auto; }'));
+    $this->get('/erp/partners')->assertOk();
+    $css = compactCss(themeCss());
+    expect($css)->toContain(compactCss('.sfk-app-page-list .fi-ta-header-toolbar>:not(.fi-ta-actions) { order: -1; margin-inline-start: 0; }'))
+        ->and($css)->toContain(compactCss('.sfk-app-page-list .fi-ta-main { overflow-x: auto; }'));
 });
 
 /*

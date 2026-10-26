@@ -5,8 +5,10 @@
 # they cost most of each request. File events do not cross that sharing, so this loop polls the source instead and,
 # when something changed, reloads php-fpm (fresh OPcache) and rebuilds what the app would otherwise work out on every
 # request from hundreds of files:
-#   - the route cache and Filament's component cache (in /tmp, see docker-compose.yml), when routes, resources,
-#     pages, providers, config or .env changed, or files were added / moved / removed;
+#   - the route cache, Filament's component cache (in /tmp, see docker-compose.yml) and the module cache, when routes
+#     (also a module's routes/), resources, pages, providers, config or .env changed, or files were added / moved / removed;
+#   - the compiled Blade views, when a .blade.php changed (Blade does not check the files itself here:
+#     VIEW_CHECK_CACHE_TIMESTAMPS=false);
 #   - the Composer class map, when PHP files were added / moved / removed.
 # Edits show up within a few seconds. Without this loop they show up only after `docker compose restart app`.
 
@@ -14,7 +16,7 @@ cd /var/www/html || exit 1
 
 SOURCES="app bootstrap/app.php bootstrap/providers.php config lang modules resources routes .env vendor/composer/installed.json"
 # changes that can alter the routes or the panels' components
-STRUCTURE='^(routes/|config/|bootstrap/|\.env$|vendor/)|module\.json$|(Provider|Plugin|Resource)\.php$|/Filament/(Pages|Clusters|Widgets)/'
+STRUCTURE='^(routes/|config/|bootstrap/app\.php|bootstrap/providers\.php|\.env$|vendor/)|/routes/|module\.json$|(Provider|Plugin|Resource)\.php$|/Filament/(Pages|Clusters|Widgets)/'
 
 OLD=/tmp/dev-watch.old
 NEW=/tmp/dev-watch.new
@@ -27,6 +29,7 @@ reload() { kill -USR2 1; }
 
 rebuild() {
     [ "$1" = classes ] && composer dump-autoload --optimize --no-scripts --quiet
+    php artisan module:cache --quiet || log 'module:cache failed'
     php artisan route:cache --quiet || log 'route:cache failed (routes are read uncached until the next change)'
     php artisan filament:cache-components --quiet || log 'filament:cache-components failed'
 }
@@ -43,9 +46,10 @@ while true; do
         continue
     fi
 
-    # the edit is visible right away; caches follow when needed
-    reload
     changed=$(cat "$OLD" "$NEW" | sort | uniq -u | cut -d' ' -f1 | sort -u)
+    # the edit is visible right away; caches follow when needed
+    echo "$changed" | grep -q '\.blade\.php$' && php artisan view:clear --quiet
+    reload
     cut -d' ' -f1 "$OLD" > "$OLD.paths"
     cut -d' ' -f1 "$NEW" > "$NEW.paths"
     if ! cmp -s "$OLD.paths" "$NEW.paths"; then

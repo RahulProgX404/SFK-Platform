@@ -1,5 +1,6 @@
 {{--
-    legacy-style look for every Filament panel (rendered at the end of <head> by BasePanelProvider).
+    legacy-style look for every Filament panel. Its <style> and <script> contents are served as the cached panel
+    stylesheet / script (Modules\Core\Filament\Support\ThemeAssets, linked at the end of <head> by BasePanelProvider).
     Colours and sizes are the legacy vendor's published UI parts (MIT-licensed plugin stylesheet "51-modern-default"
     and UI component library): #3498db submit buttons (hover #1d6fa5), #f7f9fa "normal" buttons with blue labels
     (hover #c8d6dd), #e74c3c alert buttons (hover #bf2718), #d4d7d7 disabled, #e3e7e8 hairlines, inset-shadow inputs

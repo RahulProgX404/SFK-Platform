@@ -27,6 +27,8 @@ use Modules\Core\Access\DashboardAccess;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\DashboardSettings\DashboardSettingsPlugin;
 use Modules\Core\Filament\Profile\ProfilePage;
+use Modules\Core\Filament\Support\InitialAvatarProvider;
+use Modules\Core\Filament\Support\ThemeAssets;
 use Modules\Core\Http\Middleware\EnsurePasswordIsChanged;
 
 /**
@@ -72,9 +74,11 @@ abstract class BasePanelProvider extends PanelProvider
             ->darkMode(false)
             // System Japanese fonts (no web-font download); the full stack is set by the theme view.
             ->font('Meiryo', provider: LocalFontProvider::class)
-            ->renderHook(PanelsRenderHook::HEAD_END, fn (): string => view('core::filament.theme')->render())
-            // 絞り込む dialog of the app lists (core::filament.app-filter)
-            ->renderHook(PanelsRenderHook::HEAD_END, fn (): string => view('core::filament.app-filter-script')->render())
+            // avatars drawn here: the default sends every user's name to an outside service
+            ->defaultAvatarProvider(InitialAvatarProvider::class)
+            // the look (core::filament.theme) and the Alpine components of the app lists (core::filament.app-filter-script),
+            // as a stylesheet and a script the browser keeps
+            ->renderHook(PanelsRenderHook::HEAD_END, fn (): string => ThemeAssets::headTags())
             // paging of the app lists, right of the search box
             ->renderHook(TablesRenderHook::TOOLBAR_END, fn (): string => AppListRecords::toolbarPager())
             ->sidebarCollapsibleOnDesktop()

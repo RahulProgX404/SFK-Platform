@@ -22,6 +22,7 @@ use Modules\Purchasing\Filament\Resources\Payments\PaymentResource;
 use Modules\Purchasing\Filament\Resources\Purchases\PurchaseResource;
 use Modules\Purchasing\Filament\Resources\Purchases\PurchaseRows;
 use Modules\Purchasing\Models\PayableMonth;
+use Modules\Purchasing\Models\Payment;
 use Modules\Purchasing\Models\PaymentLine;
 use Modules\Purchasing\Models\Purchase;
 
@@ -137,7 +138,7 @@ final class PayableLayout
      */
     private static function otherMonths(PayableMonth $month): array
     {
-        $months = PayableMonth::query()->where('supplier_id', $month->supplier_id)->orderByDesc('year_month')->limit(5)->get();
+        $months = PayableResource::onlyVisible(PayableMonth::query())->where('supplier_id', $month->supplier_id)->orderByDesc('year_month')->limit(5)->get();
         $figures = ['previous_balance', 'paid', 'net_balance', 'purchase_amount', 'month_total', 'closing_balance'];
 
         return [
@@ -160,7 +161,7 @@ final class PayableLayout
     private static function monthPurchases(PayableMonth $month): array
     {
         $yearMonth = YearMonth::parse($month->year_month);
-        $purchases = Purchase::query()->with('supplier')->where('supplier_id', $month->supplier_id)
+        $purchases = PurchaseResource::onlyVisible(Purchase::query())->with('supplier')->where('supplier_id', $month->supplier_id)
             ->whereBetween('purchased_on', [$yearMonth->firstDay()->toDateString(), $yearMonth->lastDay()->toDateString()])
             ->orderBy('purchased_on')->orderBy('id')->get();
 
@@ -180,6 +181,7 @@ final class PayableLayout
     {
         $yearMonth = YearMonth::parse($month->year_month);
         $lines = PaymentLine::query()->with('payment')->where('supplier_id', $month->supplier_id)
+            ->whereIn('payment_id', PaymentResource::onlyVisible(Payment::query())->select('payments.id'))
             ->whereBetween('withdrawn_on', [$yearMonth->firstDay()->toDateString(), $yearMonth->lastDay()->toDateString()])
             ->orderBy('withdrawn_on')->orderBy('id')->get();
         $labels = PurchasingFields::PAYMENT;

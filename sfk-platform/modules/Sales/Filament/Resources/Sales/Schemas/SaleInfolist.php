@@ -121,7 +121,7 @@ final class SaleInfolist
     {
         $sales = $record->order_id === null
             ? collect()
-            : Sale::query()->where('order_id', $record->order_id)->whereKeyNot($record->id)->orderByDesc('id')->get();
+            : SaleResource::onlyVisible(Sale::query())->where('order_id', $record->order_id)->whereKeyNot($record->id)->orderByDesc('id')->get();
 
         return [
             'title' => SaleLayout::label('same_order_sales'),

@@ -56,3 +56,23 @@ it('reports missing dependencies', function () {
     expect($manager->isEnabled('seo'))->toBeFalse()
         ->and($manager->disabledReasons()['seo'])->toBe('dependency [ghost] does not exist');
 });
+
+it('knows the conventional parts of a module and reads the modules from its cache without the folders', function () {
+    File::ensureDirectoryExists($this->root.'/Sales/routes');
+    File::put($this->root.'/Sales/routes/web.php', '<?php');
+    File::ensureDirectoryExists($this->root.'/Sales/Filament/Resources');
+    $cache = $this->root.'/modules.php';
+
+    $manager = new ModuleManager($this->root, cachePath: $cache);
+    expect($manager->get('sales')->has('routes/web.php'))->toBeTrue()
+        ->and($manager->get('sales')->has('Filament/Resources'))->toBeTrue()
+        ->and($manager->get('sales')->has('routes/api.php'))->toBeFalse();
+
+    File::put($cache, '<?php return '.var_export($manager->export(), true).';');
+    File::deleteDirectory($this->root.'/Sns');
+
+    // the cache is read instead of the folders: the removed module is still there until the cache is rebuilt
+    $cached = new ModuleManager($this->root, cachePath: $cache);
+    expect(array_keys($cached->enabled()))->toBe(['core', 'master-data', 'sales', 'sns'])
+        ->and($cached->get('sales')->parts)->toBe(['routes/web.php', 'Filament/Resources']);
+});

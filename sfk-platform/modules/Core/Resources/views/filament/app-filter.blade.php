@@ -3,7 +3,9 @@
     (design_ref/filter1-3.png): 条件 rows of field / comparison / value with (+) below and すべてクリア, the
     すべての条件を満たす / いずれかの条件を満たす choice once there are two rows, ソート rows, and キャンセル | 保存 適用.
     Choice and user values are picked from a list box ("--" = blank), dates from the calendar (今日 / 選択を解除).
-    Behaviour: the sfkAppFilter Alpine component (core::filament.app-filter-script).
+    Behaviour: the sfkAppFilter Alpine component (core::filament.app-filter-script). The fields and their choices
+    (AppListRecords::filterDialog(), large with many partners / users) are fetched when the dialog first opens, not
+    sent with every list page.
 --}}
 @php
     use Filament\Support\Icons\Heroicon;
@@ -11,7 +13,7 @@
 
 <div
     wire:ignore
-    x-data="sfkAppFilter(@js($page->filterDialog()))"
+    x-data="sfkAppFilter({ fields: [], sortable: [], canSave: false })"
     x-on:sfk-app-filter-open.window="open($event.detail)"
     class="sfk-filter"
 >

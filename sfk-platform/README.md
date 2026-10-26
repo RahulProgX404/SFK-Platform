@@ -62,6 +62,29 @@ php artisan serve                 # http://localhost:8000/erp
 | `composer test`                                | Pest test suite (app + all modules)                      |
 | `composer analyse`                             | PHPStan / Larastan                                       |
 | `composer lint`                                | Pint formatter                                           |
+| `php artisan module:cache` / `module:clear`    | Cache the modules (also part of `php artisan optimize`)  |
+
+## Production checklist
+
+Environment (`.env` of the server):
+
+| Variable | Value | Why |
+| --- | --- | --- |
+| `APP_ENV` / `APP_DEBUG` | `production` / `false` | debug pages show code and secrets to anyone |
+| `APP_URL` | `https://…` | links, redirects and secure cookies use HTTPS; browsers get HSTS |
+| `TRUSTED_PROXIES` | the load balancer / TLS proxy addresses (or `*` behind a private proxy) | HTTPS and client IPs (login lockout) are seen correctly |
+| `VIEW_CHECK_CACHE_TIMESTAMPS` | `false` | views are compiled on deploy; no file check per rendered view |
+| `LOG_LEVEL` | `warning` | |
+
+On every deploy: `composer install --no-dev --classmap-authoritative`, `php artisan migrate --force`,
+`php artisan optimize` (config, routes, events, views and modules cached), `php artisan filament:cache-components`,
+then reload PHP-FPM. OPcache with `opcache.validate_timestamps=0` (as in `docker/php/php.ini`).
+
+Security built in: browser protections on every response (Content-Security-Policy, no framing by other sites,
+nosniff, no referrer to other sites, HSTS over HTTPS — `Modules\Core\Http\Middleware\SecurityHeaders`), login lockout
+per account and address, CSRF on every form, private uploads served only through signed URLs with a sandbox CSP,
+app / record / field access rights on every screen, list, related list and PDF. Check dependencies with
+`composer audit` before each release.
 
 ## Repository layout
 

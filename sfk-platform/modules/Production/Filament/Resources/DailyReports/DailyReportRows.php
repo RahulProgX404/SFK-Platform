@@ -17,7 +17,7 @@ final class DailyReportRows
     /** @return array{columns: array<string, string>, numeric: list<string>, rows: list<array<string, string>>, urls: list<string|null>} */
     public static function ofOrder(Order $order): array
     {
-        $reports = DailyReport::query()->with(['worker', 'machine'])->where('order_id', $order->id)->orderByDesc('id')->limit(10)->get();
+        $reports = DailyReportResource::onlyVisible(DailyReport::query())->with(['worker', 'machine'])->where('order_id', $order->id)->orderByDesc('id')->limit(10)->get();
         $label = fn (string $name): string => DailyReportLayout::label($name);
         $time = fn (?string $value): string => $value === null ? '' : substr($value, 0, 5);
 
