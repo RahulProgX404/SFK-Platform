@@ -203,7 +203,7 @@ it('has the record features: 変更履歴, コメント to 作成者 / 更新者
         ->assertActionHasUrl('duplicate', MachineResource::getUrl('create', ['duplicate' => $machine->id]));
     Livewire::test(CreateMachine::class, ['duplicate' => (string) $machine->id])->assertSchemaStateSet(['name' => '1号機', 'machine_rate' => '5000.0000']);
 
-    Livewire::test(ListMachines::class)->assertActionHidden('bulkDelete');
+    expect(Livewire::test(ListMachines::class)->instance()->canBulkDelete())->toBeFalse();
 
     $this->get(MachineSettings::getUrl())->assertOk()->assertSeeInOrder(['インライン編集を有効にする', '一括削除を有効にする']);
     Livewire::test(MachineSettings::class)->assertSet('bulkDeleteEnabled', false)->assertSet('commentsEnabled', true);

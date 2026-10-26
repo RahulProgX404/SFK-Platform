@@ -41,6 +41,8 @@
 
     <div class="sfk-app-toolbar">
         @if ($kind === 'list')
+            {{-- keeps $store.sfkCheckedRows (rows checked in the table) current --}}
+            <span x-data="sfkCheckedRowsWatcher" hidden></span>
             <div class="sfk-app-toolbar-start">
                 @if (count($page->allListViews()) > 0)
                     <label class="sfk-app-view">

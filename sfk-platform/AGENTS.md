@@ -110,6 +110,13 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
     fields are read from the app's record page (infolist), so keep every printable field and table there; tables
     built with `RecordTable::entry()` give their column headers. Page overrides of `getHeaderActions()` keep the
     parent's actions (the 帳票 buttons are among them).
+- Deleting: parts of a record (its rows, sub-tables, 変更履歴, コメント) cascade in the database; references from other
+  records (a 取引先 used by orders, a 機械 by daily reports …) block (`restrictOnDelete()`), and every delete goes through
+  `Modules\Core\Application\Records\RecordDeletion` (`GuardedDelete::apply()` on a DeleteAction) so a blocked delete says
+  what uses the record. App lists have one red 「…」 item (Core `bulkDelete`, two confirmations): 一括削除 of the
+  filtered list when no row is checked (その他の設定 + administrators), 選択したレコードを削除 of the checked rows (削除 permission).
+- A Filament action put straight into a Blade view (`{{ $this->fooAction }}`, `{{ ($page->fooAction)([...]) }}`) is drawn
+  even when it is hidden — disabled, but visible. Wrap it: `@if (($a = ($this->fooAction)([...]))->isVisible()) {{ $a }} @endif`.
 - Never write the word for the old product anywhere; call it 旧システム in the UI and "legacy system" in English.
 - Cite the SYSTEM_BRAIN rule id in tests/docblocks when implementing a rule.
 

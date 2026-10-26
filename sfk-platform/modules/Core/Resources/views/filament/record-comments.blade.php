@@ -45,7 +45,10 @@
                     <p class="sfk-comment-body">{!! nl2br(e($comment->body)) !!}</p>
                     <div class="sfk-history-actions">
                         <button type="button" class="sfk-filter-link" wire:click="replyToComment({{ $comment->id }})">返信する</button>
-                        {{ ($page->deleteCommentAction)(['comment' => $comment->id]) }}
+                        {{-- only on one's own comments (an action drawn here would show disabled when hidden) --}}
+                        @if (($delete = ($page->deleteCommentAction)(['comment' => $comment->id]))->isVisible())
+                            {{ $delete }}
+                        @endif
                     </div>
                 </li>
             @endforeach

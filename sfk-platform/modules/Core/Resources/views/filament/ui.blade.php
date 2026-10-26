@@ -151,6 +151,53 @@
         cursor: pointer;
     }
 
+    /* ── 文字色 palette of the rich text editors (core::filament.text-color-palette) ── */
+    .sfk-text-palette {
+        position: fixed;
+        z-index: 1000;
+        width: 254px;
+        padding: 10px;
+        background: #ffffff;
+        border: 1px solid var(--kt-border);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, .18);
+    }
+
+    .sfk-text-palette-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 28px);
+        gap: 6px;
+    }
+
+    .sfk-text-palette-swatch {
+        width: 28px;
+        height: 28px;
+        border: 1px solid rgba(0, 0, 0, .15);
+        cursor: pointer;
+    }
+
+    .sfk-text-palette-swatch:hover,
+    .sfk-text-palette-swatch:focus-visible {
+        outline: 2px solid var(--kt-blue);
+        outline-offset: 1px;
+    }
+
+    .sfk-text-palette-clear {
+        margin-top: 8px;
+    }
+
+    /* the labelled tools of the editors (表を削除) */
+    .fi-fo-rich-editor-tool-with-label {
+        gap: 4px;
+        width: auto;
+        padding-inline: 6px;
+        font-size: .875rem;
+    }
+
+    /* a radio group without inline(): one option per line (the labels above flow side by side in its block) */
+    .fi-fo-radio.fi-grid-direction-col:not(.fi-inline) > .fi-fo-radio-label {
+        display: flex;
+    }
+
     .fi-fo-checkbox-list-option:has(input:focus-visible),
     .fi-fo-radio-label:has(input:focus-visible) {
         border-color: var(--kt-blue);

@@ -198,7 +198,7 @@ it('edits a row in the list and keeps the 変更履歴, comments and deletes wit
         ->and(RecordVersion::query()->where('record_type', $consumable->getMorphClass())->latest('id')->first()->snapshot)->not->toHaveKey('stock');
 
     Livewire::test(ViewConsumable::class, ['record' => $consumable->getRouteKey()])->set('commentData.body', '在庫確認済み')->call('postComment')->assertHasNoErrors();
-    Livewire::test(ListConsumables::class)->assertActionHidden('bulkDelete');
+    expect(Livewire::test(ListConsumables::class)->instance()->canBulkDelete())->toBeFalse();
 
     $consumable->delete();
     expect(RecordComment::query()->count())->toBe(0)

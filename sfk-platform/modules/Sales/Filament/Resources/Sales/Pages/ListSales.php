@@ -112,7 +112,7 @@ final class ListSales extends AppListRecords
     }
 
     /**
-     * The legacy list buttons, for administrators (Customine 06 pages 1 / 6 / 9 / 13 / 18): 期間指定から納品レコード作成 and,
+     * The legacy list buttons, for administrators (Customine 06 pages 1 / 6 / 9 / 13 / 18): 期間指定から納品書レコード作成 and,
      * on the checked rows, 選択して納品書レコード作成, 選択して請求書レコード作成 (optional 請求日), 随時請求書レコード作成 and
      * 編集制限 (編集不可にする / 編集可能にする). The issuers refuse what the legacy flow refused (rows already on a
      * document, 随時請求 rows on a closing-day invoice, rows without a delivery note) — except that 選択して納品書 / 請求書
@@ -123,10 +123,10 @@ final class ListSales extends AppListRecords
     {
         return [
             Action::make('issueDeliveryNotesForPeriod')
-                ->label('期間指定から納品レコード作成')
+                ->label('期間指定から納品書レコード作成')
                 ->icon(Heroicon::OutlinedCalendarDays)
                 ->visible(fn (): bool => SaleForm::isAdministrator())
-                ->modalHeading('期間指定から納品レコード作成')
+                ->modalHeading('期間指定から納品書レコード作成')
                 ->modalWidth('md')
                 ->modalSubmitActionLabel('作成する')
                 ->modalCancelActionLabel('キャンセル')
@@ -294,7 +294,7 @@ final class ListSales extends AppListRecords
     public function menuHelp(): array
     {
         return SaleForm::isAdministrator() ? [
-            '期間指定から納品レコード作成' => '売上日付を指定した上で任意の売上レコードを取引先別に納品レコードに変換します。',
+            '期間指定から納品書レコード作成' => '売上日付を指定した上で任意の売上レコードを取引先別に納品レコードに変換します。',
             '選択して納品書レコード作成' => 'チェックボックスで選択したレコードを取引先別に納品レコードに変換します。',
             '選択して請求書レコード作成' => 'チェックボックスで選択したレコードを取引先別に請求レコードに変換します。（納品レコードが作成されてない場合実行不可）',
             '編集制限' => '任意のタイミングで任意のレコードに対して編集制限をかけることができます。（解除も可能）',

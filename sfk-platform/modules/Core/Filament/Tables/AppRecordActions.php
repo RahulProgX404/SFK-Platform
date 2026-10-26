@@ -11,6 +11,7 @@ use Filament\Tables\Contracts\HasTable;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\AppResource;
+use Modules\Core\Filament\Support\GuardedDelete;
 
 /**
  * The actions at the end of an app list row, like the legacy list: the pencil (編集する) edits the row in place
@@ -66,7 +67,8 @@ final class AppRecordActions
                         $livewire->cancelInlineEdit();
                     }
                 }),
-            DeleteAction::make()
+            // a record still used elsewhere is not deleted (GuardedDelete)
+            GuardedDelete::apply(DeleteAction::make())
                 ->label('削除する')
                 ->icon(Heroicon::XMark)
                 ->iconButton()

@@ -15,6 +15,7 @@ use Modules\Core\Filament\Portal\PortalPage;
 use Modules\Core\Models\BusinessApp;
 use Modules\Core\Models\DashboardPortal;
 use Modules\Core\Models\Space;
+use Modules\Settings\Filament\Pages\SettingsDashboard;
 
 function portal_app(string $code, string $name, Space $space, AppStatus $status = AppStatus::Published, ?string $iconText = null): BusinessApp
 {
@@ -238,4 +239,48 @@ it('keeps the place of the apps an administrator does not see when reordering', 
     Livewire::test(PortalPage::class)->call('saveAppOrder', [$this->orders->id, $this->daily->id]);
     expect(BusinessApp::query()->orderBy('sort_order')->pluck('code')->all())->toBe(['quotation', 'sales-entry', 'daily-report-legacy'])
         ->and(BusinessApp::query()->orderBy('sort_order')->pluck('sort_order')->all())->toBe([1, 2, 3]);
+});
+
+it('shows the edit buttons of お知らせ and アプリショートカット to administrators only (not even disabled)', function () {
+    $this->actingAs($this->employee)->get('/erp')
+        ->assertOk()
+        ->assertDontSee('お知らせを編集')
+        ->assertDontSee('アプリショートカットを編集');
+
+    $this->actingAs($this->admin)->get('/erp')
+        ->assertOk()
+        ->assertSee('お知らせを編集')
+        ->assertSee('アプリショートカットを編集');
+});
+
+it('frames each アプリショートカット on its own, with space between them', function () {
+    $this->actingAs($this->admin)->get('/erp')
+        ->assertOk()
+        ->assertSee('.sfk-shortcuts { display: flex; flex-wrap: wrap; gap: .75rem;', false)
+        ->assertSee('border: 1px solid #555; color: var(--kt-blue', false);
+});
+
+it('lists 共通管理 first in ダッシュボード切替, each dashboard with its own icon, without a ダッシュボード entry', function () {
+    $superAdmin = User::factory()->superAdmin()->create();
+    Filament::setCurrentPanel('settings');
+
+    $html = $this->actingAs($superAdmin)->get('/settings')->assertOk()->getContent();
+    $menu = (string) str($html)->after('ダッシュボード切替')->before('ユーザー管理');
+
+    expect(strpos($menu, '共通管理'))->toBeLessThan(strpos($menu, '白石封筒'))
+        ->and(SettingsDashboard::shouldRegisterNavigation())->toBeFalse()
+        // 共通管理: the gear, 白石封筒: the briefcase (Heroicons cog-6-tooth / briefcase), as on the portal's cards
+        ->and(strpos($menu, 'M9.594 3.94'))->toBeLessThan(strpos($menu, 'M20.25 14.15'))
+        ->and($menu)->not->toContain('M3.75 6A2.25');
+});
+
+it('colours text from a palette under the 文字色 button and offers 表を削除 in the お知らせ editor', function () {
+    $this->actingAs($this->admin);
+
+    Livewire::test(PortalPage::class)
+        ->mountAction('editNotice')
+        ->assertMountedActionModalSeeHtml('class="sfk-text-palette"')
+        ->assertMountedActionModalSeeHtml('aria-label="文字色"')
+        ->assertMountedActionModalSeeHtml('aria-label="表を削除"')
+        ->assertMountedActionModalSeeHtml('setTextColor({ color })');
 });

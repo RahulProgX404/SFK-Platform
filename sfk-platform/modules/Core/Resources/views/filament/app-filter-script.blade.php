@@ -9,6 +9,41 @@
 <script>
     document.addEventListener('alpine:init', () => {
         /**
+         * The number of rows checked in the app list ($store.sfkCheckedRows), for the 「N件」 badges and
+         * 選択したレコードを削除: kept current by sfkCheckedRowsWatcher (one per list page, core::filament.app-header)
+         * when a box is clicked and every 300 ms (e.g. すべて選択). The table's component may start after the header,
+         * so a read before it exists gives 0.
+         */
+        Alpine.store('sfkCheckedRows', 0)
+
+        Alpine.data('sfkCheckedRowsWatcher', () => ({
+            timer: null,
+
+            init() {
+                this.onInput = () => setTimeout(() => this.read())
+                window.addEventListener('click', this.onInput)
+                window.addEventListener('change', this.onInput)
+                this.timer = setInterval(() => this.read(), 300)
+                this.read()
+            },
+
+            destroy() {
+                clearInterval(this.timer)
+                window.removeEventListener('click', this.onInput)
+                window.removeEventListener('change', this.onInput)
+            },
+
+            read() {
+                const table = document.querySelector('[x-data^=filamentTable]')
+                const data = table && table._x_dataStack ? Alpine.$data(table) : null
+                const count = data && typeof data.getSelectedRecordsCount === 'function' ? data.getSelectedRecordsCount() : 0
+                if (Alpine.store('sfkCheckedRows') !== count) {
+                    Alpine.store('sfkCheckedRows', count)
+                }
+            },
+        }))
+
+        /**
          * Shown while the table is wider than its box and the bottom of the table (with its own bar) is below the
          * screen; it covers the table's width at the bottom of the screen and scrolls with the table both ways.
          */

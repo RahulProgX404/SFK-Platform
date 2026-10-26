@@ -101,10 +101,18 @@ final class CoreServiceProvider extends ModuleServiceProvider
             return '';
         }
 
+        // administrator-only dashboards (共通管理) first, then the others in their order
+        usort($dashboards, fn (DashboardEntry $a, DashboardEntry $b): int => DashboardAccess::isAdminOnly($b->id) <=> DashboardAccess::isAdminOnly($a->id));
+
         return view('core::filament.dashboard-menu', [
             'items' => array_map(fn (DashboardEntry $dashboard): NavigationItem => NavigationItem::make($dashboard->label)
                 ->url($dashboard->url)
-                ->icon(Heroicon::OutlinedSquares2x2)
+                // the icons of the portal's dashboard cards
+                ->icon(match ($dashboard->icon) {
+                    'erp' => Heroicon::OutlinedBriefcase,
+                    'settings' => Heroicon::OutlinedCog6Tooth,
+                    default => Heroicon::OutlinedSquares2x2,
+                })
                 ->isActiveWhen(fn (): bool => $dashboard->id === $panel->getId()), $dashboards),
         ])->render();
     }

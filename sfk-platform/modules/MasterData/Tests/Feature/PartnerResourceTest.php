@@ -6,6 +6,7 @@
  */
 
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
@@ -1095,7 +1096,7 @@ it('hides the pencil and × of the rows when インライン編集 is off, and f
         ->assertSet('inlineRecordKey', null);
 });
 
-it('deletes every listed record with 一括削除, for administrators only', function () {
+it('deletes every listed record with 一括削除 after two confirmations, for administrators only', function () {
     $employee = employeeWith([AppAbility::View, AppAbility::Delete]);
     $app = BusinessApp::query()->where('code', 'partner-master')->sole();
     $supplier = makePartner(['name' => '仕入先A', 'roles' => ['仕入先']]);
@@ -1111,20 +1112,29 @@ it('deletes every listed record with 一括削除, for administrators only', fun
     $list = Livewire::test(ListPartners::class)
         ->call('applyAppFilter', ['conditions' => [['field' => 'roles', 'operator' => 'in', 'values' => ['仕入先']]]])
         ->assertActionVisible('bulkDelete')
-        ->mountAction('bulkDelete');
-    expect($list->instance()->getMountedAction()?->getModalHeading())->toBe('2件のレコードを削除しますか？');
+        ->mountAction('bulkDelete')
+        ->assertMountedActionModalSee('2件のレコードを一括削除しますか？')
+        ->callMountedAction()
+        ->assertActionMounted(TestAction::make('confirmBulkDelete')->arguments(['all' => true]))
+        ->assertMountedActionModalSee('本当に2件のレコードを削除しますか？');
     $list->callMountedAction()->assertNotified('2件のレコードを削除しました');
 
     expect(Partner::query()->pluck('name')->all())->toBe(['得意先A'])
         ->and(RecordVersion::query()->count())->toBe(0)
         ->and(RecordComment::query()->count())->toBe(0);
 
+    // switched off in その他の設定: only checked rows can be deleted
     $app->forceFill(['bulk_delete_enabled' => false])->save();
-    Livewire::test(ListPartners::class)->assertActionHidden('bulkDelete');
+    Livewire::test(ListPartners::class)->mountAction('bulkDelete')->assertNotified('レコードを選択してください。');
 
+    // employees with 削除: checked rows only, never the whole list
     $app->forceFill(['bulk_delete_enabled' => true])->save();
     $this->actingAs($employee);
-    Livewire::test(ListPartners::class)->assertActionHidden('bulkDelete')->call('bulkDelete');
+    Livewire::test(ListPartners::class)
+        ->assertActionVisible('bulkDelete')
+        ->assertActionHidden(TestAction::make('confirmBulkDelete')->arguments(['all' => true]))
+        ->mountAction('bulkDelete')
+        ->assertNotified('レコードを選択してください。');
     expect(Partner::query()->count())->toBe(1);
 });
 
@@ -1305,4 +1315,8 @@ it('edits the レコード / フィールド アクセス権 on their settings p
         ->assertNotified('フィールドのアクセス権を保存しました');
     expect($app->fieldPermissions()->sole()->field)->toBe('phone')
         ->and($app->fieldPermissions()->sole()->access->value)->toBe('view');
+});
+
+it('lists the 表示件数 choices one per line (radio groups without inline())', function () {
+    expect(compactCss(themeCss()))->toContain(compactCss('.fi-fo-radio.fi-grid-direction-col:not(.fi-inline) > .fi-fo-radio-label { display: flex; }'));
 });

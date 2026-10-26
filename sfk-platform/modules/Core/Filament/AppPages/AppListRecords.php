@@ -18,6 +18,7 @@ use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\RenderHook;
 use Filament\Schemas\Components\View as ViewComponent;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Width;
 use Filament\Support\Exceptions\Cancel;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
@@ -29,6 +30,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema as DatabaseSchema;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Js;
 use Livewire\Attributes\Session;
 use Livewire\Attributes\Url;
@@ -40,6 +42,7 @@ use Modules\Core\Application\Filters\FilterField;
 use Modules\Core\Application\Filters\RecordFilterQuery;
 use Modules\Core\Application\History\HasRecordHistory;
 use Modules\Core\Application\History\RecordHistory;
+use Modules\Core\Application\Records\RecordDeletion;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Application\Views\ListViewInvalid;
 use Modules\Core\Application\Views\ListViewSchema;
@@ -335,8 +338,8 @@ abstract class AppListRecords extends ListRecords
             }
         }
 
-        // 帳票出力 for the checked rows needs the check boxes
-        if ($this->documentOutputsAt(OutputPlacement::ListChecked) !== []) {
+        // check boxes for 帳票出力 of the checked rows and for 選択したレコードを削除
+        if ($this->documentOutputsAt(OutputPlacement::ListChecked) !== [] || $this->appResource()::canDeleteAny()) {
             $table->selectable();
         }
 
@@ -624,17 +627,6 @@ abstract class AppListRecords extends ListRecords
             ...array_map(MenuButtons::mark(...), [...$this->menuActions(), ...$this->documentActions()]),
             ActionGroup::make([
                 ...$this->optionActions(),
-                Action::make('bulkDelete')
-                    ->label('一括削除')
-                    ->icon(Heroicon::OutlinedTrash)
-                    ->visible(fn (): bool => $this->canBulkDelete())
-                    ->modalIcon(Heroicon::OutlinedTrash)
-                    ->modalIconColor('danger')
-                    ->modalWidth('md')
-                    ->modalHeading(fn (): string => ($this->getFilteredTableQuery()?->count() ?? 0).'件のレコードを削除しますか？')
-                    ->modalSubmitAction(fn (Action $action): Action => $action->label('削除する')->color('danger'))
-                    ->modalCancelActionLabel('キャンセル')
-                    ->action(fn () => $this->bulkDelete()),
                 Action::make('pageSize')
                     ->label('表示件数')
                     ->icon(Heroicon::OutlinedQueueList)
@@ -654,10 +646,13 @@ abstract class AppListRecords extends ListRecords
                             ->required(),
                     ])
                     ->action(fn (array $data) => $this->setPageSize((int) $data['size'])),
+                $this->bulkDeleteAction(),
             ])
                 ->label('その他の操作')
                 ->icon(Heroicon::EllipsisHorizontal)
                 ->color('gray')
+                // wide enough for 「選択したレコードを削除」 on one line
+                ->dropdownWidth(Width::ExtraSmall)
                 ->iconButton(),
         ];
     }
@@ -846,33 +841,127 @@ abstract class AppListRecords extends ListRecords
         return $this->appSetting('bulk_delete_enabled') && $this->isAppAdministrator() && $this->appResource()::canDeleteAny();
     }
 
-    /** 一括削除: deletes every record of the list as filtered and searched (one by one, so related data goes too). */
-    public function bulkDelete(): void
+    /**
+     * 「…」 → 一括削除 / 選択したレコードを削除 (red): with no row checked it deletes every record of the list as
+     * filtered and searched (一括削除: on in その他の設定, administrators), with rows checked only those (users with
+     * 削除). It asks twice — how many and what goes with them, then that it cannot be undone (confirmBulkDelete).
+     */
+    private function bulkDeleteAction(): Action
     {
-        $query = $this->canBulkDelete() ? $this->getFilteredTableQuery() : null;
-        if ($query === null) {
-            return;
+        return Action::make('bulkDelete')
+            // the label follows the checked rows ($store.sfkCheckedRows)
+            ->label(new HtmlString('<span x-show="$store.sfkCheckedRows === 0">一括削除</span><span x-show="$store.sfkCheckedRows > 0" x-cloak>選択したレコードを削除</span>'))
+            ->icon(Heroicon::OutlinedTrash)
+            ->color('danger')
+            ->visible(fn (): bool => $this->appResource()::canDeleteAny())
+            // without 一括削除 the item is there for checked rows only
+            ->extraAttributes(fn (): array => $this->canBulkDelete() ? [] : ['x-show' => '$store.sfkCheckedRows > 0'])
+            // mounted through the table, so the checked rows come along
+            ->accessSelectedRecords()
+            ->alpineClickHandler("(t => t ? Alpine.\$data(t).mountAction('bulkDelete') : \$wire.mountAction('bulkDelete'))(\$wire.\$el.querySelector('[x-data^=filamentTable]'))")
+            ->mountUsing(function (Action $action): void {
+                if ($action->getSelectedRecords()->isNotEmpty()) {
+                    return;
+                }
+                if (! $this->canBulkDelete()) {
+                    Notification::make()->warning()->title('レコードを選択してください。')->send();
+
+                    throw new Cancel;
+                }
+                if (($this->getFilteredTableQuery()?->count() ?? 0) === 0) {
+                    Notification::make()->warning()->title('削除するレコードがありません。')->send();
+
+                    throw new Cancel;
+                }
+            })
+            ->modalIcon(Heroicon::OutlinedExclamationTriangle)
+            ->modalIconColor('danger')
+            ->modalWidth('md')
+            ->modalHeading(fn (Action $action): string => $action->getSelectedRecords()->isNotEmpty()
+                ? '選択した'.$action->getSelectedRecords()->count().'件のレコードを削除しますか？'
+                : number_format($this->getFilteredTableQuery()?->count() ?? 0).'件のレコードを一括削除しますか？')
+            ->modalDescription(fn (Action $action): string => $action->getSelectedRecords()->isNotEmpty()
+                ? 'レコードの明細・コメント・変更履歴も削除されます。'
+                : '一覧に表示されているすべてのレコード（絞り込み・検索の結果）が削除されます。レコードの明細・コメント・変更履歴も削除されます。')
+            ->modalSubmitAction(fn (Action $action): Action => $action->label('削除する')->color('danger'))
+            ->modalCancelActionLabel('キャンセル')
+            ->action(fn (Action $action) => $this->replaceMountedAction('confirmBulkDelete', $action->getSelectedRecords()->isNotEmpty()
+                ? ['keys' => $action->getSelectedRecords()->map(fn (Model $record): int|string => $record->getKey())->values()->all()]
+                : ['all' => true]));
+    }
+
+    /** 一括削除 / 選択したレコードを削除, second step: 「この操作は取り消せません」, then the records are deleted. */
+    public function confirmBulkDeleteAction(): Action
+    {
+        return Action::make('confirmBulkDelete')
+            ->visible(fn (array $arguments): bool => $this->appResource()::canDeleteAny() && (! ($arguments['all'] ?? false) || $this->canBulkDelete()))
+            ->requiresConfirmation()
+            ->color('danger')
+            ->modalIcon(Heroicon::OutlinedTrash)
+            ->modalIconColor('danger')
+            ->modalWidth('md')
+            ->modalHeading(fn (array $arguments): string => '本当に'.number_format(count($this->bulkDeleteKeys($arguments))).'件のレコードを削除しますか？')
+            ->modalDescription('この操作は取り消せません。')
+            ->modalSubmitActionLabel('削除する')
+            ->modalCancelActionLabel('キャンセル')
+            ->action(function (array $arguments): void {
+                $this->deleteRecords($this->bulkDeleteKeys($arguments));
+                $this->deselectAllTableRecords();
+            });
+    }
+
+    /**
+     * The records a 一括削除 / 選択したレコードを削除 is about: the checked ones, or every record of the list as filtered
+     * and searched (一括削除 only).
+     *
+     * @param  array<string, mixed>  $arguments
+     * @return list<int|string>
+     */
+    private function bulkDeleteKeys(array $arguments): array
+    {
+        if (! ($arguments['all'] ?? false)) {
+            return array_values(array_filter((array) ($arguments['keys'] ?? []), is_scalar(...)));
         }
 
-        $model = $query->getModel();
-        $keys = $query->pluck($model->getQualifiedKeyName())->all();
-        $deleted = 0;
+        $query = $this->canBulkDelete() ? $this->getFilteredTableQuery() : null;
 
-        DB::transaction(function () use ($model, $keys, &$deleted): void {
-            foreach (array_chunk($keys, 200) as $chunk) {
-                foreach ($model->newQuery()->whereKey($chunk)->get() as $record) {
-                    if ($this->appResource()::canDelete($record)) {
-                        $record->delete();
-                        $deleted++;
-                    }
+        return $query === null ? [] : $query->pluck($query->getModel()->getQualifiedKeyName())->all();
+    }
+
+    /**
+     * Deletes the records the user may delete, one by one so their parts go with them; records other records still
+     * use are kept (RecordDeletion) and counted in the message.
+     *
+     * @param  list<int|string>  $keys
+     */
+    private function deleteRecords(array $keys): void
+    {
+        $resource = $this->appResource();
+        $deletion = app(RecordDeletion::class);
+        $deleted = 0;
+        $kept = [];
+
+        foreach (array_chunk($keys, 200) as $chunk) {
+            foreach ($resource::getEloquentQuery()->whereKey($chunk)->get() as $record) {
+                if (! $resource::canDelete($record)) {
+                    continue;
                 }
+
+                $reason = $deletion->delete($record);
+                $reason === null ? $deleted++ : $kept[] = $reason;
             }
-        });
+        }
 
         $this->cancelInlineEdit();
         $this->resetPage($this->getTablePaginationPageName());
 
         Notification::make()->title($deleted.'件のレコードを削除しました')->success()->send();
+        if ($kept !== []) {
+            Notification::make()->danger()->persistent()
+                ->title(count($kept).'件のレコードは他のレコードで使われているため削除できませんでした')
+                ->body($kept[0])
+                ->send();
+        }
     }
 
     /**

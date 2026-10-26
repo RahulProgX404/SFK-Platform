@@ -23,6 +23,7 @@ use Modules\Core\Access\AppAccess;
 use Modules\Core\Application\Apps\AppLifecycle;
 use Modules\Core\Filament\AppResource;
 use Modules\Core\Filament\DashboardSettings\Resources\Spaces\SpaceResource;
+use Modules\Core\Filament\Support\RichEditorTools;
 use Modules\Core\Models\BusinessApp;
 use Modules\Core\Models\DashboardPortal;
 use Modules\Core\Models\Space;
@@ -126,14 +127,19 @@ final class PortalPage extends Dashboard
             ->schema([
                 RichEditor::make('notice')
                     ->hiddenLabel()
+                    // 文字色 as a palette under the button; the table tools (with 表を削除) in the toolbar
+                    ->tools(RichEditorTools::tools())
                     ->toolbarButtons([
-                        ['bold', 'italic', 'underline', 'strike', 'textColor', 'highlight', 'link'],
+                        ['bold', 'italic', 'underline', 'strike', RichEditorTools::TEXT_COLOR, 'highlight', 'link'],
                         ['h2', 'h3'],
                         ['alignStart', 'alignCenter', 'alignEnd'],
-                        ['bulletList', 'orderedList', 'blockquote', 'table'],
+                        ['bulletList', 'orderedList', 'blockquote'],
+                        RichEditorTools::TABLE_GROUP,
                         ['undo', 'redo'],
                     ])
+                    ->floatingToolbars([])
                     ->fileAttachments(false),
+                RichEditorTools::palette(),
             ])
             ->action(function (array $data): void {
                 $portal = DashboardPortal::for(self::panelId());

@@ -59,8 +59,9 @@
                                 {{ $version->version === 1 ? '初版を表示' : '更新内容を表示' }}
                             </button>
                         @endif
-                        @if ($version->version !== $latest)
-                            {{ ($page->restoreVersionAction)(['version' => $version->version]) }}
+                        {{-- only for those who may edit the record (an action drawn here would show disabled when hidden) --}}
+                        @if ($version->version !== $latest && ($restore = ($page->restoreVersionAction)(['version' => $version->version]))->isVisible())
+                            {{ $restore }}
                         @endif
                     </div>
                 </li>

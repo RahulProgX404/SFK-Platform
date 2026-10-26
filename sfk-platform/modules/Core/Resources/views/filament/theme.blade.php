@@ -878,7 +878,7 @@
     }
 
     .sfk-app-menu-rows.has-checked .sfk-menu-badge {
-        background: #e41e3f;
+        background: var(--kt-blue);
     }
 
     .sfk-app-menu-rows.has-checked .sfk-menu-btn.fi-btn {
@@ -2902,6 +2902,12 @@
     .sfk-app-page-list .fi-ta-header-toolbar>.sfk-app-pager {
         order: 1;
         margin-inline-start: auto;
+    }
+
+    /* no 「N件選択済み / 全選択 / 全選択解除」 bar above the list when rows are checked: the app buttons carry the
+       count, 「…」 has 選択したレコードを削除 */
+    .sfk-app-page-list .fi-ta-selection-indicator {
+        display: none !important;
     }
 
     /* One horizontal scroll for header and rows, with its bar at the end of the table (also below the empty

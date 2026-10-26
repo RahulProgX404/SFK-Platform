@@ -447,7 +447,7 @@ it('has the record features: 再利用 with the table rows, コメント, 変更
         ->and($copy->papers->pluck('paper_name')->all())->toBe(['上質紙'])
         ->and($copy->paper_subtotal)->toBe(500);
 
-    Livewire::test(ListOrders::class)->assertActionHidden('bulkDelete');
+    expect(Livewire::test(ListOrders::class)->instance()->canBulkDelete())->toBeFalse();
     Livewire::test(OrderSettings::class)->assertSet('bulkDeleteEnabled', false)->assertSet('commentsEnabled', true);
 
     $order->delete();

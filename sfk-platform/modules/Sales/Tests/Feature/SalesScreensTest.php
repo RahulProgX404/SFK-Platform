@@ -167,7 +167,7 @@ it('enters a sale and makes its delivery note and invoice from the 06 list', fun
     // the legacy list buttons (Customine 06 pages 6 / 9) on the checked rows, with their 機能説明 (page 22)
     Livewire::test(ListSales::class)
         ->assertCanSeeTableRecords([$sale])
-        ->assertSeeInOrder(['期間指定から納品レコード作成', '選択して納品書レコード作成', 'sfk-menu-badge', '件', '選択して請求書レコード作成', 'sfk-menu-badge', '件', '随時請求書レコード作成', '編集制限',
+        ->assertSeeInOrder(['期間指定から納品書レコード作成', '選択して納品書レコード作成', 'sfk-menu-badge', '件', '選択して請求書レコード作成', 'sfk-menu-badge', '件', '随時請求書レコード作成', '編集制限',
             'ボタンの説明', '売上日付を指定した上で任意の売上レコードを取引先別に'], false)
         ->assertDontSee('sfk-app-menu-count', false)
         ->callAction('createDeliveryNotes')
@@ -438,7 +438,7 @@ it('sums the receivables list and creates the missing months from 「…」 (Cus
         ->assertNotified('処理が完了しました（2026年11月：1件作成）');
 });
 
-it('makes the delivery notes of a period from 期間指定から納品レコード作成 (Customine 06 page 1)', function () {
+it('makes the delivery notes of a period from 期間指定から納品書レコード作成 (Customine 06 page 1)', function () {
     $sale = screenSale($this->customer);
     screenSale(screenCustomer('株式会社別締日', ['closing_day' => '末日']));
     $this->actingAs($this->admin);

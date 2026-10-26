@@ -91,15 +91,16 @@ it('switches dashboards from the menu group ダッシュボード切替, the das
 
     $this->actingAs($admin)->get('/erp')
         ->assertOk()
-        ->assertSeeInOrder(['sfk-dashboard-switcher', 'href="'.url('/erp').'"', '白石封筒', 'data-group-label="ダッシュボード切替"', 'fi-active',
-            'href="'.url('/erp').'"', 'aria-current="page"', '白石封筒', 'href="'.url('/settings').'"', '共通管理'], escape: false)
+        // 共通管理 (administrators' dashboard) is listed first
+        ->assertSeeInOrder(['sfk-dashboard-switcher', 'href="'.url('/erp').'"', '白石封筒', 'data-group-label="ダッシュボード切替"',
+            'href="'.url('/settings').'"', '共通管理', 'fi-active', 'href="'.url('/erp').'"', 'aria-current="page"', '白石封筒'], escape: false)
         ->assertDontSee('fi-sidebar-item-label">ポータル', escape: false)
         ->assertDontSee('に切り替え');
 
     $this->actingAs($admin)->get('/settings')
         ->assertOk()
-        ->assertSeeInOrder(['data-group-label="ダッシュボード切替"', 'href="'.url('/erp').'"', '白石封筒', 'fi-active', 'href="'.url('/settings').'"',
-            'aria-current="page"', '共通管理'], escape: false);
+        ->assertSeeInOrder(['data-group-label="ダッシュボード切替"', 'fi-active', 'href="'.url('/settings').'"',
+            'aria-current="page"', '共通管理', 'href="'.url('/erp').'"', '白石封筒'], escape: false);
 });
 
 it('lists a single dashboard in ダッシュボード切替 too', function () {

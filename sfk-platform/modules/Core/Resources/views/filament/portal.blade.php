@@ -69,8 +69,9 @@
         .sfk-notice-content td, .sfk-notice-content th { border: 1px solid var(--kt-border, #e3e7e8); padding: .25rem .5rem; }
 
         .sfk-section-title { display: flex; align-items: center; gap: .5rem; margin: 2rem 0 .75rem; padding-left: .625rem; font-size: 1.125rem; font-weight: 700; border-left: 5px solid #f39c12; }
-        .sfk-shortcuts { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); max-width: 56rem; border-top: 1px solid #555; border-left: 1px solid #555; }
-        .sfk-shortcut { display: flex; flex-direction: column; align-items: center; gap: .625rem; padding: .875rem .5rem 1.25rem; border-right: 1px solid #555; border-bottom: 1px solid #555; color: var(--kt-blue, #3498db); text-decoration: none; font-size: .9375rem; font-weight: 700; }
+        /* each shortcut its own framed box (the frame covers the shortcuts only), with space between them */
+        .sfk-shortcuts { display: flex; flex-wrap: wrap; gap: .75rem; max-width: 56rem; }
+        .sfk-shortcut { display: flex; flex-direction: column; align-items: center; gap: .625rem; width: 9.5rem; padding: .875rem .5rem 1.25rem; border: 1px solid #555; color: var(--kt-blue, #3498db); text-decoration: none; font-size: .9375rem; font-weight: 700; }
         .sfk-shortcut-tile { display: grid; place-items: center; width: 6.25rem; height: 6.25rem; background: #4ea6dc; color: #fff; font-size: 2.125rem; font-weight: 700; }
         a.sfk-shortcut:hover .sfk-shortcut-tile { background: #3498db; }
         .sfk-shortcut.is-disabled { color: var(--kt-muted, #888); }
@@ -84,7 +85,7 @@
                 <header class="sfk-panel-head">
                     <span class="sfk-panel-icon is-notice" aria-hidden="true"><x-filament::icon icon="heroicon-o-megaphone" /></span>
                     <h2 id="sfk-notice-title" class="sfk-panel-title">お知らせ</h2>
-                    <div class="sfk-panel-tools">{{ $this->editNoticeAction }}</div>
+                    <div class="sfk-panel-tools">@if ($this->editNoticeAction->isVisible()){{ $this->editNoticeAction }}@endif</div>
                 </header>
 
                 <div class="sfk-notice-body">
@@ -97,7 +98,9 @@
                     @if ($shortcuts->isNotEmpty() || $isAdministrator)
                         <h3 class="sfk-section-title">
                             アプリショートカット
-                            {{ $this->editShortcutsAction }}
+                            @if ($this->editShortcutsAction->isVisible())
+                                {{ $this->editShortcutsAction }}
+                            @endif
                         </h3>
 
                         @if ($shortcuts->isEmpty())
@@ -185,7 +188,9 @@
                                         <x-filament::icon icon="heroicon-m-plus" />
                                     </a>
                                 @endif
-                                {{ $this->reorderAppsAction }}
+                                @if ($this->reorderAppsAction->isVisible())
+                                    {{ $this->reorderAppsAction }}
+                                @endif
                             </div>
                         @endif
                     </header>

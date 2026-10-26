@@ -33,6 +33,7 @@ use Modules\Core\Domain\Documents\OutputDelivery;
 use Modules\Core\Domain\Documents\OutputPlacement;
 use Modules\Core\Domain\People\EmploymentStatus;
 use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
+use Modules\Core\Filament\Support\GuardedDelete;
 use Modules\Core\Filament\Support\MenuButtons;
 use Modules\Core\Models\DocumentOutput;
 use Modules\Core\Models\RecordComment;
@@ -362,7 +363,8 @@ abstract class AppViewRecord extends ViewRecord
                     ->icon(Heroicon::OutlinedPrinter)
                     ->url(fn (): string => $resource::getUrl('view', ['record' => $this->record, 'print' => 1]))
                     ->openUrlInNewTab(),
-                DeleteAction::make()
+                // a record still used elsewhere is not deleted (GuardedDelete)
+                GuardedDelete::apply(DeleteAction::make())
                     ->label('削除する')
                     ->record(fn (): Model => $this->record)
                     ->visible(fn (): bool => $resource::canDelete($this->record)),
