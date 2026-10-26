@@ -107,7 +107,7 @@ modules/Sales/
 | Audit trail     | spatie/laravel-activitylog (add `LogsActivity` to business models)                             |
 | Permissions     | spatie/laravel-permission                                                                      |
 | Background work | Laravel queues (Redis) for bulk invoicing, month opening, imports; scheduler for periodic jobs |
-| PDF documents   | Blade HTML templates rendered by Gotenberg (planned Core/Documents service)                    |
+| PDF documents   | 帳票出力 (Core, every app): uploaded PDF forms + fields placed in a designer, FPDF/FPDI renderer — see [documents.md](documents.md) |
 | Locale/time     | `ja`, `Asia/Tokyo` by default                                                                  |
 
 ## 8. Decisions

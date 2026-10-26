@@ -12,6 +12,7 @@ use Filament\Infolists\Components\RepeatableEntry\TableColumn as EntryTableColum
 use Filament\Support\Enums\Size;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Model;
+use WeakMap;
 
 /**
  * A legacy table field (サブテーブル) on a record form or record page: the columns keep their legacy widths (the
@@ -26,6 +27,9 @@ final class RecordTable
 {
     /** Width of the ⊕ / ⊖ column. */
     private const ACTIONS_PX = 64;
+
+    /** @var WeakMap<RepeatableEntry, list<string>>|null column labels of the tables on record pages */
+    private static ?WeakMap $entryLabels = null;
 
     /**
      * @param  list<array{0: string, 1: int}>  $columns  [label, width px] in the order of the repeater's schema
@@ -66,9 +70,22 @@ final class RecordTable
      */
     public static function entry(RepeatableEntry $entry, array $columns): RepeatableEntry
     {
+        self::$entryLabels ??= new WeakMap;
+        self::$entryLabels[$entry] = array_map(fn (array $column): string => $column[0], $columns);
+
         return $entry
             ->table(array_map(fn (array $column): EntryTableColumn => EntryTableColumn::make($column[0])->width($column[1].'px'), $columns))
             ->extraAttributes(['class' => 'kt-subtable', 'style' => '--kt-subtable-width: '.self::width($columns).'px']);
+    }
+
+    /**
+     * The column headers of a table on a record page (entry()), in the order of its schema; empty for other entries.
+     *
+     * @return list<string>
+     */
+    public static function columnLabels(RepeatableEntry $entry): array
+    {
+        return self::$entryLabels[$entry] ?? [];
     }
 
     /**

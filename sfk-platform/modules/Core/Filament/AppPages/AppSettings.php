@@ -9,6 +9,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
 use LogicException;
 use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
+use Modules\Core\Filament\AppPages\Concerns\ManagesDocuments;
 use Modules\Core\Filament\AppResource;
 use Modules\Core\Models\BusinessApp;
 
@@ -16,10 +17,12 @@ use Modules\Core\Models\BusinessApp;
  * アプリの設定 → 設定 of an app (legacy App settings tab, administrators only; register it as the resource's
  * `settings` page): アクセス権 (the app's permissions) and 高度な設定 → その他の設定 with インライン編集, コメント,
  * 「レコードの再利用」, 「変更履歴」 and 一括削除 (all on by default). Changes apply when saved.
+ * The same page holds the tab 帳票出力 (?tab=documents, ManagesDocuments): 帳票テンプレート, their designer and 出力設定.
  */
 abstract class AppSettings extends Page
 {
     use HasAppChrome;
+    use ManagesDocuments;
 
     protected string $view = 'core::filament.app-settings';
 
@@ -64,7 +67,7 @@ abstract class AppSettings extends Page
 
     public function settingsTab(): string
     {
-        return 'settings';
+        return $this->isDocumentsTab() ? 'documents' : 'settings';
     }
 
     public function getTitle(): string

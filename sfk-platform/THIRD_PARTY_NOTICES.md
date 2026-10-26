@@ -35,6 +35,21 @@ SOFTWARE.
 The library's own runtime dependencies (not used here) are Lit (BSD-3-Clause, Google LLC), core-js (MIT) and uuid
 (MIT).
 
+## 帳票出力 (2026-10-26, docs/documents.md)
+
+| Component | License | Where |
+|---|---|---|
+| setasign/fpdf 1.9 (Olivier Plathey, Setasign) | MIT | Composer — PDF writer |
+| setasign/fpdi 2.6 (Setasign GmbH) | MIT | Composer — imports the pages of uploaded PDF forms |
+| pdf.js / pdfjs-dist 4.10.38 (Mozilla) | Apache-2.0 | `public/vendor/pdfjs/` (minified build, CMaps, standard fonts; `LICENSE` alongside) — draws the PDF form in the designer |
+| qpdf (Jay Berkenbilt) | Apache-2.0 | Debian package in `docker/php/Dockerfile`, run as a separate program to rewrite PDFs the reader cannot open |
+
+Design reference only: the PrintCreator customization sample of its vendor (toyokumo on GitHub; MIT, © 2015 Yuichi Ochiai)
+was read for its output workflow (帳票 drop-down + 出力 on the record and list screens, up to 500 records, checked rows).
+No code of it is included.
+
+Japanese text in the generated PDFs uses the standard Japanese CID fonts by name (not embedded): no font file is shipped.
+
 ## Dependency license review (2026-10-22)
 
 PHP (Composer, production — `composer licenses --no-dev`, 118 packages): all permissive.

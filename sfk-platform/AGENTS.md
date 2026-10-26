@@ -97,7 +97,12 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   - related-record sections of a record (e.g. 見積履歴 / 納品履歴 / 請求履歴) stay empty when there are no records —
     never a message such as 「関連するレコードはありません。」;
   - user names in lists and records use `Modules\Core\Filament\Support\UserPopup` (`->html()`, list cells
-    `->disabledClick()`) for the ユーザー情報 popup; 印刷する (print view) needs nothing per app.
+    `->disabledClick()`) for the ユーザー情報 popup; 印刷する (print view) needs nothing per app;
+  - 帳票出力 (PrintCreator replacement, `docs/documents.md`) needs nothing per app: アプリの設定 → 帳票出力 (templates from
+    uploaded PDFs, designer, 出力設定) and the buttons / 上部スペース on the list and record pages come from Core. Its
+    fields are read from the app's record page (infolist), so keep every printable field and table there; tables
+    built with `RecordTable::entry()` give their column headers. Page overrides of `getHeaderActions()` keep the
+    parent's actions (the 帳票 buttons are among them).
 - Never write the word for the old product anywhere; call it 旧システム in the UI and "legacy system" in English.
 - Cite the SYSTEM_BRAIN rule id in tests/docblocks when implementing a rule.
 

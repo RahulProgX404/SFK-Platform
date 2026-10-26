@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Modules\Core\Http\Controllers\DocumentController;
 use Modules\Core\Http\Controllers\LoginController;
 use Modules\Core\Http\Controllers\PasswordController;
 use Modules\Core\Http\Controllers\PortalController;
@@ -26,4 +27,12 @@ Route::middleware('auth')->group(function (): void {
         ->middleware('throttle:10,1')
         ->name('core.password.update');
     Route::post('account/password/keep', [PasswordController::class, 'keep'])->name('core.password.keep');
+});
+
+// 帳票出力 of the apps (PDF files; the app screens put the buttons and settings around them).
+Route::middleware(['auth', EnsurePasswordIsChanged::class])->prefix('documents')->name('core.documents.')->group(function (): void {
+    Route::get('templates/{template}/background', [DocumentController::class, 'background'])->name('background');
+    Route::match(['get', 'post'], 'templates/{template}/preview', [DocumentController::class, 'preview'])->name('preview');
+    Route::get('outputs/{output}/records/{record}', [DocumentController::class, 'record'])->name('record');
+    Route::get('print/{token}', [DocumentController::class, 'batch'])->name('print');
 });

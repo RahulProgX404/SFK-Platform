@@ -1,12 +1,20 @@
 {{--
     アプリの設定 → 設定 (Modules\Core\Filament\AppPages\AppSettings): アクセス権 (アプリ / レコード / フィールド) and 高度な設定 → その他の設定
-    (インライン編集, コメント, 「レコードの再利用」, 「変更履歴」, 一括削除) with 保存.
+    (インライン編集, コメント, 「レコードの再利用」, 「変更履歴」, 一括削除) with 保存; tab 帳票出力 (core::filament.documents.*).
 --}}
 @php
     use Filament\Support\Icons\Heroicon;
 @endphp
 
 <x-filament-panels::page>
+    @if ($this->isDocumentsTab())
+        {{-- 帳票出力: the designer of a template, else the templates and 出力設定 --}}
+        @if ($this->designedTemplate())
+            @include('core::filament.documents.designer')
+        @else
+            @include('core::filament.documents.settings')
+        @endif
+    @else
     <div class="sfk-settings">
         @if ($permissionsUrl = $this->permissionsUrl())
             <section class="sfk-settings-group" aria-labelledby="sfk-settings-permissions">
@@ -63,4 +71,5 @@
             </form>
         </section>
     </div>
+    @endif
 </x-filament-panels::page>

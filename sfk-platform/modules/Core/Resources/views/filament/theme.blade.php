@@ -3167,6 +3167,9 @@
 {{-- SFK UI: the component layer (check box, radio, switch, tooltip, attachment, read-only tables …) --}}
 @include('core::filament.ui')
 
+{{-- 帳票出力: settings, designer and the 上部スペース bar --}}
+@include('core::filament.documents.styles')
+
 <script>
     // Date / time inputs: a click anywhere in the field opens the browser's picker of its type (not only the icon).
     // One listener on the document, so fields added or redrawn by Livewire work too.

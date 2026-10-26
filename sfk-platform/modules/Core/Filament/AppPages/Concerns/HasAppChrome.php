@@ -65,7 +65,7 @@ trait HasAppChrome
 
     /**
      * ▾ next to the gear (legacy shortcuts of アプリの設定, administrators): この一覧の設定を開く (a stored view of the
-     * list), 一覧, 設定, アクセス権 and その他の設定.
+     * list), 一覧, 設定, アクセス権, その他の設定 and 帳票出力.
      *
      * @return list<array{label: string, url: string}>
      */
@@ -92,6 +92,7 @@ trait HasAppChrome
         }
         if ($resource::hasPage('settings')) {
             $menu[] = ['label' => 'その他の設定', 'url' => $resource::getUrl('settings').'#misc'];
+            $menu[] = ['label' => '帳票出力', 'url' => $resource::getUrl('settings', ['tab' => 'documents'])];
         }
 
         return $menu;
@@ -107,6 +108,8 @@ trait HasAppChrome
         }
         if ($resource::hasPage('settings')) {
             $tabs['settings'] = ['設定', $resource::getUrl('settings')];
+            // 帳票出力 (AppSettings, ManagesDocuments)
+            $tabs['documents'] = ['帳票出力', $resource::getUrl('settings', ['tab' => 'documents'])];
         }
 
         return $tabs;

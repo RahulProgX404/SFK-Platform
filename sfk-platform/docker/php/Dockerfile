@@ -4,9 +4,10 @@ FROM php:8.4-fpm-bookworm
 ARG UID=1000
 ARG GID=1000
 
+# qpdf (Apache-2.0): rewrites uploaded 帳票 background PDFs into a form the PDF reader of the renderer understands.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        git unzip libpq-dev libicu-dev libzip-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev \
+        git unzip libpq-dev libicu-dev libzip-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev qpdf \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j"$(nproc)" pdo_pgsql intl bcmath zip gd opcache pcntl exif \
     && pecl install redis \

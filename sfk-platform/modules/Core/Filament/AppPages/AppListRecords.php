@@ -7,6 +7,7 @@ namespace Modules\Core\Filament\AppPages;
 use App\Models\User;
 use BackedEnum;
 use Carbon\CarbonImmutable;
+use Closure;
 use DateTimeInterface;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -25,12 +26,16 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema as DatabaseSchema;
+use Illuminate\Support\Js;
 use Livewire\Attributes\Session;
 use Livewire\Attributes\Url;
 use Livewire\Livewire;
 use Modules\Core\Access\FieldAccess;
+use Modules\Core\Application\Documents\AppDocuments;
+use Modules\Core\Application\Documents\PrintJobs;
 use Modules\Core\Application\Filters\FilterField;
 use Modules\Core\Application\Filters\RecordFilterQuery;
 use Modules\Core\Application\History\HasRecordHistory;
@@ -40,11 +45,15 @@ use Modules\Core\Application\Views\ListViewInvalid;
 use Modules\Core\Application\Views\ListViewSchema;
 use Modules\Core\Application\Views\ListViewService;
 use Modules\Core\Domain\Apps\FieldAccessLevel;
+use Modules\Core\Domain\Documents\OutputDelivery;
+use Modules\Core\Domain\Documents\OutputMode;
+use Modules\Core\Domain\Documents\OutputPlacement;
 use Modules\Core\Domain\Filters\FilterFieldType;
 use Modules\Core\Domain\Filters\RecordFilter;
 use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
 use Modules\Core\Filament\Support\MenuButtons;
 use Modules\Core\Filament\Tables\InlineField;
+use Modules\Core\Models\DocumentOutput;
 
 /**
  * Record list of an app, in the legacy layout: app frame; the 一覧 dropdown (the app's views from アプリの設定 → 一覧,
@@ -324,6 +333,11 @@ abstract class AppListRecords extends ListRecords
             if (! $column->isSortable() && in_array($column->getName(), $fields, true)) {
                 $column->sortable();
             }
+        }
+
+        // 帳票出力 for the checked rows needs the check boxes
+        if ($this->documentOutputsAt(OutputPlacement::ListChecked) !== []) {
+            $table->selectable();
         }
 
         return $table
@@ -607,7 +621,7 @@ abstract class AppListRecords extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            ...array_map(MenuButtons::mark(...), $this->menuActions()),
+            ...array_map(MenuButtons::mark(...), [...$this->menuActions(), ...$this->documentActions()]),
             ActionGroup::make([
                 ...$this->optionActions(),
                 Action::make('bulkDelete')
@@ -692,6 +706,127 @@ abstract class AppListRecords extends ListRecords
 
                 $schema?->fill();
             });
+    }
+
+    /**
+     * 帳票出力 (アプリの設定 → 帳票出力): a button per 出力設定 of 一覧画面のメニュー — for the records of the list as
+     * filtered and searched (asking 「N件のレコードを出力しますか？」), or for the checked rows.
+     *
+     * @return list<Action>
+     */
+    private function documentActions(): array
+    {
+        $actions = [];
+        foreach ($this->documentOutputsAt(OutputPlacement::ListMenu) as $output) {
+            $actions[] = $this->listedDocumentAction(Action::make('documentList'.$output->id), fn (): DocumentOutput => $output)
+                ->label($output->name);
+        }
+        foreach ($this->documentOutputsAt(OutputPlacement::ListChecked) as $output) {
+            $actions[] = MenuButtons::withCheckedCount(self::onCheckedRows(
+                Action::make('documentChecked'.$output->id)
+                    ->label($output->name)
+                    ->icon(Heroicon::OutlinedPrinter)
+                    ->action(function (Collection $records) use ($output): void {
+                        if ($records->count() > DocumentOutput::MAX_RECORDS) {
+                            Notification::make()->danger()->title(DocumentOutput::MAX_RECORDS.'件以下になるようにレコードを選択してください。')->send();
+
+                            return;
+                        }
+
+                        $this->openDocuments($output, $records->map(fn (Model $record): int|string => $record->getKey())->values()->all());
+                    }),
+            ));
+        }
+
+        return $actions;
+    }
+
+    /** 一覧画面の上部スペース: 出力 of the 帳票 chosen in the drop-down (core::filament.documents.bar; arguments: output). */
+    public function printDocumentsAction(): Action
+    {
+        return $this->listedDocumentAction(
+            Action::make('printDocuments'),
+            fn (array $arguments): ?DocumentOutput => collect($this->documentOutputsAt(OutputPlacement::ListSpace))
+                ->firstWhere('id', (int) ($arguments['output'] ?? 0)),
+        );
+    }
+
+    /**
+     * 一覧画面の上部スペース: the 出力設定 offered in the 帳票 drop-down + 出力 under the toolbar.
+     *
+     * @return list<array{key: string, name: string}>
+     */
+    public function documentBar(): array
+    {
+        return array_map(
+            fn (DocumentOutput $output): array => ['key' => (string) $output->id, 'name' => $output->name],
+            $this->documentOutputsAt(OutputPlacement::ListSpace),
+        );
+    }
+
+    /** @return list<DocumentOutput> the 出力設定 the user gets at the place */
+    private function documentOutputsAt(OutputPlacement $placement): array
+    {
+        $user = auth()->user();
+
+        return AppDocuments::at($this->appResource()::app(), $user instanceof User ? $user : null, $placement);
+    }
+
+    /**
+     * A 出力 of the listed records: asks 「N件のレコードを出力しますか？」 (nothing listed, or more than the limit: a
+     * message instead), then opens the 帳票.
+     *
+     * @param  Closure(array<string, mixed>): ?DocumentOutput  $output
+     */
+    private function listedDocumentAction(Action $action, Closure $output): Action
+    {
+        return $action
+            ->icon(Heroicon::OutlinedPrinter)
+            ->modalIcon(Heroicon::OutlinedPrinter)
+            ->modalWidth('md')
+            ->modalHeading(fn (): string => number_format($this->getFilteredTableQuery()?->count() ?? 0).'件のレコードを出力しますか？')
+            ->modalSubmitActionLabel('出力する')
+            ->modalCancelActionLabel('キャンセル')
+            ->mountUsing(function (array $arguments) use ($output): void {
+                $count = $output($arguments) === null ? 0 : ($this->getFilteredTableQuery()?->count() ?? 0);
+                if ($count === 0) {
+                    Notification::make()->warning()->title('出力するレコードがありません。')->send();
+
+                    throw new Cancel;
+                }
+                if ($count > DocumentOutput::MAX_RECORDS) {
+                    Notification::make()->danger()->title(DocumentOutput::MAX_RECORDS.'件以下になるように絞り込んでください。')->send();
+
+                    throw new Cancel;
+                }
+            })
+            ->action(function (array $arguments) use ($output): void {
+                $document = $output($arguments);
+                $query = $this->getFilteredSortedTableQuery();
+                if ($document === null || $query === null) {
+                    return;
+                }
+
+                $this->openDocuments($document, $query->limit(DocumentOutput::MAX_RECORDS)->pluck($query->getModel()->getQualifiedKeyName())->all());
+            });
+    }
+
+    /**
+     * Keeps the records for the 出力設定 (PrintJobs) and opens their 帳票 in a new tab, or downloads it.
+     *
+     * @param  list<int|string>  $keys
+     */
+    private function openDocuments(DocumentOutput $output, array $keys): void
+    {
+        $user = auth()->user();
+        if (! $user instanceof User) {
+            return;
+        }
+
+        $url = route('core.documents.print', ['token' => app(PrintJobs::class)->store($user->id, $output->id, $keys)]);
+        $opens = $output->delivery === OutputDelivery::Open && $output->mode === OutputMode::Merged;
+
+        $this->js($opens ? 'window.open('.Js::from($url).', "_blank")' : 'window.location.href = '.Js::from($url));
     }
 
     /**

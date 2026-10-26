@@ -160,4 +160,16 @@ final class BusinessApp extends Model
     {
         return $this->hasMany(AppListView::class)->orderBy('sort_order')->orderBy('id');
     }
+
+    /** @return HasMany<DocumentTemplate, $this> 帳票出力: the app's 帳票テンプレート, by name */
+    public function documentTemplates(): HasMany
+    {
+        return $this->hasMany(DocumentTemplate::class)->orderBy('name')->orderBy('id');
+    }
+
+    /** @return HasMany<DocumentOutput, $this> 帳票出力: the app's 出力設定, in button order */
+    public function documentOutputs(): HasMany
+    {
+        return $this->hasMany(DocumentOutput::class)->orderBy('sort_order')->orderBy('id');
+    }
 }

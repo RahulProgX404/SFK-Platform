@@ -16,7 +16,7 @@ Replacement for SFK's legacy system, built as a **modular monolith** on Laravel 
 | Database                | PostgreSQL 17 (SQLite works for a quick local look and the test suite)   |
 | Queue / cache / session | Redis                                                                    |
 | Permissions / audit     | spatie/laravel-permission 8, spatie/laravel-activitylog 5                |
-| PDF                     | Gotenberg (HTML → PDF, Japanese fonts)                                   |
+| PDF                     | 帳票出力: FPDF + FPDI over uploaded PDF forms (docs/documents.md); Gotenberg for HTML → PDF |
 | Quality                 | Pest 4, Larastan 3 (level 6), Pint, GitHub Actions (SQLite + PostgreSQL) |
 
 ## Quick start

@@ -141,6 +141,11 @@
         @endif
     </div>
 
+    {{-- 帳票出力 in the 上部スペース --}}
+    @if (in_array($kind, ['list', 'view'], true) && method_exists($page, 'documentBar') && ($documentBar = $page->documentBar()) !== [])
+        @include('core::filament.documents.bar', ['bar' => $documentBar, 'kind' => $kind])
+    @endif
+
     @if ($menuHelp)
         @include('core::filament.app-menu-help', ['help' => $menuHelp, 'key' => 'sfk-app-help:'.$page::class])
     @endif

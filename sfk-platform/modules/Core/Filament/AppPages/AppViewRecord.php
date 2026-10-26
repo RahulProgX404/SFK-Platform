@@ -26,11 +26,15 @@ use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Url;
 use Modules\Core\Application\Comments\HasRecordComments;
 use Modules\Core\Application\Comments\RecordComments;
+use Modules\Core\Application\Documents\AppDocuments;
 use Modules\Core\Application\History\HasRecordHistory;
 use Modules\Core\Application\History\RecordHistory;
+use Modules\Core\Domain\Documents\OutputDelivery;
+use Modules\Core\Domain\Documents\OutputPlacement;
 use Modules\Core\Domain\People\EmploymentStatus;
 use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
 use Modules\Core\Filament\Support\MenuButtons;
+use Modules\Core\Models\DocumentOutput;
 use Modules\Core\Models\RecordComment;
 use Modules\Core\Models\RecordVersion;
 
@@ -333,8 +337,11 @@ abstract class AppViewRecord extends ViewRecord
         $resource = static::getResource();
 
         return [
-            // the app's legacy record buttons, not on an old version of the record
-            ...array_map(fn (Action $action): Action => MenuButtons::mark($action)->hidden(fn (): bool => $this->historyVersion !== null), $this->menuActions()),
+            // the app's legacy record buttons and its 帳票出力 buttons, not on an old version of the record
+            ...array_map(fn (Action $action): Action => MenuButtons::mark($action)->hidden(fn (): bool => $this->historyVersion !== null), [
+                ...$this->menuActions(),
+                ...$this->documentActions(),
+            ]),
             EditAction::make()
                 ->label('レコードを編集する')
                 ->icon(Heroicon::OutlinedPencil)
@@ -376,6 +383,47 @@ abstract class AppViewRecord extends ViewRecord
     protected function menuActions(): array
     {
         return [];
+    }
+
+    /**
+     * 帳票出力 (アプリの設定 → 帳票出力): a button per 出力設定 shown in レコード詳細画面のメニュー, putting out this record
+     * (a new tab, or a download).
+     *
+     * @return list<Action>
+     */
+    private function documentActions(): array
+    {
+        $user = auth()->user();
+
+        return array_map(
+            fn (DocumentOutput $output): Action => Action::make('document'.$output->id)
+                ->label($output->name)
+                ->icon(Heroicon::OutlinedPrinter)
+                ->url(fn (): string => route('core.documents.record', ['output' => $output, 'record' => $this->record->getKey()]))
+                ->openUrlInNewTab($output->delivery === OutputDelivery::Open),
+            AppDocuments::at($this->appResource()::app(), $user instanceof User ? $user : null, OutputPlacement::RecordMenu),
+        );
+    }
+
+    /**
+     * レコード詳細画面の上部スペース: the 出力設定 offered in the 帳票 drop-down + 出力 under the toolbar
+     * (core::filament.documents.bar), with the file of this record.
+     *
+     * @return list<array{key: string, name: string, url: string, newTab: bool}>
+     */
+    public function documentBar(): array
+    {
+        $user = auth()->user();
+        if ($this->printMode || $this->historyVersion !== null) {
+            return [];
+        }
+
+        return array_map(fn (DocumentOutput $output): array => [
+            'key' => (string) $output->id,
+            'name' => $output->name,
+            'url' => route('core.documents.record', ['output' => $output, 'record' => $this->record->getKey()]),
+            'newTab' => $output->delivery === OutputDelivery::Open,
+        ], AppDocuments::at($this->appResource()::app(), $user instanceof User ? $user : null, OutputPlacement::RecordSpace));
     }
 
     /**
