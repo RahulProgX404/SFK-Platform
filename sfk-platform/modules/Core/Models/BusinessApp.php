@@ -9,8 +9,10 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Modules\Core\Domain\Apps\AppStatus;
+use WeakMap;
 
 /**
  * アプリ: one feature of the system (e.g. 01. 取引先マスタ, 04. 受注入力 — SYSTEM_BRAIN 03_APPS). Created by a
@@ -51,6 +53,46 @@ final class BusinessApp extends Model
         'bulk_delete_enabled' => true,
     ];
 
+    /** @var WeakMap<Request, array<string, self>>|null code => registry row, per request */
+    private static ?WeakMap $perRequest = null;
+
+    /**
+     * The registry row of an app (with its spaces), null while it is not registered. The registry is read once per
+     * request: screens ask for apps many times per page (sidebar entries, list columns, field access). Saving an app
+     * or a space drops the memo.
+     */
+    public static function forCode(string $code): ?self
+    {
+        self::$perRequest ??= new WeakMap;
+        $request = request();
+        $cached = self::$perRequest[$request] ?? [];
+
+        if ($cached === []) {
+            // the registry is small: one read serves every app on the page (e.g. the whole sidebar)
+            foreach (self::query()->with('spaces')->get() as $app) {
+                $cached[$app->code] = $app;
+            }
+            self::$perRequest[$request] = $cached;
+        }
+
+        return $cached[$code] ?? null;
+    }
+
+    public static function forgetCached(): void
+    {
+        self::$perRequest = null;
+    }
+
+    protected static function booted(): void
+    {
+        self::saved(function (): void {
+            self::forgetCached();
+        });
+        self::deleted(function (): void {
+            self::forgetCached();
+        });
+    }
+
     protected function casts(): array
     {
         return [
@@ -90,7 +132,7 @@ final class BusinessApp extends Model
     public function spaceOn(string $panelId, ?User $user): ?Space
     {
         $spaces = $this->spaces->where('panel_id', $panelId)->values();
-        $member = $user === null ? null : $spaces->first(fn (Space $space): bool => $space->users()->whereKey($user->id)->exists());
+        $member = $user === null ? null : $spaces->first(fn (Space $space): bool => $space->hasMember($user));
 
         return $member ?? $spaces->first();
     }

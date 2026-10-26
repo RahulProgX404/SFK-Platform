@@ -47,7 +47,7 @@ final class AppAccess
         $key = $user->id.':'.$appCode;
 
         if (! array_key_exists($key, $cached)) {
-            $app = BusinessApp::query()->with('spaces')->where('code', $appCode)->first();
+            $app = BusinessApp::forCode($appCode);
             $cached[$key] = self::abilitiesFor($user, $app);
             self::$perRequest[$request] = $cached;
         }
@@ -97,7 +97,7 @@ final class AppAccess
         }
 
         $member = $app->spaces->contains(fn (Space $space): bool => DashboardAccess::allows($user, $space->panel_id)
-            && $space->users()->whereKey($user->id)->exists());
+            && $space->hasMember($user));
 
         if (! $member) {
             return [];

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Modules\ModuleServiceProvider;
 use Filament\Auth\Http\Responses\Contracts\LogoutResponse;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Select;
 use Filament\Navigation\NavigationItem;
 use Filament\Notifications\Livewire\Notifications;
 use Filament\Notifications\View\NotificationsIconAlias;
@@ -75,6 +76,9 @@ final class CoreServiceProvider extends ModuleServiceProvider
             NotificationsIconAlias::NOTIFICATION_WARNING => Heroicon::ExclamationTriangle,
             NotificationsIconAlias::NOTIFICATION_DANGER => Heroicon::XCircle,
         ]);
+
+        // Drop-downs search shortly after typing stops (Filament waits a full second).
+        Select::configureUsing(fn (Select $select): Select => $select->searchDebounce(300));
     }
 
     private static function dashboardSwitcher(string $place): string

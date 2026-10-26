@@ -25,6 +25,8 @@
         <!-- Docker injects .env as real environment variables (read by Laravel from $_SERVER first);
              force both env and server values so tests never touch the development database. -->
         <env name="APP_ENV" value="testing" force="true"/>
+        <!-- never the route cache of the development container (docker-compose.yml): tests register their own routes -->
+        <env name="APP_ROUTES_CACHE" value="bootstrap/cache/routes-testing.php" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
         <env name="BCRYPT_ROUNDS" value="4" force="true"/>
         <env name="BROADCAST_CONNECTION" value="null" force="true"/>
@@ -39,6 +41,7 @@
         <env name="TELESCOPE_ENABLED" value="false" force="true"/>
         <env name="NIGHTWATCH_ENABLED" value="false" force="true"/>
         <server name="APP_ENV" value="testing" force="true"/>
+        <server name="APP_ROUTES_CACHE" value="bootstrap/cache/routes-testing.php" force="true"/>
         <server name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
         <server name="BCRYPT_ROUNDS" value="4" force="true"/>
         <server name="BROADCAST_CONNECTION" value="null" force="true"/>

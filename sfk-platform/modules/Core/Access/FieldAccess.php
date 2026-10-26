@@ -71,7 +71,7 @@ final class FieldAccess
         $user = auth()->user();
         $page = Livewire::current();
         // outside a Livewire component current() is false
-        if (! $user instanceof User || ! is_object($page) || ! method_exists($page, 'getResource')) {
+        if (! $user instanceof User || $user->user_type->isAdministrator() || ! is_object($page) || ! method_exists($page, 'getResource')) {
             return [];
         }
 

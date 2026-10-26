@@ -121,7 +121,7 @@ abstract class AppResource extends Resource
     /** The registry row of this app (null while not registered yet). */
     public static function app(): ?BusinessApp
     {
-        return BusinessApp::query()->with('spaces')->where('code', static::appCode())->first();
+        return BusinessApp::forCode(static::appCode());
     }
 
     public static function appCan(AppAbility $ability): bool

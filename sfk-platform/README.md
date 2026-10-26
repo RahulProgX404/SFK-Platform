@@ -35,6 +35,11 @@ Open http://localhost:8080 → sign in → the dashboard selection portal (`/por
 and the platform settings (`/settings`: users, 従業員カテゴリ, 役職). Mail: http://localhost:8025.
 After changing `SUPER_ADMIN_*` in `.env`, run `php artisan core:super-admin` to apply it.
 
+Speed: the app container does not check the source files on each request (slow through the Windows/macOS file
+sharing). Its watcher (`docker/php/dev-watch.sh`, see `docker compose logs app`) reloads PHP a few seconds after an
+edit and keeps the route / Filament component caches and the class map current. Should an edit not show up,
+`docker compose restart app`.
+
 ### B. Without Docker (Laravel Herd / local PHP)
 
 The host PHP needs `pdo_pgsql` for PostgreSQL; otherwise use SQLite for a quick look:

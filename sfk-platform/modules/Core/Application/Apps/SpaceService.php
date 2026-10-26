@@ -30,6 +30,7 @@ final class SpaceService
 
             $space->users()->sync(array_map('intval', $data['user_ids'] ?? []));
             $this->syncApps($space, array_map('intval', $data['app_ids'] ?? []));
+            Space::forgetCached();
 
             return $space;
         });

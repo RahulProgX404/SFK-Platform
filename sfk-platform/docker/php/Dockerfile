@@ -15,6 +15,7 @@ RUN apt-get update \
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 COPY docker/php/php.ini /usr/local/etc/php/conf.d/zz-platform.ini
+COPY docker/php/php-fpm.conf /usr/local/etc/php-fpm.d/zz-platform.conf
 
 # The vendor directory is the mount point of the `vendor` volume (docker-compose.yml); owned by www-data so
 # composer can write it.
