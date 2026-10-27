@@ -54,8 +54,9 @@ final class InvoiceIssuer
 
     /**
      * 【新】選択して請求書レコード作成 (06_SalesEntry.bundle.js): every sale must be on a delivery note and none 随時請求;
-     * per customer, the sales go on the invoice one of them is already on (the rows missing there added at the end), else
-     * on a new invoice as issue() makes it (CustomerDocuments).
+     * per customer, the sales go on the invoice one of them is already on (the rows missing there added at the end, the rows
+     * there written again where they differ from the sale, and its 21. 売入金管理 record following), else on a new invoice
+     * as issue() makes it (CustomerDocuments).
      *
      * @param  iterable<Sale>  $sales
      * @return list<Invoice> the invoices created or added to
@@ -94,11 +95,11 @@ final class InvoiceIssuer
                 ], withBalances: true);
             }
 
-            $sort = (int) $invoice->lines()->max('sort');
-            foreach (CustomerDocuments::missingRows($invoice, $group['sales']) as $sale) {
-                $invoice->lines()->create([...DeliveryNoteIssuer::lineOf($sale), 'slip_number' => $sale->deliveryNote?->number, 'sort' => ++$sort]);
+            $synced = CustomerDocuments::syncRows($invoice, $group['sales'],
+                fn (Sale $sale): array => [...DeliveryNoteIssuer::lineOf($sale), 'slip_number' => $sale->deliveryNote?->number]);
+            if ($synced['updated'] + $synced['appended'] > 0) {
+                SaleDocumentRefresh::refreshReceipt($invoice);
             }
-            $invoice->refreshTotals();
             Sale::query()->whereKey($group['sales']->pluck('id')->all())->update(['invoice_id' => $invoice->id]);
 
             return $invoice;

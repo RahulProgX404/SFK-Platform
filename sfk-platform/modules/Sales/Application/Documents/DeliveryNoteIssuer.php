@@ -48,7 +48,8 @@ final class DeliveryNoteIssuer
 
     /**
      * 【新】選択して納品書レコード作成 (06_SalesEntry.bundle.js): per customer, the sales go on the note one of them is
-     * already on (the rows missing there added at the end), else on a new note (CustomerDocuments).
+     * already on (the rows missing there added at the end, the rows there written again where they differ from the sale),
+     * else on a new note (CustomerDocuments).
      *
      * @param  iterable<Sale>  $sales
      * @return list<DeliveryNote> the notes created or added to
@@ -68,11 +69,7 @@ final class DeliveryNoteIssuer
                 return $this->issueFor($group['sales']);
             }
 
-            $sort = (int) $note->lines()->max('sort');
-            foreach (CustomerDocuments::missingRows($note, $group['sales']) as $sale) {
-                $note->lines()->create([...self::lineOf($sale), 'sort' => ++$sort]);
-            }
-            $note->refreshTotals();
+            CustomerDocuments::syncRows($note, $group['sales'], self::lineOf(...));
             Sale::query()->whereKey($group['sales']->pluck('id')->all())->update(['delivery_note_id' => $note->id]);
 
             return $note;

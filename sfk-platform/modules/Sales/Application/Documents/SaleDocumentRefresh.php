@@ -77,14 +77,14 @@ final class SaleDocumentRefresh
                 $invoice->forceFill(['previous_amount' => $balance->previous_balance ?? 0, 'received_amount' => $balance->received ?? 0])->save();
             }
             $invoice->refreshTotals();
-            $this->refreshReceipt($invoice->fresh() ?? $invoice);
+            self::refreshReceipt($invoice->fresh() ?? $invoice);
 
             return self::UPDATED;
         });
     }
 
     /** 21. 売入金管理: the invoice's 請求日 / 請求金額 / 今回締日 copied again. */
-    private function refreshReceipt(Invoice $invoice): void
+    public static function refreshReceipt(Invoice $invoice): void
     {
         $receipt = Receipt::query()->where('invoice_id', $invoice->id)->first();
         if ($receipt === null) {

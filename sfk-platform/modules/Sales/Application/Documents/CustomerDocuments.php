@@ -12,7 +12,8 @@ use Modules\Sales\Models\Sale;
 
 /**
  * The selected sales of the 【新】 buttons of 06_SalesEntry.bundle.js by customer, each customer's sales with the
- * document (納品書 / 請求書) one of them is already on: the rest of them are added to it. Refused, as in the legacy script:
+ * document (納品書 / 請求書) one of them is already on: the rest of them are added to it, the rows of those already on it
+ * written again from the sales (syncRows()). Refused, as in the legacy script:
  * a customer's sales on different documents, and one document for several customers.
  */
 final class CustomerDocuments
@@ -56,15 +57,36 @@ final class CustomerDocuments
     }
 
     /**
-     * The sales of the group not yet a row of the document.
+     * The group's sales onto the document (syncInvoiceRows of 06_SalesEntry): a sale's row already there is written again
+     * from the sale where any column differs — it keeps its id and place, rows of other sales and rows typed by hand stay as
+     * they are — and the sales not yet on it are added at the end. Nothing is saved when nothing differs or is new.
      *
      * @param  Collection<int, Sale>  $sales
-     * @return Collection<int, Sale>
+     * @param  callable(Sale): array<string, mixed>  $rowOf
+     * @return array{updated: int, appended: int}
      */
-    public static function missingRows(DeliveryNote|Invoice $document, Collection $sales): Collection
+    public static function syncRows(DeliveryNote|Invoice $document, Collection $sales, callable $rowOf): array
     {
-        $onDocument = $document->lines()->pluck('sale_id')->filter()->map(fn (mixed $id): int => (int) $id)->all();
+        $rows = $document->lines()->whereIn('sale_id', $sales->modelKeys())->get()->keyBy('sale_id');
+        $sort = (int) $document->lines()->max('sort');
+        $updated = 0;
+        $appended = 0;
 
-        return $sales->reject(fn (Sale $sale): bool => in_array($sale->id, $onDocument, true))->values();
+        foreach ($sales as $sale) {
+            $row = $rows->get($sale->id);
+            if ($row === null) {
+                $document->lines()->create([...$rowOf($sale), 'sort' => ++$sort]);
+                $appended++;
+            } elseif ($row->fill($rowOf($sale))->isDirty()) {
+                $row->save();
+                $updated++;
+            }
+        }
+
+        if ($updated + $appended > 0) {
+            $document->refreshTotals();
+        }
+
+        return ['updated' => $updated, 'appended' => $appended];
     }
 }

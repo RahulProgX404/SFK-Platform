@@ -532,6 +532,51 @@ it('asks what to do with sales already on a 納品書 / 請求書: refuse, or ad
         ->and($second->fresh()->invoice_id)->toBe($invoice->id);
 });
 
+it('writes the rows of sales already on the 納品書 / 請求書 again from the sales when they are added again (syncInvoiceRows of 06_SalesEntry)', function () {
+    $this->actingAs($this->admin);
+    $first = screenSale($this->customer);
+    $second = screenSale($this->customer, ['delivery_due_on' => '2026-10-08', 'product_name' => '角2封筒']);
+    $note = app(DeliveryNoteIssuer::class)->issue([$first, $second])[0];
+    $invoice = app(InvoiceIssuer::class)->issue([$first->fresh(), $second->fresh()], CarbonImmutable::parse('2026-10-20'))[0];
+    $typed = $invoice->lines()->create(['product_name' => '値引', 'amount' => -500, 'tax_rate' => $invoice->lines()->value('tax_rate'), 'sort' => 9]);
+    $rows = fn (DeliveryNote|Invoice $document): array => $document->lines()->orderBy('sort')->get(['id', 'product_name', 'unit_price', 'amount'])
+        ->map(fn ($row): array => [$row->id, $row->product_name, $row->unit_price, $row->amount])->all();
+    $noteRows = $rows($note);
+    $invoiceRows = $rows($invoice);
+
+    // nothing differs: nothing written
+    $this->travel(1)->minutes();
+    Livewire::test(ListSales::class)
+        ->set('selectedTableRecords', [(string) $first->id, (string) $second->id])
+        ->callAction('createDeliveryNotes', data: ['existing' => 'append'])
+        ->assertNotified('納品書レコードの作成が完了しました（1件）');
+    Livewire::test(ListSales::class)
+        ->set('selectedTableRecords', [(string) $first->id, (string) $second->id])
+        ->callAction('createInvoices', data: ['existing' => 'append'])
+        ->assertNotified('請求書レコードの作成が完了しました（1件）');
+    expect($rows($note))->toBe($noteRows)->and($rows($invoice))->toBe($invoiceRows)
+        ->and($note->lines()->max('updated_at'))->toBe($note->lines()->min('updated_at'));
+
+    // the second sale changed (単価 filled in later): its rows are written again in place, the totals and 21 follow
+    $second->fresh()->forceFill(['product_name' => '角2封筒（白）', 'unit_price' => '12', 'amount' => 12000])->save();
+    Livewire::test(ListSales::class)
+        ->set('selectedTableRecords', [(string) $second->id])
+        ->callAction('createDeliveryNotes', data: ['existing' => 'append'])
+        ->assertNotified('納品書レコードの作成が完了しました（1件）');
+    Livewire::test(ListSales::class)
+        ->set('selectedTableRecords', [(string) $second->id])
+        ->callAction('createInvoices', data: ['existing' => 'append'])
+        ->assertNotified('請求書レコードの作成が完了しました（1件）');
+
+    expect(DeliveryNote::query()->count())->toBe(1)->and(Invoice::query()->count())->toBe(1)
+        ->and($rows($note))->toBe([$noteRows[0], [$noteRows[1][0], '角2封筒（白）', '12.0000', 12000]])
+        ->and($rows($invoice))->toBe([$invoiceRows[0], [$invoiceRows[1][0], '角2封筒（白）', '12.0000', 12000], $invoiceRows[2]])
+        ->and($typed->fresh()->product_name)->toBe('値引')
+        ->and($note->fresh()->subtotal)->toBe(22000)
+        ->and($invoice->fresh()->subtotal)->toBe(21500)
+        ->and($invoice->receipt->fresh()->billed_amount)->toBe($invoice->fresh()->purchaseTotal());
+});
+
 it('deletes sales like the legacy 削除 (06_SalesEntry.bundle.js) through 選択したレコードを削除 and 削除する, warning of the notes and invoices', function () {
     $this->actingAs($this->admin); // the default view lists the sales one created
     $sale = screenSale($this->customer);

@@ -941,6 +941,7 @@
         display: block;
     }
 
+
     .sfk-delete-impact {
         display: block;
         margin-top: .75rem;
