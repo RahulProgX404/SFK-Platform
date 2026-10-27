@@ -12,6 +12,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
 use Modules\Core\Application\Filters\FilterField;
+use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Domain\Filters\FilterCondition;
 use Modules\Core\Domain\Filters\FilterOperator;
@@ -375,7 +376,7 @@ final class OrdersTable
             // 得意先(受注先): searchable by name; 昇順 by name
             $name === 'customer_id' => $column
                 ->state(fn (Order $record): ?string => $record->customer?->name)
-                ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHas('customer', fn (Builder $q) => $q->whereLike('name', "%{$search}%")))
+                ->searchable(query: SearchQuery::through('customer', 'name'))
                 ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy(
                     Partner::query()->select('name')->whereColumn('partners.id', 'orders.customer_id')->limit(1),
                     $direction,

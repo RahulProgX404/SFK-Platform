@@ -9,6 +9,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Application\Filters\FilterField;
+use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\Support\AppFormat;
@@ -118,8 +119,8 @@ final class PaymentsTable
                     ->all())
                 ->listWithLineBreaks()
                 ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHas('lines', fn (Builder $q): Builder => $q
-                    ->whereLike('notes', "%{$search}%")
-                    ->orWhereHas('supplier', fn (Builder $s): Builder => $s->whereLike('name', "%{$search}%"))))
+                    ->where(fn (Builder $q) => SearchQuery::where($q, 'payment_lines.notes', $search))
+                    ->orWhereHas('supplier', fn (Builder $s) => SearchQuery::where($s, 'partners.name', $search))))
                 // by the 仕入先 of the first row
                 ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy(
                     Partner::query()->select('partners.name')->join('payment_lines', 'payment_lines.supplier_id', '=', 'partners.id')

@@ -32,6 +32,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema as DatabaseSchema;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Js;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Session;
 use Livewire\Attributes\Url;
 use Livewire\Livewire;
@@ -43,6 +44,7 @@ use Modules\Core\Application\Filters\RecordFilterQuery;
 use Modules\Core\Application\History\HasRecordHistory;
 use Modules\Core\Application\History\RecordHistory;
 use Modules\Core\Application\Records\RecordDeletion;
+use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Application\Views\ListViewInvalid;
 use Modules\Core\Application\Views\ListViewSchema;
@@ -51,9 +53,13 @@ use Modules\Core\Domain\Apps\FieldAccessLevel;
 use Modules\Core\Domain\Documents\OutputDelivery;
 use Modules\Core\Domain\Documents\OutputMode;
 use Modules\Core\Domain\Documents\OutputPlacement;
+use Modules\Core\Domain\Filters\FilterCondition;
 use Modules\Core\Domain\Filters\FilterFieldType;
+use Modules\Core\Domain\Filters\FilterOperator;
 use Modules\Core\Domain\Filters\RecordFilter;
+use Modules\Core\Domain\Search\SearchText;
 use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
+use Modules\Core\Filament\Support\DeleteImpact;
 use Modules\Core\Filament\Support\MenuButtons;
 use Modules\Core\Filament\Tables\InlineField;
 use Modules\Core\Models\DocumentOutput;
@@ -98,6 +104,16 @@ abstract class AppListRecords extends ListRecords
     /** @var array<string, mixed>|null 適用 conditions (RecordFilter::toArray()); null = those of the view */
     #[Session]
     public ?array $appFilter = null;
+
+    /**
+     * 検索: the one column searched (the icon right of the search box); null = the app's searchable columns. Kept for
+     * the signed-in user until they log out (searchColumns()), so another user starts from the default.
+     */
+    #[Locked]
+    public ?string $searchColumn = null;
+
+    /** Session key of the chosen search columns: user id => list page => column (cleared at login and logout). */
+    public const SEARCH_COLUMNS_SESSION = 'sfk_search_columns';
 
     /** インライン編集: key of the row being edited */
     public ?string $inlineRecordKey = null;
@@ -308,6 +324,8 @@ abstract class AppListRecords extends ListRecords
         if (! array_key_exists($this->listView, $this->allListViews())) {
             $this->listView = $this->listViews()[0]->key;
         }
+
+        $this->searchColumn = self::searchColumns()[static::class] ?? null;
     }
 
     public function updatedListView(): void
@@ -346,7 +364,198 @@ abstract class AppListRecords extends ListRecords
         return $table
             ->paginated([$this->pageSize()])
             ->defaultPaginationPageOption($this->pageSize())
+            // 検索: the app's searchable columns, or the one chosen with the icon right of the box (searchColumn)
+            ->searchable($this->searchColumnOptions($table) !== [])
+            ->searchUsing(fn (Builder $query, string $search) => $this->applySearch($query, $search))
+            ->searchPlaceholder(fn (): string => ($label = $this->searchColumnOptions()[$this->activeSearchColumn() ?? ''] ?? null) !== null ? $label.'で検索' : '検索')
+            ->searchDebounce('300ms')
             ->striped();
+    }
+
+    /**
+     * The columns of the current 一覧 the search can look in one at a time (name => label): the app's searchable
+     * columns and the fields of 絞り込む (text, number, date, choice, user).
+     *
+     * @return array<string, string>
+     */
+    public function searchColumnOptions(?Table $table = null): array
+    {
+        $searchable = $this->defaultSearchColumns($table);
+        $fields = $this->filterFieldMap();
+        $labels = $this->listColumns();
+        $options = [];
+        foreach ($this->viewColumns() as $name) {
+            if (in_array($name, $searchable, true) || isset($fields[$name])) {
+                $options[$name] = $labels[$name] ?? $name;
+            }
+        }
+
+        return $options;
+    }
+
+    /** @return list<string> the columns the search looks in when no column is chosen (the app's searchable columns) */
+    public function defaultSearchColumns(?Table $table = null): array
+    {
+        $columns = [];
+        foreach (($table ?? $this->getTable())->getColumns() as $name => $column) {
+            if (! $column->isHidden() && $column->isGloballySearchable()) {
+                $columns[] = (string) $name;
+            }
+        }
+
+        return $columns;
+    }
+
+    /** The column chosen for the search, or null for the app's searchable columns (the first column when it has none). */
+    public function activeSearchColumn(): ?string
+    {
+        $options = $this->searchColumnOptions();
+        if ($this->searchColumn !== null && isset($options[$this->searchColumn])) {
+            return $this->searchColumn;
+        }
+
+        return $this->defaultSearchColumns() === [] ? array_key_first($options) : null;
+    }
+
+    /** The icon right of the search box: search one column (null = the app's searchable columns). */
+    public function setSearchColumn(?string $name): void
+    {
+        $this->searchColumn = $name !== null && isset($this->searchColumnOptions()[$name]) ? $name : null;
+        $this->cancelInlineEdit();
+        $this->resetPage($this->getTablePaginationPageName());
+
+        $user = auth()->id();
+        if ($user !== null) {
+            $stored = (array) session(self::SEARCH_COLUMNS_SESSION, []);
+            $stored[$user] = [...self::searchColumns(), static::class => $this->searchColumn];
+            session([self::SEARCH_COLUMNS_SESSION => $stored]);
+        }
+    }
+
+    /** @return array<string, string|null> the signed-in user's chosen search columns, by list page */
+    private static function searchColumns(): array
+    {
+        $user = auth()->id();
+        $stored = (array) session(self::SEARCH_COLUMNS_SESSION, []);
+
+        return $user !== null && is_array($stored[$user] ?? null) ? $stored[$user] : [];
+    }
+
+    /**
+     * Each word of the search (SearchText::words()) must be found — in the chosen column, else in one of the app's
+     * searchable columns; every comparison is on the normalized forms (SearchQuery).
+     *
+     * @param  Builder<Model>  $query
+     */
+    private function applySearch(Builder $query, string $search): void
+    {
+        $column = $this->activeSearchColumn();
+
+        foreach (SearchText::words($search) as $word) {
+            $query->where(function (Builder $query) use ($column, $word): void {
+                if ($column !== null) {
+                    $this->searchOneColumn($query, $column, $word);
+
+                    return;
+                }
+
+                $isFirst = true;
+                foreach ($this->getTable()->getColumns() as $tableColumn) {
+                    if (! $tableColumn->isHidden() && $tableColumn->isGloballySearchable()) {
+                        $tableColumn->applySearchConstraint($query, $word, $isFirst);
+                    }
+                }
+                if ($isFirst) {
+                    $query->whereRaw('1 = 0');
+                }
+            });
+        }
+    }
+
+    /** @param  Builder<Model>  $query */
+    private function searchOneColumn(Builder $query, string $name, string $word): void
+    {
+        $column = $this->getTable()->getColumn($name);
+        if ($column !== null && $column->isGloballySearchable()) {
+            $isFirst = true;
+            $column->applySearchConstraint($query, $word, $isFirst);
+
+            return;
+        }
+
+        $field = $this->filterFieldMap()[$name] ?? null;
+        if ($field === null) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $condition = fn (FilterOperator $operator, array $values): FilterCondition => new FilterCondition($field->name, $field->type, $operator, $values);
+        $custom = $field->getQuery();
+        $relationship = $field->getRelationship();
+        $qualified = fn (Builder $query, string $column): string => $query->qualifyColumn($column);
+
+        switch ($field->type) {
+            case FilterFieldType::Text:
+            case FilterFieldType::Textarea:
+                match (true) {
+                    $custom !== null => $custom($query, $condition(FilterOperator::Contains, [$word])),
+                    $relationship !== null => $query->whereHas($relationship, fn (Builder $q) => SearchQuery::where($q, $qualified($q, (string) $field->getRelatedColumn()), $word)),
+                    default => SearchQuery::where($query, $qualified($query, $field->getColumn()), $word),
+                };
+
+                return;
+            case FilterFieldType::Number:
+                $number = str_replace([',', '円', '¥', '\\'], '', $word);
+                if (! is_numeric($number)) {
+                    $query->whereRaw('1 = 0');
+                } elseif ($custom !== null) {
+                    $custom($query, $condition(FilterOperator::Equals, [$number]));
+                } else {
+                    self::castContains($query, $qualified($query, $field->getColumn()), $number);
+                }
+
+                return;
+            case FilterFieldType::Date:
+            case FilterFieldType::DateTime:
+                $custom === null
+                    ? self::castContains($query, $qualified($query, $field->getColumn()), self::searchDate($word))
+                    : $query->whereRaw('1 = 0');
+
+                return;
+            case FilterFieldType::Choice:
+            case FilterFieldType::User:
+                // the options whose label has the word
+                $values = array_map('strval', array_keys(array_filter(
+                    $field->getOptions(),
+                    fn (string $label): bool => array_filter(SearchText::variants($word), fn (string $form): bool => str_contains(SearchText::normalize($label), $form)) !== [],
+                )));
+                match (true) {
+                    $values === [] => $query->whereRaw('1 = 0'),
+                    $custom !== null => $custom($query, $condition(FilterOperator::In, $values)),
+                    $relationship !== null => $query->whereHas($relationship, fn (Builder $q) => $q->whereIn($qualified($q, (string) $field->getRelatedColumn()), $values)),
+                    default => $query->whereIn($qualified($query, $field->getColumn()), $values),
+                };
+
+                return;
+        }
+    }
+
+    /** @param  Builder<Model>  $query */
+    private static function castContains(Builder $query, string $column, string $text): void
+    {
+        $query->whereRaw('CAST('.$query->getQuery()->getGrammar()->wrap($column)." AS TEXT) LIKE ? ESCAPE '!'", ['%'.SearchQuery::escapeLike($text).'%']);
+    }
+
+    /** A date as typed (2026/10/5, 2026年10月, 10/05 …) in the stored form: parts joined by -, months and days 2 digits. */
+    private static function searchDate(string $word): string
+    {
+        $parts = preg_split('/[\/.\-年月日]+/u', $word, flags: PREG_SPLIT_NO_EMPTY) ?: [];
+        if (count($parts) < 2) {
+            return $word;
+        }
+
+        return implode('-', array_map(fn (string $part): string => ctype_digit($part) && strlen($part) === 1 ? '0'.$part : $part, $parts));
     }
 
     /** A click on the sorted column's header switches 昇順 ⇄ 降順 (it does not go back to the default order). */
@@ -534,6 +743,14 @@ abstract class AppListRecords extends ListRecords
         return $page instanceof self ? view('core::filament.app-pager', ['page' => $page, 'position' => 'top'])->render() : '';
     }
 
+    /** The icon right of the search box choosing the column searched (core::filament.app-search-column); empty outside app lists. */
+    public static function toolbarSearchColumn(): string
+    {
+        $page = Livewire::current();
+
+        return $page instanceof self ? view('core::filament.app-search-column', ['page' => $page])->render() : '';
+    }
+
     public function getFooter(): View
     {
         return view('core::filament.app-pager', ['page' => $this, 'position' => 'bottom']);
@@ -701,6 +918,51 @@ abstract class AppListRecords extends ListRecords
 
                 $schema?->fill();
             });
+    }
+
+    /**
+     * A checked-row button that needs certain records ($scope, e.g. sales with a 納品書): disabled while the rows it
+     * would work on — the checked rows, or the list as filtered and searched when none is checked — hold none of them.
+     * The checked rows are judged in the browser ($store.sfkChecked) against the list's records outside $scope; with
+     * more than NEEDS_ROWS_LIMIT of those, checked rows always leave the button on (its action still checks them).
+     *
+     * @param  Closure(Builder<Model>): mixed  $scope
+     */
+    protected function needsRows(Action $action, Closure $scope): Action
+    {
+        return $action->extraAttributes(fn (): array => ['x-bind:disabled' => $this->needsRowsExpression($scope)], merge: true);
+    }
+
+    private const NEEDS_ROWS_LIMIT = 2000;
+
+    /** @var array<string, string> needsRows() expressions of this request, by the scope's query */
+    private array $needsRowsExpressions = [];
+
+    /** @param  Closure(Builder<Model>): mixed  $scope */
+    private function needsRowsExpression(Closure $scope): string
+    {
+        $query = $this->getFilteredTableQuery();
+        if (! $query instanceof Builder) {
+            return 'false';
+        }
+
+        $matching = $query->clone()->where(fn (Builder $query) => $scope($query));
+        $memo = $matching->toRawSql();
+        if (isset($this->needsRowsExpressions[$memo])) {
+            return $this->needsRowsExpressions[$memo];
+        }
+
+        if (! $matching->exists()) {
+            return $this->needsRowsExpressions[$memo] = 'true';
+        }
+
+        $keyName = $query->getModel()->getQualifiedKeyName();
+        $others = $query->clone()->reorder()->whereNot(fn (Builder $query) => $scope($query))
+            ->limit(self::NEEDS_ROWS_LIMIT + 1)->pluck($keyName)->map(fn (mixed $key): string => (string) $key)->all();
+
+        return $this->needsRowsExpressions[$memo] = count($others) > self::NEEDS_ROWS_LIMIT
+            ? 'false'
+            : '(c => c.count > 0 && ! c.all && c.keys.every(k => '.Js::from($others).'.includes(k)))($store.sfkChecked)';
     }
 
     /**
@@ -880,9 +1142,10 @@ abstract class AppListRecords extends ListRecords
             ->modalHeading(fn (Action $action): string => $action->getSelectedRecords()->isNotEmpty()
                 ? '選択した'.$action->getSelectedRecords()->count().'件のレコードを削除しますか？'
                 : number_format($this->getFilteredTableQuery()?->count() ?? 0).'件のレコードを一括削除しますか？')
-            ->modalDescription(fn (Action $action): string => $action->getSelectedRecords()->isNotEmpty()
-                ? 'レコードの明細・コメント・変更履歴も削除されます。'
-                : '一覧に表示されているすべてのレコード（絞り込み・検索の結果）が削除されます。レコードの明細・コメント・変更履歴も削除されます。')
+            ->modalDescription(fn (Action $action): HtmlString => $action->getSelectedRecords()->isNotEmpty()
+                ? DeleteImpact::description($this->appResource()::getModel(), $action->getSelectedRecords()->map(fn (Model $record): int|string => $record->getKey())->values()->all())
+                : DeleteImpact::description($this->appResource()::getModel(), $this->bulkDeleteKeys(['all' => true]),
+                    '一覧に表示されているすべてのレコード（絞り込み・検索の結果）が削除されます。'.DeleteImpact::PARTS))
             ->modalSubmitAction(fn (Action $action): Action => $action->label('削除する')->color('danger'))
             ->modalCancelActionLabel('キャンセル')
             ->action(fn (Action $action) => $this->replaceMountedAction('confirmBulkDelete', $action->getSelectedRecords()->isNotEmpty()

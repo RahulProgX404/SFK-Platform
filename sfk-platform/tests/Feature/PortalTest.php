@@ -1,7 +1,7 @@
 <?php
 
 /*
- * ポータル of 白石封筒 (legacy-style home): greeting, お知らせ and アプリショートカット (administrators edit),
+ * ポータル of 白石封筒 (legacy-style home): greeting, お知らせ and アプリショートカット (shown to everyone, administrators edit),
  * スペース (joined / all) and アプリ (only those the user may view, filterable by space).
  */
 
@@ -135,7 +135,7 @@ it('links every space to its settings for administrators', function () {
     Livewire::test(PortalPage::class)->assertDontSee('スペースの設定');
 });
 
-it('lets administrators choose アプリショートカット, shown only when the user may view the app', function () {
+it('lets administrators choose アプリショートカット, shown to everyone of the dashboard, linked where the user may open the app', function () {
     $this->actingAs($this->admin);
 
     Livewire::test(PortalPage::class)
@@ -143,13 +143,26 @@ it('lets administrators choose アプリショートカット, shown only when t
         ->assertHasNoActionErrors();
 
     expect(DashboardPortal::for('erp')->shortcut_app_ids)->toBe([$this->orders->id, $this->daily->id]);
+    DashboardPortal::for('erp')->fill(['shortcut_app_ids' => [$this->orders->id, $this->daily->id, $this->draft->id]])->save();
 
+    // not a member of 製造スペース: 08 is shown without a link; 09 is 開発中 (super admins only)
     $this->actingAs($this->employee);
     Livewire::test(PortalPage::class)
         ->assertSee('アプリショートカット')
-        ->assertSee('売上入力')
-        ->assertDontSee('日報入力')
+        ->assertSeeInOrder(['sfk-shortcuts', '売上入力', '日報入力'])
+        ->assertSee('title="このアプリを開く権限がありません"', escape: false)
+        ->assertDontSee('見積書管理')
         ->assertActionHidden('editShortcuts');
+
+    // a dashboard user in no space at all sees them too, and cannot change them
+    $this->actingAs(grantDashboards(User::factory()->create(), 'erp'));
+    Livewire::test(PortalPage::class)
+        ->assertSee('アプリショートカット')
+        ->assertSee('売上入力')
+        ->assertActionHidden('editShortcuts')
+        ->call('mountAction', 'editShortcuts')
+        ->assertActionNotMounted('editShortcuts');
+    expect(DashboardPortal::for('erp')->shortcut_app_ids)->toBe([$this->orders->id, $this->daily->id, $this->draft->id]);
 });
 
 it('offers the + buttons to the right people', function () {

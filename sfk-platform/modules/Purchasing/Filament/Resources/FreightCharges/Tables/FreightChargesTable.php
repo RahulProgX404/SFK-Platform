@@ -14,6 +14,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Modules\Core\Application\Filters\FilterField;
+use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Domain\Filters\FilterCondition;
 use Modules\Core\Domain\Filters\FilterOperator;
@@ -179,7 +180,7 @@ final class FreightChargesTable
             $name === 'quantity' => $column->alignEnd()->formatStateUsing(fn (mixed $state): string => AppFormat::number($state)),
             $name === 'order_id' => $column
                 ->state(fn (FreightCharge $record): ?string => $record->order?->order_number)
-                ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHas('order', fn (Builder $q): Builder => $q->whereLike('order_number', "%{$search}%")))
+                ->searchable(query: SearchQuery::through('order', 'order_number'))
                 ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy(
                     Order::query()->select('orders.order_number')->whereColumn('orders.id', 'freight_charges.order_id'),
                     $direction,

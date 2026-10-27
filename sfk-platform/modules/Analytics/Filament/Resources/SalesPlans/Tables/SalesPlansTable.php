@@ -14,6 +14,7 @@ use Modules\Analytics\Filament\Resources\SalesPlans\SalesPlanLayout;
 use Modules\Analytics\Filament\Resources\SalesPlans\SalesPlanResource;
 use Modules\Analytics\Models\SalesPlan;
 use Modules\Core\Application\Filters\FilterField;
+use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\Support\AppFormat;
@@ -127,7 +128,7 @@ final class SalesPlansTable
                     '(case when coalesce(sales_plans.plan_total, 0) = 0 then null else sales_plans.actual_total * 1.0 / sales_plans.plan_total end) '.($direction === 'desc' ? 'desc' : 'asc'),
                 )),
             $name === 'customer_name' => $column->state(fn (SalesPlan $record): ?string => $record->customer?->name)
-                ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHas('customer', fn (Builder $q): Builder => $q->whereLike('name', "%{$search}%")))
+                ->searchable(query: SearchQuery::through('customer', 'name'))
                 ->sortable(query: $partner('name')),
             isset(SalesPlanLayout::MASTER[$name]) => $column
                 ->state(fn (SalesPlan $record): ?string => AppFormat::text($record->customer?->getAttribute(SalesPlanLayout::MASTER[$name])))

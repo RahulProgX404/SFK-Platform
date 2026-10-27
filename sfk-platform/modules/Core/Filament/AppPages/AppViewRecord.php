@@ -19,20 +19,24 @@ use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\View as ViewComponent;
 use Filament\Schemas\Schema;
+use Filament\Support\Exceptions\Cancel;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\HtmlString;
 use Livewire\Attributes\Url;
 use Modules\Core\Application\Comments\HasRecordComments;
 use Modules\Core\Application\Comments\RecordComments;
 use Modules\Core\Application\Documents\AppDocuments;
 use Modules\Core\Application\History\HasRecordHistory;
 use Modules\Core\Application\History\RecordHistory;
+use Modules\Core\Application\Records\RecordDeletion;
 use Modules\Core\Domain\Documents\OutputDelivery;
 use Modules\Core\Domain\Documents\OutputPlacement;
 use Modules\Core\Domain\People\EmploymentStatus;
 use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
+use Modules\Core\Filament\Support\DeleteImpact;
 use Modules\Core\Filament\Support\GuardedDelete;
 use Modules\Core\Filament\Support\MenuButtons;
 use Modules\Core\Models\DocumentOutput;
@@ -363,17 +367,53 @@ abstract class AppViewRecord extends ViewRecord
                     ->icon(Heroicon::OutlinedPrinter)
                     ->url(fn (): string => $resource::getUrl('view', ['record' => $this->record, 'print' => 1]))
                     ->openUrlInNewTab(),
-                // a record still used elsewhere is not deleted (GuardedDelete)
-                GuardedDelete::apply(DeleteAction::make())
+                // asks twice (confirmDelete)
+                Action::make('delete')
                     ->label('削除する')
-                    ->record(fn (): Model => $this->record)
-                    ->visible(fn (): bool => $resource::canDelete($this->record)),
+                    ->icon(Heroicon::OutlinedTrash)
+                    ->color('danger')
+                    ->visible(fn (): bool => $resource::canDelete($this->record))
+                    // a record still used elsewhere is not deleted (RecordDeletion)
+                    ->mountUsing(function (): void {
+                        $reason = app(RecordDeletion::class)->blocker($this->record);
+                        if ($reason !== null) {
+                            Notification::make()->danger()->title('削除できません')->body($reason)->persistent()->send();
+
+                            throw new Cancel;
+                        }
+                    })
+                    ->requiresConfirmation()
+                    ->modalIcon(Heroicon::OutlinedExclamationTriangle)
+                    ->modalIconColor('danger')
+                    ->modalWidth('md')
+                    ->modalHeading('このレコードを削除しますか？')
+                    ->modalDescription(fn (): HtmlString => DeleteImpact::description($this->record, [$this->record->getKey()]))
+                    ->modalSubmitActionLabel('削除する')
+                    ->modalCancelActionLabel('キャンセル')
+                    ->action(fn () => $this->replaceMountedAction('confirmDelete')),
             ])
                 ->label('その他の操作')
                 ->icon(Heroicon::EllipsisHorizontal)
                 ->color('gray')
                 ->iconButton(),
         ];
+    }
+
+    /** 削除する, second step: 「この操作は取り消せません」, then the record is deleted with its parts (GuardedDelete). */
+    public function confirmDeleteAction(): DeleteAction
+    {
+        $resource = static::getResource();
+
+        return GuardedDelete::apply(DeleteAction::make('confirmDelete'))
+            ->record(fn (): Model => $this->record)
+            ->visible(fn (): bool => $resource::canDelete($this->record))
+            ->modalIcon(Heroicon::OutlinedTrash)
+            ->modalWidth('md')
+            ->modalHeading('本当にこのレコードを削除しますか？')
+            ->modalDescription('この操作は取り消せません。')
+            ->modalSubmitActionLabel('削除する')
+            ->modalCancelActionLabel('キャンセル')
+            ->successRedirectUrl(fn (): string => $resource::getUrl('index'));
     }
 
     /**

@@ -14,7 +14,6 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Modules\Core\Domain\Billing\ClosingDay;
 use Modules\Core\Filament\AppPages\AppListRecords;
@@ -114,7 +113,8 @@ final class ListSales extends AppListRecords
     /**
      * The legacy list buttons, for administrators (Customine 06 pages 1 / 6 / 9 / 13 / 18): 期間指定から納品書レコード作成 and,
      * on the checked rows, 選択して納品書レコード作成, 選択して請求書レコード作成 (optional 請求日), 随時請求書レコード作成 and
-     * 編集制限 (編集不可にする / 編集可能にする). The issuers refuse what the legacy flow refused (rows already on a
+     * 編集制限 (編集不可にする / 編集可能にする) — the 納品書 buttons green, the 請求書 ones orange, and those off while no sale they would
+     * work on has a 納品書番号 (needsDeliveryNote()). The issuers refuse what the legacy flow refused (rows already on a
      * document, 随時請求 rows on a closing-day invoice, rows without a delivery note) — except that 選択して納品書 / 請求書
      * レコード作成, when ticked sales are already on such a document, ask whether to refuse (作成しない) or to add the
      * customer's other sales to it (既存の…に追加する, the 【新】 buttons of 06_SalesEntry.bundle.js, issueOrAppend()).
@@ -122,7 +122,7 @@ final class ListSales extends AppListRecords
     protected function menuActions(): array
     {
         return [
-            Action::make('issueDeliveryNotesForPeriod')
+            MenuButtons::tone(Action::make('issueDeliveryNotesForPeriod'), self::DELIVERY_TONE)
                 ->label('期間指定から納品書レコード作成')
                 ->icon(Heroicon::OutlinedCalendarDays)
                 ->visible(fn (): bool => SaleForm::isAdministrator())
@@ -141,7 +141,7 @@ final class ListSales extends AppListRecords
                     CarbonImmutable::parse((string) $data['to']),
                     ClosingDay::tryFrom((string) ($data['closing_day'] ?? '')),
                 ))),
-            MenuButtons::withCheckedCount(self::onCheckedRows(Action::make('createDeliveryNotes')))
+            MenuButtons::tone(MenuButtons::withCheckedCount(self::onCheckedRows(Action::make('createDeliveryNotes'))), self::DELIVERY_TONE)
                 ->label('選択して納品書レコード作成')
                 ->icon(Heroicon::OutlinedDocumentText)
                 ->visible(fn (): bool => SaleForm::isAdministrator())
@@ -167,7 +167,7 @@ final class ListSales extends AppListRecords
                         ? app(DeliveryNoteIssuer::class)->issueOrAppend($sales)
                         : app(DeliveryNoteIssuer::class)->issue($sales)))
                 ->deselectRecordsAfterCompletion(),
-            MenuButtons::withCheckedCount(self::onCheckedRows(Action::make('createInvoices')))
+            $this->needsDeliveryNote(MenuButtons::withCheckedCount(self::onCheckedRows(Action::make('createInvoices'))))
                 ->label('選択して請求書レコード作成')
                 ->icon(Heroicon::OutlinedDocumentCurrencyYen)
                 ->visible(fn (): bool => SaleForm::isAdministrator())
@@ -198,7 +198,7 @@ final class ListSales extends AppListRecords
                         : app(InvoiceIssuer::class)->issue($sales, $invoicedOn));
                 })
                 ->deselectRecordsAfterCompletion(),
-            self::onCheckedRows(Action::make('createAdHocInvoices'))
+            $this->needsDeliveryNote(self::onCheckedRows(Action::make('createAdHocInvoices')))
                 ->label('随時請求書レコード作成')
                 ->icon(Heroicon::OutlinedBolt)
                 ->visible(fn (): bool => SaleForm::isAdministrator())
@@ -231,59 +231,7 @@ final class ListSales extends AppListRecords
                     Notification::make()->success()->title($data['operation'] === self::LOCK ? '編集を不可にしました' : '編集を可能にしました')->send();
                 })
                 ->deselectRecordsAfterCompletion(),
-            ...$this->scriptActions(),
         ];
-    }
-
-    /**
-     * The list button of 06_SalesEntry.bundle.js, for administrators, on the checked rows: 削除 — the sales deleted after two
-     * confirmations, their rows going from the delivery notes and invoices with them (Sale::deleting). (Its 【新】選択して
-     * 納品書 / 請求書レコード作成 are part of 選択して納品書 / 請求書レコード作成, which ask what to do with sales already on a
-     * document.)
-     *
-     * @return list<Action>
-     */
-    private function scriptActions(): array
-    {
-        return [
-            self::onCheckedRows(Action::make('deleteSales'))
-                ->label('削除')
-                ->icon(Heroicon::OutlinedTrash)
-                ->visible(fn (): bool => SaleForm::isAdministrator() && SaleResource::canDeleteAny())
-                ->requiresConfirmation()
-                ->modalIcon(Heroicon::OutlinedTrash)
-                ->color('danger')
-                ->modalHeading(fn (Action $action): string => '選択された'.$action->getSelectedRecords()->count().'件の売上データに関連する売上明細は、対応する納品書および請求書データから削除されます。')
-                ->modalSubmitActionLabel('削除')
-                ->modalCancelActionLabel('キャンセル')
-                ->action(fn (Collection $records) => $this->replaceMountedAction('confirmDeleteSales', ['ids' => $records->modelKeys()])),
-        ];
-    }
-
-    /** 削除, second step: 「この操作は取り消せません」, then the sales the user may delete are deleted. */
-    public function confirmDeleteSalesAction(): Action
-    {
-        return Action::make('confirmDeleteSales')
-            ->visible(fn (): bool => SaleForm::isAdministrator())
-            ->requiresConfirmation()
-            ->color('danger')
-            ->modalHeading('確認')
-            ->modalDescription('この操作は取り消せません。実行してもよろしいですか？')
-            ->modalSubmitActionLabel('OK')
-            ->modalCancelActionLabel('キャンセル')
-            ->action(function (array $arguments): void {
-                $ids = array_map(intval(...), (array) ($arguments['ids'] ?? []));
-                DB::transaction(function () use ($ids): void {
-                    foreach (Sale::query()->whereKey($ids)->get() as $sale) {
-                        if (SaleResource::canDelete($sale)) {
-                            $sale->delete();
-                        }
-                    }
-                });
-
-                $this->deselectAllTableRecords();
-                Notification::make()->success()->title('選択されたレコードの削除が完了しました。')->send();
-            });
     }
 
     /**
@@ -299,6 +247,20 @@ final class ListSales extends AppListRecords
             '選択して請求書レコード作成' => 'チェックボックスで選択したレコードを取引先別に請求レコードに変換します。（納品レコードが作成されてない場合実行不可）',
             '編集制限' => '任意のタイミングで任意のレコードに対して編集制限をかけることができます。（解除も可能）',
         ] : [];
+    }
+
+    /** 納品書 buttons green, 請求書 buttons orange. */
+    private const DELIVERY_TONE = 'green';
+
+    private const INVOICE_TONE = 'orange';
+
+    /**
+     * 選択して請求書 / 随時請求書レコード作成: an invoice needs sales with a 納品書番号, so the button is off while none of
+     * the checked sales (none checked: of the list as filtered and searched) has one.
+     */
+    private function needsDeliveryNote(Action $action): Action
+    {
+        return MenuButtons::tone($this->needsRows($action, fn (Builder $query) => $query->whereNotNull('sales.delivery_note_id')), self::INVOICE_TONE);
     }
 
     private const ANY_CLOSING_DAY = '指定なし';

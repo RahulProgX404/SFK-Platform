@@ -80,6 +80,12 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   `MenuButtons::withCheckedCount()`); give each one an icon. Do not hide legacy buttons in 「…」 or in bulk actions.
   Buttons of the legacy JavaScript (`../js-customization/<app>/`) are legacy buttons too: keep their labels, including
   the 【新】 / [新] / (新) trial ones, as separate buttons next to the Customine ones (after them, in the script's order).
+- 検索 of the app lists (Core): an app marks its default columns `->searchable()` on AppTextColumn (a related record's
+  column: `->searchable(query: SearchQuery::through('customer', 'name'))`, never a raw `whereLike`); words compare
+  folded (全角 / 半角, case, カタカナ / ひらがな, romaji → kana — `Domain\Search\SearchText`, `Application\Search\SearchQuery`)
+  and the icon right of the box searches one column of the 一覧 (searchable columns + 絞り込む fields). Every default
+  search column gets a trigram index in its module's migration (`SearchIndex::create($table, [...])`, PostgreSQL) —
+  `ListSearchTest` fails otherwise.
 - App lists (Core, automatic): search box on the left, one horizontal scroll with its bar at the end of the table (and a synced copy fixed at the bottom of the screen while the end of the table is out of view),
   表示件数 20–300 per user, and every column sorts on a header click (昇順 ⇄ 降順). Database columns become sortable by
   themselves; give computed columns (state from relations or flags) `->sortable(query: …)`.
@@ -115,6 +121,11 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   `Modules\Core\Application\Records\RecordDeletion` (`GuardedDelete::apply()` on a DeleteAction) so a blocked delete says
   what uses the record. App lists have one red 「…」 item (Core `bulkDelete`, two confirmations): 一括削除 of the
   filtered list when no row is checked (その他の設定 + administrators), 選択したレコードを削除 of the checked rows (削除 permission).
+  The record page's 削除する asks twice too (Core `delete` → `confirmDelete`). Every first confirmation (and the list
+  row ×) warns which other apps' records are deleted, unlinked or keep the delete from happening
+  (`RecordDeletion::impact()` via `Support\DeleteImpact`, read from the foreign keys). A model that deletes other
+  records' rows itself in a `deleting` hook (e.g. 売上 → 納品書 / 請求書 rows) implements
+  `Modules\Core\Application\Records\DeletesWith` so the warning counts them. No per-app 削除 buttons.
 - A Filament action put straight into a Blade view (`{{ $this->fooAction }}`, `{{ ($page->fooAction)([...]) }}`) is drawn
   even when it is hidden — disabled, but visible. Wrap it: `@if (($a = ($this->fooAction)([...]))->isVisible()) {{ $a }} @endif`.
 - Never write the word for the old product anywhere; call it 旧システム in the UI and "legacy system" in English.

@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
 use Modules\Core\Access\UserType;
 use Modules\Core\Application\Filters\FilterField;
+use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Domain\Filters\FilterCondition;
 use Modules\Core\Domain\Filters\FilterOperator;
@@ -147,7 +148,7 @@ final class ConsumableOrdersTable
             $name === 'status' => $column->state(fn (ConsumableOrder $record): string => $record->status->value),
             $name === 'supplier_id' => $column
                 ->state(fn (ConsumableOrder $record): ?string => $record->supplier?->name)
-                ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHas('supplier', fn (Builder $q): Builder => $q->whereLike('name', "%{$search}%")))
+                ->searchable(query: SearchQuery::through('supplier', 'name'))
                 ->sortable(query: $supplier('name')),
             isset(ConsumableOrderLayout::SUPPLIER_VALUES[$name]) => $column
                 ->state(fn (ConsumableOrder $record): ?string => AppFormat::text($record->supplier?->getAttribute(ConsumableOrderLayout::SUPPLIER_VALUES[$name])))
@@ -157,7 +158,7 @@ final class ConsumableOrdersTable
                     ->map(fn (ConsumableOrderLine $line): string => trim(($line->consumable->name ?? '').' '.AppFormat::number($line->quantity).($line->unit ?? '')))
                     ->all())
                 ->listWithLineBreaks()
-                ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHas('lines.consumable', fn (Builder $q): Builder => $q->whereLike('name', "%{$search}%")))
+                ->searchable(query: SearchQuery::through('lines.consumable', 'name'))
                 // by the 商品名 of the first row
                 ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy(
                     Consumable::query()->select('consumables.name')->join('consumable_order_lines', 'consumable_order_lines.consumable_id', '=', 'consumables.id')

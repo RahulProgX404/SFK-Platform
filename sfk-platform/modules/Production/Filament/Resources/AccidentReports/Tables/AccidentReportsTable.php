@@ -12,6 +12,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
 use Modules\Core\Application\Filters\FilterField;
+use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Domain\Filters\FilterCondition;
 use Modules\Core\Domain\Filters\FilterOperator;
@@ -143,7 +144,7 @@ final class AccidentReportsTable
                     ->whereColumn('accident_report_user.accident_report_id', 'accident_reports.id')->orderBy('users.name')->limit(1))),
             $name === 'order_id' => $column
                 ->state(fn (AccidentReport $record): ?string => $record->order?->order_number)
-                ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHas('order', fn (Builder $q): Builder => $q->whereLike('order_number', "%{$search}%")))
+                ->searchable(query: SearchQuery::through('order', 'order_number'))
                 ->sortable(query: $order(fn (): Builder => Order::query()->select('orders.order_number')->whereColumn('orders.id', 'accident_reports.order_id'))),
             $name === 'customer' => $column
                 ->state(fn (AccidentReport $record): ?string => $record->order?->customer?->name)
@@ -151,7 +152,7 @@ final class AccidentReportsTable
                     ->whereColumn('orders.id', 'accident_reports.order_id'))),
             $name === 'product_name' => $column
                 ->state(fn (AccidentReport $record): ?string => $record->order?->product_name)
-                ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHas('order', fn (Builder $q): Builder => $q->whereLike('product_name', "%{$search}%")))
+                ->searchable(query: SearchQuery::through('order', 'product_name'))
                 ->sortable(query: $order(fn (): Builder => Order::query()->select('orders.product_name')->whereColumn('orders.id', 'accident_reports.order_id'))),
             $name === 'machine_id' => $column
                 ->state(fn (AccidentReport $record): ?string => $record->machine?->name)

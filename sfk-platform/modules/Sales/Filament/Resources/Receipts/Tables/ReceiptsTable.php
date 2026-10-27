@@ -12,6 +12,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
 use Modules\Core\Application\Filters\FilterField;
+use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Domain\Billing\ClosingDay;
 use Modules\Core\Domain\Billing\CollectionMonth;
@@ -155,14 +156,14 @@ final class ReceiptsTable
                 ->sortable(query: $difference(self::OVERPAYMENT_SQL)),
             'invoice_id' => $column
                 ->state(fn (Receipt $record): ?string => $record->invoice?->number)
-                ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHas('invoice', fn (Builder $q): Builder => $q->whereLike('number', "%{$search}%")))
+                ->searchable(query: SearchQuery::through('invoice', 'number'))
                 ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy(
                     Invoice::query()->select('invoices.number')->whereColumn('invoices.id', 'receipts.invoice_id'),
                     $direction,
                 )),
             'customer_id' => $column
                 ->state(fn (Receipt $record): string => $record->customer->name)
-                ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHas('customer', fn (Builder $q): Builder => $q->whereLike('name', "%{$search}%")))
+                ->searchable(query: SearchQuery::through('customer', 'name'))
                 ->sortable(query: $partner('name')),
             'customer_code' => $column->state(fn (Receipt $record): ?string => $record->customer->code)->sortable(query: $partner('code')),
             'collection_month', 'collection_day', 'master_closing_day' => $column

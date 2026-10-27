@@ -10,6 +10,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Application\Filters\FilterField;
+use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Domain\Billing\ClosingDay;
 use Modules\Core\Domain\Filters\DateMode;
@@ -160,7 +161,7 @@ final class ReceivablesTable
             $name === 'created_at' => $column->dateTime('Y-m-d H:i'),
             $name === 'customer_id' => $column
                 ->state(fn (ReceivableMonth $record): string => $record->customer->name)
-                ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHas('customer', fn (Builder $q): Builder => $q->whereLike('name', "%{$search}%")))
+                ->searchable(query: SearchQuery::through('customer', 'name'))
                 ->sortable(query: $partner('name')),
             $name === 'customer_code' => $column->state(fn (ReceivableMonth $record): ?string => $record->customer->code)->sortable(query: $partner('code')),
             isset(self::MASTER[$name]) => $column

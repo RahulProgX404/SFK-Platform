@@ -10,6 +10,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Application\Filters\FilterField;
+use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Domain\Filters\DateMode;
 use Modules\Core\Domain\Filters\FilterOperator;
@@ -147,7 +148,7 @@ final class PayablesTable
             $name === 'created_at' => $column->dateTime('Y-m-d H:i'),
             $name === 'supplier_id' => $column
                 ->state(fn (PayableMonth $record): string => $record->supplier->name)
-                ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHas('supplier', fn (Builder $q): Builder => $q->whereLike('name', "%{$search}%")))
+                ->searchable(query: SearchQuery::through('supplier', 'name'))
                 ->sortable(query: $supplier('name')),
             isset(PayableLayout::MASTER[$name]) => $column
                 ->state(fn (PayableMonth $record): ?string => AppFormat::text($record->supplier->getAttribute(PayableLayout::MASTER[$name])))

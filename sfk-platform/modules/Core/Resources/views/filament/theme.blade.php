@@ -889,6 +889,102 @@
         background: var(--kt-normal-hover);
     }
 
+    /* a tone per kind of button (MenuButtons::tone()), e.g. 納品書 green / 請求書 orange: a coloured left edge and icon
+       (!important: the theme forces the gray button colours) */
+    .sfk-app-toolbar .sfk-menu-btn.fi-btn[data-sfk-tone] {
+        box-shadow: 3px 0 0 var(--sfk-tone) inset, 1px 1px 1px #ffffff inset !important;
+        color: var(--sfk-tone-dark) !important;
+    }
+
+    .sfk-app-toolbar .sfk-menu-btn.fi-btn[data-sfk-tone] .fi-icon {
+        color: var(--sfk-tone) !important;
+    }
+
+    .sfk-app-toolbar .sfk-menu-btn.fi-btn[data-sfk-tone],
+    .sfk-app-menu-rows.has-checked .sfk-menu-btn.fi-btn[data-sfk-tone] {
+        background: var(--sfk-tone-soft) !important;
+    }
+
+    .sfk-app-toolbar .sfk-menu-btn.fi-btn[data-sfk-tone]:hover {
+        background: var(--kt-normal-hover) !important;
+        color: var(--sfk-tone-dark) !important;
+    }
+
+    .sfk-menu-btn[data-sfk-tone="green"] {
+        --sfk-tone: #2e9d5b;
+        --sfk-tone-dark: #1e6b3d;
+        --sfk-tone-soft: #eaf6ee;
+    }
+
+    .sfk-menu-btn[data-sfk-tone="orange"] {
+        --sfk-tone: #e67e22;
+        --sfk-tone-dark: #a35212;
+        --sfk-tone-soft: #fdf1e6;
+    }
+
+    /* a button with nothing to work on (MenuButtons / AppListRecords::needsRows()) */
+    .sfk-app-toolbar .sfk-app-menu .sfk-menu-btn.fi-btn:disabled,
+    .sfk-app-toolbar .sfk-app-menu .sfk-menu-btn.fi-btn:disabled:hover {
+        background: var(--kt-normal) !important;
+        box-shadow: none !important;
+        color: var(--kt-muted) !important;
+        cursor: not-allowed;
+        opacity: .55;
+    }
+
+    .sfk-app-toolbar .sfk-app-menu .sfk-menu-btn.fi-btn:disabled .fi-icon {
+        color: var(--kt-muted) !important;
+    }
+
+    /* 削除 confirmations (core::filament.delete-impact): the other apps' records the delete affects, as a warning */
+    .sfk-delete-text {
+        display: block;
+    }
+
+    .sfk-delete-impact {
+        display: block;
+        margin-top: .75rem;
+        padding: .5rem .75rem;
+        background: #fff8e6;
+        border: 1px solid #f3d27a;
+        border-left: 3px solid #e6a700;
+        color: var(--kt-text);
+        font-size: .875rem;
+        text-align: start;
+    }
+
+    .sfk-delete-impact-title {
+        display: flex;
+        align-items: center;
+        gap: .375rem;
+        margin-bottom: .25rem;
+        color: #8a5a00;
+        font-weight: 700;
+    }
+
+    .sfk-delete-impact-title .fi-icon {
+        width: 1.125rem;
+        height: 1.125rem;
+        color: #e6a700;
+    }
+
+    .sfk-delete-impact-row {
+        display: block;
+        padding: .125rem 0;
+    }
+
+    .sfk-delete-impact-row.is-blocking {
+        color: var(--kt-red-dark);
+    }
+
+    .sfk-delete-impact-app {
+        font-weight: 700;
+    }
+
+    .sfk-delete-impact-app::after {
+        content: '：';
+    }
+
     /* ボタンの説明 (core::filament.app-menu-help): the legacy menu text as a collapsible list under the toolbar */
     .sfk-app-help {
         margin: 0 .875rem .625rem;
@@ -2896,6 +2992,68 @@
 
     .sfk-app-page-list .fi-ta-header-toolbar>.fi-ta-actions:empty {
         display: none;
+    }
+
+    /* the column the search looks in (core::filament.app-search-column): an icon joined to the right of the box,
+       blue while one column is chosen */
+    .sfk-app-page-list .fi-ta-header-toolbar>div:has(.sfk-search-column) {
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+    }
+
+    .sfk-search-column,
+    .sfk-search-column .fi-dropdown-trigger {
+        display: flex;
+    }
+
+    .sfk-search-column-btn {
+        display: grid;
+        place-items: center;
+        width: 2.5rem;
+        min-height: 2.25rem;
+        margin-inline-start: -1px;
+        background: #ffffff;
+        border: 1px solid var(--kt-border);
+        color: var(--kt-blue);
+    }
+
+    .sfk-search-column-btn .fi-icon {
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+
+    .sfk-search-column-btn:hover {
+        background: var(--kt-normal-hover);
+    }
+
+    .sfk-search-column-btn.is-active {
+        background: var(--kt-blue);
+        border-color: var(--kt-blue);
+        color: #ffffff;
+    }
+
+    .sfk-search-column-btn:focus-visible {
+        outline: 2px solid var(--kt-blue);
+        outline-offset: 1px;
+    }
+
+    /* the toolbar (sticky: a layer of its own) above the rows, so its lists (e.g. the search column) are not covered */
+    .sfk-app-page-list .fi-ta-header-ctn {
+        z-index: 20;
+    }
+
+    .sfk-search-column-item {
+        font-size: .9375rem;
+    }
+
+    .sfk-search-column-item:not(:has(.fi-icon)) {
+        padding-inline-start: 2.25rem;
+    }
+
+    .sfk-search-column-item.is-selected {
+        color: var(--kt-blue-dark);
+        font-weight: 700;
     }
 
     /* the paging at the right end of the search row */

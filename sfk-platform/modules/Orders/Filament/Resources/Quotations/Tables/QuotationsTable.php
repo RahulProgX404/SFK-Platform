@@ -12,6 +12,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
 use Modules\Core\Application\Filters\FilterField;
+use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\Support\AppFormat;
@@ -128,7 +129,8 @@ final class QuotationsTable
             $name === 'customer_id' => $column
                 ->state(fn (Quotation $record): ?string => $record->customer?->name)
                 ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHas('customer', fn (Builder $q): Builder => $q
-                    ->whereLike('name', "%{$search}%")->orWhereLike('short_name', "%{$search}%")))
+                    ->where(fn (Builder $q) => SearchQuery::where($q, 'partners.name', $search))
+                    ->orWhere(fn (Builder $q) => SearchQuery::where($q, 'partners.short_name', $search))))
                 ->sortable(query: $partner('name')),
             $name === 'customer_code' => $column->state(fn (Quotation $record): ?string => $record->customer?->code)->sortable(query: $partner('code')),
             $name === 'file_name' => $column->state(fn (Quotation $record): string => $record->fileName())

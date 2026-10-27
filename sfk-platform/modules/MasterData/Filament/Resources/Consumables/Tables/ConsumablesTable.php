@@ -10,6 +10,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Application\Filters\FilterField;
+use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Domain\Filters\FilterCondition;
 use Modules\Core\Domain\Filters\FilterOperator;
@@ -157,7 +158,7 @@ final class ConsumablesTable
             'kind', 'box_type' => $column->formatStateUsing(fn (mixed $state): string => $state instanceof BackedEnum ? (string) $state->value : ''),
             'supplier_id' => $column
                 ->state(fn (Consumable $record): ?string => $record->supplier?->name)
-                ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHas('supplier', fn (Builder $q): Builder => $q->whereLike('name', "%{$search}%")))
+                ->searchable(query: SearchQuery::through('supplier', 'name'))
                 ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy(
                     Partner::query()->select('partners.name')->whereColumn('partners.id', 'consumables.supplier_id'),
                     $direction,

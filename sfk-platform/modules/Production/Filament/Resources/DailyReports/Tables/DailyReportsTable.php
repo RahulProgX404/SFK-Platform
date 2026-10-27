@@ -12,6 +12,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
 use Modules\Core\Application\Filters\FilterField;
+use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\Support\AppFormat;
@@ -223,16 +224,16 @@ final class DailyReportsTable
                 ->state(fn (DailyReport $record): HtmlString => UserPopup::html($record->worker))
                 ->html()
                 ->disabledClick()
-                ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHas('worker', fn (Builder $q): Builder => $q->whereLike('name', "%{$search}%")))
+                ->searchable(query: SearchQuery::through('worker', 'name'))
                 ->sortable(query: $by(User::class, 'name', 'user_id')),
             'worker_code', 'employee_code', 'sales_staff_code', 'department_code' => $column
                 ->state(fn (DailyReport $record): ?string => AppFormat::text($record->worker->getAttribute($name)))
                 ->sortable(query: $by(User::class, $name, 'user_id')),
             'order_id' => $column->state(fn (DailyReport $record): ?string => $record->order?->order_number)
-                ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHas('order', fn (Builder $q): Builder => $q->whereLike('order_number', "%{$search}%")))
+                ->searchable(query: SearchQuery::through('order', 'order_number'))
                 ->sortable(query: $by(Order::class, 'order_number', 'order_id')),
             'product_name' => $column->state(fn (DailyReport $record): ?string => $record->order?->product_name)
-                ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHas('order', fn (Builder $q): Builder => $q->whereLike('product_name', "%{$search}%")))
+                ->searchable(query: SearchQuery::through('order', 'product_name'))
                 ->sortable(query: $by(Order::class, 'product_name', 'order_id')),
             'order_quantity' => $number(fn (DailyReport $record): mixed => $record->order?->quantity)->sortable(query: $by(Order::class, 'quantity', 'order_id')),
             'manufactured_quantity', 'manufacturing_remaining' => $number(fn (DailyReport $record): mixed => $record->order?->getAttribute($name))

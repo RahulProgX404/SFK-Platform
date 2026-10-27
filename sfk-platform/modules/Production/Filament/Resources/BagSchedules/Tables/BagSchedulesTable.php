@@ -10,6 +10,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Application\Filters\FilterField;
+use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Domain\Filters\FilterCondition;
 use Modules\Core\Domain\Filters\FilterOperator;
@@ -152,7 +153,7 @@ final class BagSchedulesTable
             $name === 'machine_code' => $column->state(fn (BagSchedule $record): ?string => $record->machine?->code)->sortable(query: $machine('code')),
             $name === 'order_id' => $column
                 ->state(fn (BagSchedule $record): ?string => $record->order?->order_number)
-                ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHas('order', fn (Builder $q): Builder => $q->whereLike('order_number', "%{$search}%")))
+                ->searchable(query: SearchQuery::through('order', 'order_number'))
                 ->sortable(query: $order('order_number')),
             $name === 'product_name' => $column->state(fn (BagSchedule $record): ?string => $record->order?->product_name)->sortable(query: $order('product_name')),
             $name === 'order_number_p' => $column->state(fn (BagSchedule $record): ?string => $record->orderNumber())

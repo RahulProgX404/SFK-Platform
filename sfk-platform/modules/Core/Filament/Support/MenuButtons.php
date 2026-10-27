@@ -27,6 +27,12 @@ final class MenuButtons
         return $action instanceof Action && ($action->getExtraAttributes()[self::MARKER] ?? null) === 'true';
     }
 
+    /** A colour for a kind of button (e.g. 納品書 'green', 請求書 'orange'; core::filament.theme): left edge, icon, tint. */
+    public static function tone(Action $action, string $tone): Action
+    {
+        return $action->extraAttributes(['data-sfk-tone' => $tone], merge: true);
+    }
+
     /** A checked-row button showing the number of checked rows as a 「N件」 badge on its corner. */
     public static function withCheckedCount(Action $action): Action
     {

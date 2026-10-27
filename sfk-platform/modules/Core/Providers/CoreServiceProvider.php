@@ -19,12 +19,17 @@ use Filament\Support\Facades\FilamentView;
 use Filament\Support\Icons\Heroicon;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
+use Illuminate\Database\Events\ConnectionEstablished;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Modules\Core\Access\DashboardAccess;
 use Modules\Core\Application\Apps\AppDiscovery;
 use Modules\Core\Application\Numbering\DocumentNumberGenerator;
+use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Console\SyncAppsCommand;
 use Modules\Core\Console\SyncSuperAdminCommand;
+use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\Records\RelatedLists;
 use Modules\Core\Http\Portal\DashboardDirectory;
 use Modules\Core\Http\Portal\DashboardEntry;
@@ -53,9 +58,22 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
     protected function bootModule(): void
     {
+        // the compared form of the list search (sfk_search_norm) on SQLite connections; PostgreSQL has it from a migration
+        Event::listen(ConnectionEstablished::class, fn (ConnectionEstablished $event) => SearchQuery::registerFunction($event->connection));
+        foreach (DB::getConnections() as $connection) {
+            SearchQuery::registerFunction($connection);
+        }
+
         Event::listen(Login::class, function (Login $event): void {
             if ($event->user instanceof User) {
                 $event->user->forceFill(['last_login_at' => now()])->saveQuietly();
+            }
+        });
+
+        // the search column chosen on the app lists lasts until logout: every login starts from the default
+        Event::listen([Login::class, Logout::class], function (): void {
+            if (app()->bound('session')) {
+                session()->forget(AppListRecords::SEARCH_COLUMNS_SESSION);
             }
         });
 

@@ -81,6 +81,8 @@ abstract class BasePanelProvider extends PanelProvider
             ->renderHook(PanelsRenderHook::HEAD_END, fn (): string => ThemeAssets::headTags())
             // paging of the app lists, right of the search box
             ->renderHook(TablesRenderHook::TOOLBAR_END, fn (): string => AppListRecords::toolbarPager())
+            // the column the search looks in, an icon right of the search box of the app lists
+            ->renderHook(TablesRenderHook::TOOLBAR_SEARCH_AFTER, fn (): string => AppListRecords::toolbarSearchColumn())
             ->sidebarCollapsibleOnDesktop()
             // 通知 (bell in the top bar), e.g. a コメント on a record (Modules\Core\Application\Comments\RecordComments)
             ->databaseNotifications()

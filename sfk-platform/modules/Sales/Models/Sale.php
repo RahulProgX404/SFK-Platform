@@ -14,6 +14,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Application\Comments\HasRecordComments;
 use Modules\Core\Application\History\HasRecordHistory;
+use Modules\Core\Application\Records\DeletesWith;
 use Modules\Core\Domain\Billing\BillingCycle;
 use Modules\Core\Domain\Billing\ClosingDay;
 use Modules\Core\Domain\Money\RoundingMode;
@@ -82,7 +83,7 @@ use Modules\Orders\Models\Order;
  * @property-read Collection<int, User> $assignees
  * @property-read Collection<int, SaleAllocation> $allocations
  */
-final class Sale extends Model implements HasRecordComments, HasRecordHistory
+final class Sale extends Model implements DeletesWith, HasRecordComments, HasRecordHistory
 {
     use RecordsComments, TracksAuthors {
         TracksAuthors::commentRecipients insteadof RecordsComments;
@@ -161,6 +162,7 @@ final class Sale extends Model implements HasRecordComments, HasRecordHistory
 
         // the rows copied to delivery notes and invoices go with the sale
         self::deleting(function (self $sale): void {
+            // the rows of deletesWith()
             DB::transaction(function () use ($sale): void {
                 foreach ([DeliveryNoteLine::class => DeliveryNote::class, InvoiceLine::class => Invoice::class] as $line => $document) {
                     $documentIds = $line::query()->where('sale_id', $sale->id)->pluck(str($document)->classBasename()->snake()->append('_id')->toString())->unique()->all();
@@ -169,6 +171,12 @@ final class Sale extends Model implements HasRecordComments, HasRecordHistory
                 }
             });
         });
+    }
+
+    /** Deleting a sale takes its rows off the delivery notes and invoices (booted(), legacy 削除 of 06_SalesEntry.bundle.js). */
+    public static function deletesWith(): array
+    {
+        return ['delivery_note_lines' => 'sale_id', 'invoice_lines' => 'sale_id'];
     }
 
     /** 端数区分 of the customer as of the sale (blank ⇒ 切捨, BR-TX-01). */

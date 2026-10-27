@@ -108,14 +108,14 @@
                         @else
                             <div class="sfk-shortcuts">
                                 @foreach ($shortcuts as $app)
-                                    @php($url = $appUrls[$app->id] ?? null)
+                                    @php($url = $shortcutUrls[$app->id] ?? null)
                                     @if ($url !== null)
                                         <a href="{{ $url }}" @class(['sfk-shortcut', 'sfk-unpublished' => $app->status !== \Modules\Core\Domain\Apps\AppStatus::Published])>
                                             <span>{{ $app->displayName() }}</span>
                                             <span class="sfk-shortcut-tile" aria-hidden="true">{{ $app->iconText() }}</span>
                                         </a>
                                     @else
-                                        <div class="sfk-shortcut is-disabled" title="画面は準備中です">
+                                        <div class="sfk-shortcut is-disabled" title="{{ array_key_exists($app->id, $shortcutUrls) ? '画面は準備中です' : 'このアプリを開く権限がありません' }}">
                                             <span>{{ $app->displayName() }}</span>
                                             <span class="sfk-shortcut-tile" aria-hidden="true">{{ $app->iconText() }}</span>
                                         </div>

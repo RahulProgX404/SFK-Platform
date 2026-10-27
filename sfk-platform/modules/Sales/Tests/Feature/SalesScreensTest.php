@@ -532,34 +532,61 @@ it('asks what to do with sales already on a 納品書 / 請求書: refuse, or ad
         ->and($second->fresh()->invoice_id)->toBe($invoice->id);
 });
 
-it('deletes the checked sales after two confirmations with 削除 of 06_SalesEntry.bundle.js, their rows going from the note', function () {
+it('deletes sales like the legacy 削除 (06_SalesEntry.bundle.js) through 選択したレコードを削除 and 削除する, warning of the notes and invoices', function () {
     $this->actingAs($this->admin); // the default view lists the sales one created
     $sale = screenSale($this->customer);
     $kept = screenSale($this->customer, ['product_name' => '角2封筒']);
-    app(DeliveryNoteIssuer::class)->issue([$sale, $kept]);
+    $last = screenSale($this->customer, ['product_name' => '洋長3封筒']);
+    app(DeliveryNoteIssuer::class)->issue([$sale, $kept, $last]);
+    app(InvoiceIssuer::class)->issue([$last->fresh()]);
     $note = DeliveryNote::query()->sole();
+
+    // the legacy list button is gone: Core's 「…」 does it
+    Livewire::test(ListSales::class)->assertActionDoesNotExist('deleteSales');
 
     Livewire::test(ListSales::class)
         ->set('selectedTableRecords', [(string) $sale->id])
-        ->mountAction('deleteSales')
-        ->assertMountedActionModalSee('選択された1件の売上データに関連する売上明細は、対応する納品書および請求書データから削除されます。')
+        ->mountAction('bulkDelete')
+        ->assertMountedActionModalSee(['選択した1件のレコードを削除しますか？', '次のアプリのレコードにも影響します', '10. 納品書管理(売上)', '1件のレコードから明細が削除されます'])
         ->callMountedAction()
-        ->assertActionMounted('confirmDeleteSales')
-        ->assertMountedActionModalSee('この操作は取り消せません。実行してもよろしいですか？')
+        ->assertMountedActionModalSee('本当に1件のレコードを削除しますか？')
         ->callMountedAction()
-        ->assertNotified('選択されたレコードの削除が完了しました。');
+        ->assertNotified('1件のレコードを削除しました');
 
     expect(Sale::query()->whereKey($sale->id)->exists())->toBeFalse()
-        ->and($note->lines()->pluck('product_name')->all())->toBe(['角2封筒'])
-        ->and($note->fresh()->subtotal)->toBe(10000);
+        ->and($note->lines()->orderBy('sort')->pluck('product_name')->all())->toBe(['角2封筒', '洋長3封筒'])
+        ->and($note->fresh()->subtotal)->toBe(20000);
 
-    // not for employees, even with 削除 on the app
-    $app = BusinessApp::query()->where('code', 'sales-entry')->sole();
-    $app->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true, AppAbility::Delete->column() => true]);
-    $employee = grantDashboards(User::factory()->create(), 'erp');
-    $app->spaces->first()?->users()->attach($employee);
-    $this->actingAs($employee);
-    Livewire::test(ListSales::class)->assertActionHidden('deleteSales')->assertActionHidden('createDeliveryNotes')->assertActionHidden('createInvoices');
+    // the record page's 削除する asks twice too, naming the note and the invoice
+    Livewire::test(ViewSale::class, ['record' => $last->getRouteKey()])
+        ->mountAction('delete')
+        ->assertMountedActionModalSee(['このレコードを削除しますか？', '10. 納品書管理(売上)', InvoiceResource::appName()])
+        ->callMountedAction()
+        ->assertActionMounted('confirmDelete')
+        ->assertMountedActionModalSee(['本当にこのレコードを削除しますか？', 'この操作は取り消せません。'])
+        ->callMountedAction()
+        ->assertRedirect(SaleResource::getUrl('index'));
+
+    expect(Sale::query()->whereKey($last->id)->exists())->toBeFalse()
+        ->and($note->lines()->pluck('product_name')->all())->toBe(['角2封筒'])
+        ->and(Invoice::query()->sole()->lines()->count())->toBe(0);
+});
+
+it('colours the 納品書 / 請求書 buttons and turns the 請求書 ones off while no sale concerned has a 納品書番号', function () {
+    $this->actingAs($this->admin);
+    $undelivered = screenSale($this->customer);
+
+    // nothing checked, and no sale of the list has a note: off
+    $html = Livewire::test(ListSales::class)->html();
+    expect($html)->toContain('data-sfk-tone="green"')->toContain('data-sfk-tone="orange"')
+        ->and(substr_count($html, 'x-bind:disabled="true"'))->toBe(2);
+
+    // a sale with a note in the list: on, except while only sales without a note are checked
+    $delivered = screenSale($this->customer, ['product_name' => '角2封筒']);
+    app(DeliveryNoteIssuer::class)->issue([$delivered]);
+    $html = Livewire::test(ListSales::class)->html();
+    expect(substr_count($html, 'x-bind:disabled="true"'))->toBe(0)
+        ->and($html)->toContain('c.keys.every(k => JSON.parse(');
 });
 
 it('writes a changed sale address to its delivery note when an administrator saves (AutoReflectSalesDeliveryAddress.bundle.js)', function () {

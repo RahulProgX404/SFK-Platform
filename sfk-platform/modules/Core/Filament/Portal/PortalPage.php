@@ -30,7 +30,7 @@ use Modules\Core\Models\Space;
 
 /**
  * ポータル: the home page of a dashboard, laid out like the legacy portal — a greeting, the お知らせ with the
- * アプリショートカット (both edited by administrators), and on the right the スペース and アプリ lists; the ⚙ of アプリ
+ * アプリショートカット (both shown to everyone of the dashboard and edited by administrators), and on the right the スペース and アプリ lists; the ⚙ of アプリ
  * (administrators) changes the order of the apps by drag and drop. Everything is scoped to the current dashboard and to
  * what the user may open (spaces they belong to, apps they may view).
  */
@@ -87,13 +87,16 @@ final class PortalPage extends Dashboard
         $portal = DashboardPortal::for(self::panelId());
         $apps = $this->visibleApps();
         $spaces = $this->spaces();
+        $shortcuts = $this->shortcutApps($portal);
 
         return [
             'notice' => filled($portal->notice) ? RichContentRenderer::make($portal->notice)->toHtml() : null,
-            'shortcuts' => collect($portal->shortcut_app_ids ?? [])
-                ->map(fn (int $id): ?BusinessApp => $apps->firstWhere('id', $id))
-                ->filter()
-                ->values(),
+            'shortcuts' => $shortcuts,
+            // only the apps the user may open lead somewhere; the others are shown as tiles without a link
+            'shortcutUrls' => $user === null ? [] : $shortcuts
+                ->filter(fn (BusinessApp $app): bool => AppAccess::listsOnDashboard($user, $app))
+                ->mapWithKeys(fn (BusinessApp $app): array => [$app->id => AppResource::urlForApp($app->code, Filament::getCurrentOrDefaultPanel())])
+                ->all(),
             'spaces' => $spaces,
             // ⚙ of each space (administrators): its settings (the edit dialog of スペース)
             'spaceSettingsUrls' => self::isAdministrator()
@@ -203,6 +206,32 @@ final class PortalPage extends Dashboard
         $ids = array_values(array_intersect(array_map('intval', $ids), $visible));
 
         app(AppLifecycle::class)->reorder($ids, $user);
+    }
+
+    /**
+     * アプリショートカット: shown to everyone who may open this dashboard — the chosen apps placed in it, whether or not
+     * the user may open them, except apps not open to employees (開発中 etc.: super admins only), in the chosen order.
+     *
+     * @return Collection<int, BusinessApp>
+     */
+    private function shortcutApps(DashboardPortal $portal): Collection
+    {
+        $user = self::actor();
+        $ids = $portal->shortcut_app_ids ?? [];
+        if ($user === null || $ids === []) {
+            return collect();
+        }
+
+        $apps = BusinessApp::query()
+            ->whereKey($ids)
+            ->where(fn ($query) => $query
+                ->whereHas('spaces', fn ($query) => $query->where('panel_id', self::panelId()))
+                ->when($user->isSuperAdmin(), fn ($query) => $query->orWhereIn('code', AppResource::appCodesIn(Filament::getCurrentOrDefaultPanel()))))
+            ->get()
+            ->filter(fn (BusinessApp $app): bool => $user->isSuperAdmin() || $app->status->isOpenToEmployees())
+            ->keyBy('id');
+
+        return collect($ids)->map(fn (int $id): ?BusinessApp => $apps->get($id))->filter()->values();
     }
 
     /**

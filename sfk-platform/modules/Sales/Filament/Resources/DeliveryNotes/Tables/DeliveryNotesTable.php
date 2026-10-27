@@ -11,6 +11,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
 use Modules\Core\Application\Filters\FilterField;
+use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Domain\Billing\ClosingDay;
 use Modules\Core\Domain\Filters\FilterOperator;
@@ -149,7 +150,7 @@ final class DeliveryNotesTable
             'subtotal', 'tax_total' => $column->alignEnd()->formatStateUsing(fn (mixed $state): string => SalesFormat::yen($state)),
             'customer_id' => $column
                 ->state(fn (DeliveryNote $record): ?string => $record->customer?->name)
-                ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHas('customer', fn (Builder $q): Builder => $q->whereLike('name', "%{$search}%")))
+                ->searchable(query: SearchQuery::through('customer', 'name'))
                 ->sortable(query: $partner('name')),
             'customer_code' => $column->state(fn (DeliveryNote $record): ?string => $record->customer?->code)->sortable(query: $partner('code')),
             'delivery_note_issuance', 'invoice_issuance' => $column

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Modules\Core\Filament\Tables;
 
 use Filament\Tables\Columns\TextColumn;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Filament\AppPages\AppListRecords;
 
 /**
@@ -24,6 +26,28 @@ class AppTextColumn extends TextColumn
         }
 
         return $field->toHtml('inlineData', (string) $this->getLabel(), $page->getErrorBag(), $page->inlineData[$field->name] ?? null);
+    }
+
+    /**
+     * The list search on this column compares the normalized forms (SearchQuery: 全角 / 半角, case, カタカナ / ひらがな,
+     * romaji), so its trigram index is used. searchable(query: …) columns search their own way — for a related
+     * record's column through SearchQuery::through().
+     *
+     * @param  Builder<*>  $query
+     * @return Builder<*>
+     */
+    public function applySearchConstraint(Builder $query, string $search, bool &$isFirst): Builder
+    {
+        if ($this->searchQuery !== null || $this->hasRelationship($query->getModel())) {
+            return parent::applySearchConstraint($query, $search, $isFirst);
+        }
+
+        foreach ($this->getSearchColumns($query->getModel()) as $column) {
+            SearchQuery::where($query, $query->qualifyColumn($column), $search, $isFirst ? 'and' : 'or');
+            $isFirst = false;
+        }
+
+        return $query;
     }
 
     public function isClickDisabled(): bool

@@ -16,6 +16,12 @@
          */
         Alpine.store('sfkCheckedRows', 0)
 
+        /**
+         * The checked rows themselves ($store.sfkChecked): their keys, or all: true while すべて選択 covers every page
+         * (keys are then the unchecked ones). Read by the buttons that need certain rows (AppListRecords::needsRows()).
+         */
+        Alpine.store('sfkChecked', { count: 0, all: false, keys: [] })
+
         Alpine.data('sfkCheckedRowsWatcher', () => ({
             timer: null,
 
@@ -39,6 +45,13 @@
                 const count = data && typeof data.getSelectedRecordsCount === 'function' ? data.getSelectedRecordsCount() : 0
                 if (Alpine.store('sfkCheckedRows') !== count) {
                     Alpine.store('sfkCheckedRows', count)
+                }
+
+                const all = !!(data && data.isTrackingDeselectedRecords)
+                const keys = data ? [...(all ? data.deselectedRecords : data.selectedRecords)].map(String) : []
+                const checked = Alpine.store('sfkChecked')
+                if (checked.count !== count || checked.all !== all || checked.keys.join() !== keys.join()) {
+                    Alpine.store('sfkChecked', { count, all, keys })
                 }
             },
         }))
