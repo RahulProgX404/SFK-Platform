@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace Modules\Purchasing\Application\Purchases;
 
 use App\Models\User;
-use Filament\Actions\Action;
-use Filament\Notifications\Notification;
-use Filament\Support\Icons\Heroicon;
+use Modules\Core\Application\Notifications\Notice;
+use Modules\Core\Application\Notifications\Notifier;
 use Modules\Purchasing\Models\Purchase;
 
 /**
@@ -16,7 +15,12 @@ use Modules\Purchasing\Models\Purchase;
  */
 final class OverrunAlert
 {
+    /** The kind of its 通知 (registered by the module). */
+    public const NOTIFICATION = 'purchasing.purchase.overrun';
+
     public const MESSAGE = '仕入原価超過があります。';
+
+    public function __construct(private readonly Notifier $notifier) {}
 
     /** @param  string  $url  the purchase's record page */
     public function send(Purchase $purchase, ?User $actor, string $subject, string $url): void
@@ -25,17 +29,14 @@ final class OverrunAlert
             return;
         }
 
-        $recipients = $purchase->notifiedUsers()->get()->reject(fn (User $user): bool => $actor !== null && $user->is($actor));
-        if ($recipients->isEmpty()) {
-            return;
-        }
-
-        Notification::make()
-            ->title($subject)
-            ->body(self::MESSAGE.'（'.implode('・', (array) $purchase->overruns).'）')
-            ->icon(Heroicon::OutlinedExclamationTriangle)
-            ->iconColor('warning')
-            ->actions([Action::make('open')->label('レコードを開く')->url($url)->markAsRead()])
-            ->sendToDatabase($recipients);
+        $this->notifier->send(
+            Notice::make(self::NOTIFICATION)
+                ->about($purchase)
+                ->title($subject)
+                ->body(self::MESSAGE.'（'.implode('・', (array) $purchase->overruns).'）')
+                ->url($url),
+            $purchase->notifiedUsers()->get(),
+            $actor,
+        );
     }
 }

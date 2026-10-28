@@ -20,17 +20,26 @@ use Filament\Support\Icons\Heroicon;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Events\ConnectionEstablished;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Modules\Core\Access\DashboardAccess;
 use Modules\Core\Application\Apps\AppDiscovery;
+use Modules\Core\Application\Comments\RecordComments;
+use Modules\Core\Application\Notifications\NotificationKind;
+use Modules\Core\Application\Notifications\NotificationKinds;
+use Modules\Core\Application\Notifications\Notifier;
+use Modules\Core\Application\Notifications\RecordDirectory;
 use Modules\Core\Application\Numbering\DocumentNumberGenerator;
 use Modules\Core\Application\Search\SearchQuery;
+use Modules\Core\Console\PruneNotificationsCommand;
+use Modules\Core\Console\RunNotificationChecksCommand;
 use Modules\Core\Console\SyncAppsCommand;
 use Modules\Core\Console\SyncSuperAdminCommand;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\Records\RelatedLists;
+use Modules\Core\Filament\Support\AppRecordDirectory;
 use Modules\Core\Http\Portal\DashboardDirectory;
 use Modules\Core\Http\Portal\DashboardEntry;
 use Modules\Core\Http\Responses\LoginPageLogoutResponse;
@@ -42,12 +51,19 @@ final class CoreServiceProvider extends ModuleServiceProvider
     protected array $commands = [
         SyncSuperAdminCommand::class,
         SyncAppsCommand::class,
+        RunNotificationChecksCommand::class,
+        PruneNotificationsCommand::class,
     ];
 
     protected function registerModule(): void
     {
         $this->app->singleton(DocumentNumberGenerator::class);
         $this->app->singleton(RelatedLists::class);
+
+        // 通知: the kinds the modules register, the sender, and the records seen through the app screens
+        $this->app->singleton(NotificationKinds::class);
+        $this->app->singleton(RecordDirectory::class, AppRecordDirectory::class);
+        $this->app->singleton(Notifier::class);
 
         // Apps are discovered from the AppResource screens of every module (enabled or not).
         $this->app->bind(AppDiscovery::class, fn (): AppDiscovery => new AppDiscovery([base_path('modules')]));
@@ -94,6 +110,19 @@ final class CoreServiceProvider extends ModuleServiceProvider
             NotificationsIconAlias::NOTIFICATION_WARNING => Heroicon::ExclamationTriangle,
             NotificationsIconAlias::NOTIFICATION_DANGER => Heroicon::XCircle,
         ]);
+
+        // 通知 of a コメント, in every app (RecordComments)
+        $this->app->make(NotificationKinds::class)->register(new NotificationKind(
+            key: RecordComments::NOTIFICATION,
+            label: 'コメント',
+            icon: Heroicon::OutlinedChatBubbleLeftEllipsis,
+        ));
+
+        // the daily 通知 every morning before work starts; old 通知 pruned at night
+        $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
+            $schedule->command(RunNotificationChecksCommand::class)->dailyAt('07:30')->withoutOverlapping();
+            $schedule->command(PruneNotificationsCommand::class)->dailyAt('03:00');
+        });
 
         // Drop-downs search shortly after typing stops (Filament waits a full second).
         Select::configureUsing(fn (Select $select): Select => $select->searchDebounce(300));

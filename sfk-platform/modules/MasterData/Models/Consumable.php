@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Carbon;
 use Modules\Core\Application\Comments\HasRecordComments;
 use Modules\Core\Application\History\HasRecordHistory;
 use Modules\Core\Models\Concerns\RecordsComments;
@@ -36,6 +37,7 @@ use Modules\MasterData\Domain\Consumables\ConsumableKind;
  * @property string|null $lot_size
  * @property int|null $supplier_id
  * @property string|null $notes
+ * @property Carbon|null $reorder_alerted_at when the 要発注 通知 was sent (ReorderAlert)
  * @property int|null $created_by
  * @property int|null $updated_by
  * @property-read Partner|null $supplier
@@ -47,7 +49,7 @@ final class Consumable extends Model implements HasRecordComments, HasRecordHist
     use RecordsComments;
     use RecordsHistory;
 
-    protected $guarded = ['id', 'created_by', 'updated_by', 'created_at', 'updated_at'];
+    protected $guarded = ['id', 'reorder_alerted_at', 'created_by', 'updated_by', 'created_at', 'updated_at'];
 
     protected function casts(): array
     {
@@ -59,6 +61,7 @@ final class Consumable extends Model implements HasRecordComments, HasRecordHist
             'amount' => 'decimal:4',
             'unit_price' => 'decimal:4',
             'lot_size' => 'decimal:4',
+            'reorder_alerted_at' => 'datetime',
         ];
     }
 
@@ -124,7 +127,7 @@ final class Consumable extends Model implements HasRecordComments, HasRecordHist
      */
     protected function historyExcludedColumns(): array
     {
-        return [$this->getKeyName(), 'created_by', 'updated_by', 'stock', $this->getCreatedAtColumn(), $this->getUpdatedAtColumn()];
+        return [$this->getKeyName(), 'created_by', 'updated_by', 'stock', 'reorder_alerted_at', $this->getCreatedAtColumn(), $this->getUpdatedAtColumn()];
     }
 
     /** @return list<User|null> 作成者 and 更新者 */

@@ -219,3 +219,29 @@ it('records the alcohol check before and after driving', function () {
         ->call('applyAppFilter', ['conditions' => [['field' => 'after_method', 'operator' => 'in', 'values' => ['対面']]]])
         ->assertCanNotSeeTableRecords([$check]);
 });
+
+it('notifies the administrators at once of 酒気帯び運転 有 (BR-HR-04)', function () {
+    $manager = User::factory()->admin()->create(['name' => '安全運転管理者']);
+    $this->actingAs($this->employee);
+
+    Livewire::test(CreateAlcoholCheck::class)
+        ->fillForm(['checked_on' => '2026-10-21', 'before_time' => '08:05', 'before_vehicle' => 'な　2-10（トラック）', 'before_method' => '対面', 'before_detected' => '有',
+            'before_checker_id' => $this->admin->id, 'after_time' => '17:20', 'after_vehicle' => 'な　2-10（トラック）', 'after_method' => '電話', 'after_detected' => '無',
+            'after_checker_id' => $this->admin->id])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $check = AlcoholCheck::query()->sole();
+    $notice = $manager->notifications()->sole();
+    expect($notice->data['title'])->toBe(AlcoholCheckResource::appName().': 2026-10-21 申請 太郎')
+        ->and($notice->data['body'])->toBe('酒気帯び運転の有無: 有（運転前）')
+        ->and($this->admin->notifications()->count())->toBe(1)
+        ->and($this->employee->notifications()->count())->toBe(0);
+
+    // saved again: not again; 運転後 becomes 有: once more
+    $check->update(['before_notes' => '再検査済']);
+    expect($manager->notifications()->count())->toBe(1);
+    $check->update(['after_detected' => '有']);
+    expect($manager->notifications()->count())->toBe(2)
+        ->and($manager->notifications()->get()->pluck('data.body')->all())->toContain('酒気帯び運転の有無: 有（運転後）');
+});

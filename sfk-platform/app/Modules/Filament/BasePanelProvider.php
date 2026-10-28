@@ -84,7 +84,7 @@ abstract class BasePanelProvider extends PanelProvider
             // the column the search looks in, an icon right of the search box of the app lists
             ->renderHook(TablesRenderHook::TOOLBAR_SEARCH_AFTER, fn (): string => AppListRecords::toolbarSearchColumn())
             ->sidebarCollapsibleOnDesktop()
-            // 通知 (bell in the top bar), e.g. a コメント on a record (Modules\Core\Application\Comments\RecordComments)
+            // 通知 (bell in the top bar), sent through Modules\Core\Application\Notifications\Notifier (docs/notifications.md)
             ->databaseNotifications()
             ->middleware([
                 EncryptCookies::class,

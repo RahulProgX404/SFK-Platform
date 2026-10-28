@@ -1142,6 +1142,7 @@ it('takes コメント with 宛先 on the record and notifies them, 作成者 an
     publishedPartnerApp();
     $creator = User::factory()->create(['name' => '作成 太郎']);
     $addressee = User::factory()->admin()->create(['name' => '宛先 花子']);
+    openAppTo('partner-master', $creator);
     $this->actingAs($creator);
     $partner = makePartner(['name' => 'コメント取引先']);
     $this->actingAs($this->admin);

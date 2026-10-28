@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\Production\Filament\Resources\AccidentReports\Pages;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Filament\AppPages\AppCreateRecord;
+use Modules\Production\Application\AccidentReports\AccidentAlert;
 use Modules\Production\Filament\Resources\AccidentReports\AccidentReportResource;
 use Modules\Production\Models\AccidentDamage;
 use Modules\Production\Models\AccidentReport;
 
+/** @property AccidentReport $record */
 final class CreateAccidentReport extends AppCreateRecord
 {
     protected static string $resource = AccidentReportResource::class;
@@ -35,6 +38,15 @@ final class CreateAccidentReport extends AppCreateRecord
         }
 
         return $data;
+    }
+
+    /** A new incident → administrators and 営業関係者 (AccidentAlert), after the 営業関係者 were saved. */
+    protected function afterCreate(): void
+    {
+        parent::afterCreate();
+
+        $actor = auth()->user();
+        app(AccidentAlert::class)->created($this->record, $actor instanceof User ? $actor : null, AccidentReportResource::titleOf($this->record));
     }
 
     /** Like the legacy system, show the saved record. */

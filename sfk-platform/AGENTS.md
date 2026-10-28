@@ -126,6 +126,10 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   (`RecordDeletion::impact()` via `Support\DeleteImpact`, read from the foreign keys). A model that deletes other
   records' rows itself in a `deleting` hook (e.g. 売上 → 納品書 / 請求書 rows) implements
   `Modules\Core\Application\Records\DeletesWith` so the warning counts them. No per-app 削除 buttons.
+- 通知 (bell + e-mail, `docs/notifications.md`): every notification goes through Core `Notifier::send(Notice, $recipients, $actor)`
+  with a kind the module registers in `NotificationKinds` (it then appears in プロフィール → 通知設定); `Notice::about($record)`
+  so only users who may open the record get it. Never `Notification::sendToDatabase()` directly (toasts: `->send()`).
+  Conditions found by looking (dates, thresholds) are daily `NotificationCheck`s with `once()` keys.
 - A Filament action put straight into a Blade view (`{{ $this->fooAction }}`, `{{ ($page->fooAction)([...]) }}`) is drawn
   even when it is hidden — disabled, but visible. Wrap it: `@if (($a = ($this->fooAction)([...]))->isVisible()) {{ $a }} @endif`.
 - Never write the word for the old product anywhere; call it 旧システム in the UI and "legacy system" in English.

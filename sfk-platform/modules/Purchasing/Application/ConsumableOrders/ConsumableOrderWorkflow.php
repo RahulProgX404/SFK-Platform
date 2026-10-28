@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace Modules\Purchasing\Application\ConsumableOrders;
 
 use App\Models\User;
-use Filament\Actions\Action;
-use Filament\Notifications\Notification;
-use Filament\Support\Icons\Heroicon;
-use Modules\Core\Access\UserType;
+use Modules\Core\Application\Notifications\Notice;
+use Modules\Core\Application\Notifications\Notifier;
 use Modules\Purchasing\Application\PurchasingActionNotAllowed;
 use Modules\Purchasing\Domain\ConsumableOrders\ConsumableOrderStatus;
 use Modules\Purchasing\Models\ConsumableOrder;
@@ -21,6 +19,11 @@ use Modules\Purchasing\Models\ConsumableOrder;
  */
 final class ConsumableOrderWorkflow
 {
+    /** The kind of its 通知 (registered by the module). */
+    public const NOTIFICATION = 'purchasing.consumable-order.status';
+
+    public function __construct(private readonly Notifier $notifier) {}
+
     public function canAdvance(ConsumableOrder $order, User $user): bool
     {
         return match ($order->status) {
@@ -41,22 +44,11 @@ final class ConsumableOrderWorkflow
         $action = (string) $order->status->action();
         $order->forceFill(['status' => $next])->save();
 
-        $recipients = ($next === ConsumableOrderStatus::Checking
-            ? User::query()->whereIn('user_type', [UserType::Admin->value, UserType::SuperAdmin->value])->get()
-            : collect([$order->creator, ...$order->orderers()->get()->all()])->filter())
-            ->unique('id')
-            ->reject(fn (User $recipient): bool => $recipient->is($user))
-            ->values();
-
-        if ($recipients->isNotEmpty()) {
-            Notification::make()
-                ->title($subject)
-                ->body($user->name.': '.$action.'（ステータス: '.$next->value.'）')
-                ->icon(Heroicon::OutlinedClipboardDocumentCheck)
-                ->iconColor('primary')
-                ->actions([Action::make('open')->label('レコードを開く')->url($url)->markAsRead()])
-                ->sendToDatabase($recipients);
-        }
+        $this->notifier->send(
+            Notice::make(self::NOTIFICATION)->about($order)->title($subject)->body($user->name.': '.$action.'（ステータス: '.$next->value.'）')->url($url),
+            $next === ConsumableOrderStatus::Checking ? $this->notifier->administrators() : [$order->creator, ...$order->orderers()->get()->all()],
+            $user,
+        );
 
         return $order;
     }

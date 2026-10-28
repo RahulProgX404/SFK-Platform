@@ -467,3 +467,36 @@ it('limits employees to what the app permissions allow', function () {
     $this->actingAs(grantDashboards(User::factory()->create(), 'erp'));
     $this->get(OrderResource::getUrl('index'))->assertForbidden();
 });
+
+it('reminds the 担当者 every morning of jobs due today or on the next weekday, once per 納期', function () {
+    publishedOrderApp();
+    $sales = User::factory()->create(['name' => '営業 一郎']);
+    $creator = User::factory()->create(['name' => '入力 花子']);
+    openAppTo('order-entry', $sales, $creator);
+    $this->actingAs($creator);
+
+    // Friday 2026-10-30: due Friday to Monday
+    $monday = makeOrder(['due_date' => '2026-11-02', 'due_time' => '10:00', 'product_name' => '長3封筒']);
+    $monday->assignees()->attach($sales);
+    $shipped = makeOrder(['due_date' => '2026-10-30', 'status' => '発送完了']);
+    $shipped->assignees()->attach($sales);
+    $tuesday = makeOrder(['due_date' => '2026-11-03']);
+    $tuesday->assignees()->attach($sales);
+    $unassigned = makeOrder(['due_date' => '2026-10-30']);
+    auth()->logout();
+
+    $this->artisan('core:notification-checks', ['--date' => '2026-10-30'])->assertSuccessful();
+    $notice = $sales->notifications()->sole();
+    expect($notice->data['title'])->toBe('04. 受注入力: '.$monday->order_number)
+        ->and($notice->data['body'])->toBe('納期: 2026-11-02 10:00（月曜日） / 長3封筒')
+        ->and($notice->data['actions'][0]['url'])->toBe(OrderResource::getUrl('view', ['record' => $monday]))
+        ->and($creator->notifications()->sole()->data['body'])->toBe('納期: 2026-10-30（本日）');
+
+    // the next mornings: nothing twice; a moved 納期 is announced again
+    $this->artisan('core:notification-checks', ['--date' => '2026-10-31'])->assertSuccessful();
+    expect($sales->notifications()->count())->toBe(1);
+    $monday->update(['due_date' => '2026-11-03']);
+    $this->artisan('core:notification-checks', ['--date' => '2026-11-02'])->assertSuccessful();
+    expect($sales->notifications()->count())->toBe(3)
+        ->and($creator->notifications()->count())->toBe(1);
+});

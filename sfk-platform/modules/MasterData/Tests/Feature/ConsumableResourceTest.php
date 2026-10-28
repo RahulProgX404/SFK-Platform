@@ -218,3 +218,35 @@ it('limits employees to what the app permissions allow, 入出庫 included', fun
     $this->get(ConsumableResource::getUrl('create'))->assertForbidden();
     $this->get(ConsumableResource::getUrl('edit', ['record' => $consumable]))->assertForbidden();
 });
+
+it('notifies the administrators once each time the stock falls to the 発注点 (BR-MD-05)', function () {
+    $employee = User::factory()->create();
+    $consumable = Consumable::query()->create(['name' => '段ボール A式', 'reorder_point' => '10']);
+    $move = fn (StockMovementReason $reason, string $quantity) => $consumable->stockMovements()->create(['moved_on' => '2026-10-01', 'reason' => $reason, 'quantity' => $quantity]);
+    $notices = fn () => $this->admin->notifications()->count();
+
+    $move(StockMovementReason::Receipt, '30');
+    expect($notices())->toBe(0);
+
+    $usage = $move(StockMovementReason::Usage, '-20');
+    $notice = $this->admin->notifications()->sole();
+    expect($notice->data['title'])->toBe(ConsumableResource::appName().': 段ボール A式')
+        ->and($notice->data['body'])->toBe('要発注（在庫数 10 / 発注点 10）')
+        ->and($notice->data['actions'][0]['url'])->toBe(ConsumableResource::getUrl('view', ['record' => $consumable]))
+        ->and($employee->notifications()->count())->toBe(0)
+        ->and($consumable->fresh()?->reorder_alerted_at)->not->toBeNull();
+
+    // still 要発注: not again; above the 発注点 and down again: again
+    $move(StockMovementReason::Usage, '-1');
+    expect($notices())->toBe(1);
+    $move(StockMovementReason::Receipt, '50');
+    expect($consumable->fresh()?->reorder_alerted_at)->toBeNull();
+    $usage->update(['quantity' => '-70']);
+    expect($notices())->toBe(2);
+
+    // a 発注点 raised outside the models is caught by the daily check
+    $move(StockMovementReason::Receipt, '100');
+    DB::table('consumables')->where('id', $consumable->id)->update(['reorder_point' => '500']);
+    $this->artisan('core:notification-checks')->assertSuccessful();
+    expect($notices())->toBe(3);
+});

@@ -954,6 +954,7 @@
         text-align: start;
     }
 
+
     .sfk-delete-impact-title {
         display: flex;
         align-items: center;
@@ -962,6 +963,7 @@
         color: #8a5a00;
         font-weight: 700;
     }
+
 
     .sfk-delete-impact-title .fi-icon {
         width: 1.125rem;

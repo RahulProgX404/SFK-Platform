@@ -154,6 +154,7 @@ it('takes a consumable order through 承認依頼 and 承認する', function ()
     $creator = User::factory()->create(['name' => '発注 太郎']);
     $employee = User::factory()->create(['name' => '他の社員']);
     $admin = User::factory()->admin()->create(['name' => '管理者']);
+    openAppTo('consumable-order', $creator); // 通知 go to users who may open the order
     $this->actingAs($creator);
     $order = ConsumableOrder::query()->create(['ordered_on' => '2026-12-01', 'supplier_id' => flowSupplier()->id]);
     $workflow = app(ConsumableOrderWorkflow::class);

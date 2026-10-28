@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace Modules\HumanResources\Application\LeaveRequests;
 
 use App\Models\User;
-use Filament\Actions\Action;
-use Filament\Notifications\Notification;
-use Filament\Support\Icons\Heroicon;
-use Modules\Core\Access\UserType;
+use Modules\Core\Application\Notifications\Notice;
+use Modules\Core\Application\Notifications\Notifier;
 use Modules\HumanResources\Application\HrActionNotAllowed;
 use Modules\HumanResources\Domain\LeaveRequests\LeaveRequestStatus;
 use Modules\HumanResources\Models\LeaveRequest;
@@ -21,6 +19,11 @@ use Modules\HumanResources\Models\LeaveRequest;
  */
 final class LeaveRequestWorkflow
 {
+    /** The kind of its 通知 (registered by the module). */
+    public const NOTIFICATION = 'hr.leave-request.status';
+
+    public function __construct(private readonly Notifier $notifier) {}
+
     /** @return list<string> the actions the user may run on the request now */
     public function actionsFor(LeaveRequest $request, User $user): array
     {
@@ -48,22 +51,11 @@ final class LeaveRequestWorkflow
         $next = $request->status->actions()[$action];
         $request->forceFill(['status' => $next])->save();
 
-        $recipients = ($next === LeaveRequestStatus::Pending
-            ? User::query()->whereIn('user_type', [UserType::Admin->value, UserType::SuperAdmin->value])->get()
-            : collect([$request->applicant, $request->creator])->filter())
-            ->unique('id')
-            ->reject(fn (User $recipient): bool => $recipient->is($user))
-            ->values();
-
-        if ($recipients->isNotEmpty()) {
-            Notification::make()
-                ->title($subject)
-                ->body($user->name.': '.$action.'（ステータス: '.$next->value.'）')
-                ->icon(Heroicon::OutlinedClipboardDocumentCheck)
-                ->iconColor('primary')
-                ->actions([Action::make('open')->label('レコードを開く')->url($url)->markAsRead()])
-                ->sendToDatabase($recipients);
-        }
+        $this->notifier->send(
+            Notice::make(self::NOTIFICATION)->about($request)->title($subject)->body($user->name.': '.$action.'（ステータス: '.$next->value.'）')->url($url),
+            $next === LeaveRequestStatus::Pending ? $this->notifier->administrators() : [$request->applicant, $request->creator],
+            $user,
+        );
 
         return $request;
     }

@@ -304,3 +304,27 @@ it('reports an incident with its damage', function () {
         ->sortTable('customer')
         ->sortTable('total_damage');
 });
+
+it('notifies the administrators and 営業関係者 of a new incident', function () {
+    $job = productionJob();
+    $sales = User::factory()->create(['name' => '営業 花子']);
+    $outsider = User::factory()->create(['name' => '他部署']);
+    $manager = User::factory()->admin()->create(['name' => '工場長']);
+    openAppTo('accident-report', $sales);
+    $this->actingAs($this->admin);
+
+    Livewire::test(CreateAccidentReport::class)
+        ->fillForm(['occurred_on' => '2026-10-20', 'reporter_id' => $this->worker->id, 'order_id' => $job->id, 'machine_id' => $this->machine->id, 'sales_users' => [$sales->id, $outsider->id],
+            'description' => '糊がはみ出した'])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $report = AccidentReport::query()->sole();
+    $notice = $sales->notifications()->sole();
+    expect($notice->data['title'])->toBe(AccidentReportResource::appName().': '.AccidentReportResource::titleOf($report))
+        ->and($notice->data['body'])->toBe('事故発生日: 2026-10-20 / 報告者: 製造 太郎 / 長3封筒')
+        ->and($manager->notifications()->count())->toBe(1)
+        // the writer knows; who may not open the app is not told
+        ->and($this->admin->notifications()->count())->toBe(0)
+        ->and($outsider->notifications()->count())->toBe(0);
+});

@@ -126,6 +126,7 @@ it('registers the five apps from the code, with 一括削除 as in their legacy 
 it('enters a purchase: 金額 from 数量 × 単価, numbered, totalled, its job and payables updated', function () {
     $job = screenJob();
     $watcher = User::factory()->create(['name' => '通知 太郎']);
+    openAppTo('purchase-entry', $watcher);
     $this->actingAs($this->admin);
 
     // 1,234 × 1.5 = 1,851 (四捨五入 of the supplier)
@@ -154,6 +155,7 @@ it('enters a purchase: 金額 from 数量 × 単価, numbered, totalled, its job
 
     // an unchanged alert is not sent again; a new 通知先 gets it
     $second = User::factory()->create();
+    openAppTo('purchase-entry', $second);
     Livewire::test(EditPurchase::class, ['record' => $purchase->getRouteKey()])->fillForm(['product_name' => 'クラフト紙A'])->call('save')->assertHasNoFormErrors();
     Livewire::test(EditPurchase::class, ['record' => $purchase->getRouteKey()])->fillForm(['notified_users' => [$watcher->id, $second->id]])->call('save')->assertHasNoFormErrors();
     expect($watcher->notifications()->count())->toBe(2)->and($second->notifications()->count())->toBe(1);

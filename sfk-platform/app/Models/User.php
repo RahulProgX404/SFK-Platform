@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
@@ -22,6 +23,7 @@ use Modules\Core\Domain\People\EmploymentStatus;
 use Modules\Core\Domain\People\Gender;
 use Modules\Core\Models\Concerns\RecordsComments;
 use Modules\Core\Models\EmployeeCategory;
+use Modules\Core\Models\NotificationSetting;
 use Modules\Core\Models\Position;
 use Modules\Core\Models\Space;
 
@@ -142,6 +144,25 @@ class User extends Authenticatable implements FilamentUser, HasRecordComments
     public function position(): BelongsTo
     {
         return $this->belongsTo(Position::class);
+    }
+
+    /** @return HasMany<NotificationSetting, $this> 通知設定 (プロフィール) */
+    public function notificationSettings(): HasMany
+    {
+        return $this->hasMany(NotificationSetting::class);
+    }
+
+    /** Where the e-mail copies of 通知 go: the 連絡用メールアドレス, else the login address. */
+    public function notificationEmail(): ?string
+    {
+        $email = filled($this->getAttribute('contact_email')) ? $this->getAttribute('contact_email') : $this->email;
+
+        return filter_var($email, FILTER_VALIDATE_EMAIL) !== false ? (string) $email : null;
+    }
+
+    public function routeNotificationForMail(): ?string
+    {
+        return $this->notificationEmail();
     }
 
     /**

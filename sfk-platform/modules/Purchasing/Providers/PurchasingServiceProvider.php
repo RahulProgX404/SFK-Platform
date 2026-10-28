@@ -6,10 +6,15 @@ namespace Modules\Purchasing\Providers;
 
 use App\Modules\ModuleServiceProvider;
 use Filament\Support\Facades\FilamentView;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\View\TablesRenderHook;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Application\Notifications\NotificationKind;
+use Modules\Core\Application\Notifications\NotificationKinds;
 use Modules\Core\Filament\Records\RelatedLists;
+use Modules\Purchasing\Application\ConsumableOrders\ConsumableOrderWorkflow;
 use Modules\Purchasing\Application\ConsumableOrders\ConsumableReceipt;
+use Modules\Purchasing\Application\Purchases\OverrunAlert;
 use Modules\Purchasing\Application\PurchasingObserver;
 use Modules\Purchasing\Filament\Resources\Payables\Pages\ListPayables;
 use Modules\Purchasing\Filament\Resources\Purchases\PurchaseResource;
@@ -30,6 +35,22 @@ final class PurchasingServiceProvider extends ModuleServiceProvider
 
     protected function bootModule(): void
     {
+        // 仕入原価超過 → 通知先 (BR-PU-05); 消耗品発注 承認依頼 / 承認する → whom it goes to next (BR-PU-09)
+        $kinds = $this->app->make(NotificationKinds::class);
+        $kinds->register(new NotificationKind(
+            key: OverrunAlert::NOTIFICATION,
+            label: '仕入原価超過',
+            appCode: 'purchase-entry',
+            icon: Heroicon::OutlinedExclamationTriangle,
+            color: 'warning',
+        ));
+        $kinds->register(new NotificationKind(
+            key: ConsumableOrderWorkflow::NOTIFICATION,
+            label: 'ステータスの変更',
+            appCode: 'consumable-order',
+            icon: Heroicon::OutlinedClipboardDocumentCheck,
+        ));
+
         // job costs, 支払金額合計 and payables follow the source records
         foreach ([Purchase::class, PaymentLine::class, PayableMonth::class] as $model) {
             $model::observe(PurchasingObserver::class);

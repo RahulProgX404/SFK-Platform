@@ -5,24 +5,28 @@ declare(strict_types=1);
 namespace Modules\Core\Application\Comments;
 
 use App\Models\User;
-use Filament\Actions\Action;
-use Filament\Notifications\Notification;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Modules\Core\Application\Notifications\Notice;
+use Modules\Core\Application\Notifications\Notifier;
 use Modules\Core\Models\RecordComment;
 
 /**
  * コメント of app records (legacy record comments): written by anyone who may view the record, optionally addressed to
  * users (宛先); the 宛先 and the record's comment recipients (e.g. 作成者 / 更新者) get a 通知 with a link to the
- * record, except the writer. Only the writer deletes a comment.
+ * record, except the writer and users who may not open the record (Notifier). Only the writer deletes a comment.
  */
 final class RecordComments
 {
+    /** The kind of its 通知 (NotificationKinds, registered by Core). */
+    public const NOTIFICATION = 'comment';
+
     /** Longest comment, like the legacy system. */
     public const MAX_LENGTH = 65535;
+
+    public function __construct(private readonly Notifier $notifier) {}
 
     /** @return Collection<int, RecordComment> newest first */
     public function comments(Model $record): Collection
@@ -46,20 +50,15 @@ final class RecordComments
             'mentions' => $addressed->modelKeys(),
         ]);
 
-        $recipients = collect([...$addressed->all(), ...$record->commentRecipients()])
-            ->filter(fn (?User $user): bool => $user !== null && ! $user->is($writer))
-            ->unique('id')
-            ->values();
-
-        if ($recipients->isNotEmpty()) {
-            Notification::make()
+        $this->notifier->send(
+            Notice::make(self::NOTIFICATION)
+                ->about($record)
                 ->title($subject)
-                ->body($writer->name.': '.Str::limit(preg_replace('/\s+/u', ' ', $body) ?? $body, 100))
-                ->icon(Heroicon::OutlinedChatBubbleLeftEllipsis)
-                ->iconColor('primary')
-                ->actions([Action::make('open')->label('レコードを開く')->url($url)->markAsRead()])
-                ->sendToDatabase($recipients);
-        }
+                ->body($writer->name.': '.Str::limit(preg_replace("/\s+/u", ' ', $body) ?? $body, 100))
+                ->url($url),
+            [...$addressed->all(), ...$record->commentRecipients()],
+            $writer,
+        );
 
         return $comment;
     }

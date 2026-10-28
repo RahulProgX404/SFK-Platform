@@ -7,6 +7,7 @@ namespace Modules\Core\Filament\Profile;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Auth\Pages\EditProfile;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\TextEntry;
@@ -18,12 +19,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
+use Modules\Core\Application\Notifications\NotificationPreferences;
 use Modules\Core\Domain\People\Gender;
+use Modules\Core\Filament\AppResource;
+use Modules\Core\Models\BusinessApp;
 use SensitiveParameter;
 
 /**
  * プロフィール (user menu of every dashboard): the user's own details. They may update 氏名, フリガナ, 性別 and
- * 住所・連絡先 and change their password here; everything else is maintained by administrators.
+ * 住所・連絡先, their 通知設定 (NotificationPreferences) and change their password here; everything else is maintained by
+ * administrators.
  */
 final class ProfilePage extends EditProfile
 {
@@ -92,6 +97,18 @@ final class ProfilePage extends EditProfile
                     TextInput::make('emergency_contact_name')->label('緊急連絡先（氏名・続柄）')->maxLength(64),
                     TextInput::make('emergency_contact_phone')->label('緊急連絡先（電話番号）')->tel()->maxLength(32),
                 ]),
+            Section::make('通知設定')
+                ->columns(2)
+                ->schema([
+                    CheckboxList::make('notifications_receive')
+                        ->label('受け取る')
+                        ->options(fn (): array => $this->notificationOptions())
+                        ->live(),
+                    CheckboxList::make('notifications_mail')
+                        ->label('メールでも受け取る')
+                        ->options(fn (): array => $this->notificationOptions())
+                        ->disableOptionWhen(fn (string $value, Get $get): bool => ! in_array($value, (array) $get('notifications_receive'), true)),
+                ]),
             Section::make('パスワード変更')
                 ->hidden(fn (): bool => $this->user()->managed_by_env)
                 ->schema([
@@ -143,10 +160,31 @@ final class ProfilePage extends EditProfile
         ];
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        $preferences = app(NotificationPreferences::class);
+
+        return [
+            ...parent::mutateFormDataBeforeFill($data),
+            'notifications_receive' => $preferences->receiving($this->user()),
+            'notifications_mail' => $preferences->mailing($this->user()),
+        ];
+    }
+
     /** @param  array<string, mixed>  $data */
     protected function handleRecordUpdate(Model $record, #[SensitiveParameter] array $data): Model
     {
         /** @var User $record */
+        app(NotificationPreferences::class)->save(
+            $record,
+            array_values(array_map('strval', (array) ($data['notifications_receive'] ?? []))),
+            array_values(array_map('strval', (array) ($data['notifications_mail'] ?? []))),
+        );
+
         $record->fill(array_intersect_key($data, array_flip(self::EDITABLE)));
 
         if (array_key_exists('password', $data) && ! $record->managed_by_env) {
@@ -165,6 +203,19 @@ final class ProfilePage extends EditProfile
     protected function getSavedNotificationTitle(): string
     {
         return 'プロフィールを保存しました';
+    }
+
+    /** @return array<string, string> kind => 「<app name>: <label>」 */
+    private function notificationOptions(): array
+    {
+        $options = [];
+        foreach (app(NotificationPreferences::class)->kindsFor($this->user()) as $kind) {
+            $resource = $kind->appCode !== null ? AppResource::forCode($kind->appCode) : null;
+            $app = $kind->appCode !== null ? (BusinessApp::forCode($kind->appCode)->name ?? ($resource !== null ? $resource::appName() : null)) : null;
+            $options[$kind->key] = $app !== null ? $app.': '.$kind->label : $kind->label;
+        }
+
+        return $options;
     }
 
     private function user(): User
