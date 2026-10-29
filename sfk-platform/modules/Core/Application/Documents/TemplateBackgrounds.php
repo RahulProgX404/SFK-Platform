@@ -5,18 +5,18 @@ declare(strict_types=1);
 namespace Modules\Core\Application\Documents;
 
 use Illuminate\Support\Facades\Process;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Modules\Core\Application\Documents\Pdf\JapanesePdf;
+use Modules\Core\Application\Files\Uploads;
 use Modules\Core\Models\BusinessApp;
 use Modules\Core\Models\DocumentTemplate;
 use Throwable;
 
 /**
- * Background PDFs of the 帳票テンプレート, kept on the local disk under documents/templates/<app id>/. An uploaded PDF the
- * renderer's free PDF reader cannot open (compressed cross-reference streams of PDF 1.5+, encryption without a
- * password) is rewritten by qpdf (Apache-2.0, part of the PHP image) into a classic PDF first; the drawing stays the
- * same.
+ * Background PDFs of the 帳票テンプレート, kept on the uploads disk (Uploads) under documents/templates/<app id>/. An
+ * uploaded PDF the renderer's free PDF reader cannot open (compressed cross-reference streams of PDF 1.5+, encryption
+ * without a password) is rewritten by qpdf (Apache-2.0, part of the PHP image; where it is missing such a PDF is
+ * refused) into a classic PDF first; the drawing stays the same.
  */
 final class TemplateBackgrounds
 {
@@ -25,7 +25,7 @@ final class TemplateBackgrounds
     private const DIRECTORY = 'documents/templates';
 
     /**
-     * Stores an uploaded PDF (a file on the local disk, e.g. from the upload field) for the app.
+     * Stores an uploaded PDF (a file on the uploads disk, e.g. from the upload field) for the app.
      *
      * @return array{path: string, pages: list<array{width: float, height: float}>}
      *
@@ -33,7 +33,7 @@ final class TemplateBackgrounds
      */
     public function store(BusinessApp $app, string $uploadedPath): array
     {
-        $disk = Storage::disk(DocumentTemplate::DISK);
+        $disk = Uploads::storage();
         if (! $disk->exists($uploadedPath)) {
             throw DocumentSettingsInvalid::of('background', 'PDFファイルを選択してください。');
         }
@@ -43,9 +43,14 @@ final class TemplateBackgrounds
         $disk->move($uploadedPath, $path);
 
         try {
-            $pages = $this->pages($disk->path($path));
+            $file = Uploads::localFile($path) ?? throw DocumentSettingsInvalid::of('background', 'PDFファイルを選択してください。');
+            $original = hash_file('xxh128', $file);
+            $pages = $this->pages($file);
+            if (hash_file('xxh128', $file) !== $original) {
+                Uploads::storeLocalFile($path); // rewritten by qpdf
+            }
         } catch (DocumentSettingsInvalid $invalid) {
-            $disk->delete($path);
+            Uploads::delete($path);
 
             throw $invalid;
         }
@@ -60,10 +65,28 @@ final class TemplateBackgrounds
             return null;
         }
 
-        $disk = Storage::disk(DocumentTemplate::DISK);
         $path = self::DIRECTORY.'/'.$template->business_app_id.'/'.Str::uuid()->toString().'.pdf';
 
-        return $disk->copy($template->background_path, $path) ? $path : null;
+        return Uploads::storage()->copy($template->background_path, $path) ? $path : null;
+    }
+
+    /** Whether the template has a background PDF (false for a blank sheet or a lost file). */
+    public function exists(DocumentTemplate $template): bool
+    {
+        return $template->background_path !== null && Uploads::storage()->exists($template->background_path);
+    }
+
+    /** A file on this server with the background PDF, or null for a blank sheet (or a lost file). */
+    public function file(DocumentTemplate $template): ?string
+    {
+        return $template->background_path !== null ? Uploads::localFile($template->background_path) : null;
+    }
+
+    public function delete(?string $path): void
+    {
+        if ($path !== null) {
+            Uploads::delete($path);
+        }
     }
 
     /**

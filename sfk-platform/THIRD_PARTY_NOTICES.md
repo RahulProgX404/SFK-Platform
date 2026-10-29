@@ -50,6 +50,16 @@ No code of it is included.
 
 Japanese text in the generated PDFs uses the standard Japanese CID fonts by name (not embedded): no font file is shipped.
 
+## Uploads in object storage (2026-10-29, Laravel Cloud)
+
+| Component | License | Where |
+|---|---|---|
+| league/flysystem-aws-s3-v3 3.35 (Frank de Jonge) | MIT | Composer — the S3-compatible disk of the uploads bucket |
+| aws/aws-sdk-php 3.402 (Amazon Web Services) | Apache-2.0 | Composer, with the above — S3 client, temporary URLs |
+| aws/aws-crt-php 1.2 (Amazon Web Services) | Apache-2.0 | Composer, with the above |
+| mtdowling/jmespath.php 2.9 (Michael Dowling) | MIT | Composer, with the above |
+| symfony/filesystem 8.1 (Symfony) | MIT | Composer, with the above |
+
 ## Dependency license review (2026-10-22)
 
 PHP (Composer, production — `composer licenses --no-dev`, 118 packages): all permissive.

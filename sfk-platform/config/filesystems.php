@@ -17,6 +17,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Uploads Disk
+    |--------------------------------------------------------------------------
+    |
+    | The private disk of the files users upload (Modules\Core\Application\Files\Uploads): "local" in development and
+    | on a server of our own; on Laravel Cloud the disk name of a private bucket, whose servers keep no files between
+    | deploys.
+    |
+    */
+
+    'uploads' => env('UPLOADS_DISK', 'local'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |

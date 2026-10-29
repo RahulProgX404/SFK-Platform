@@ -78,7 +78,7 @@ AppListRecords / AppViewRecord          GET  …/background                Docum
 | id | bigint | |
 | business_app_id | FK business_apps, cascade | the app |
 | name | varchar(100), unique per app | テンプレート名 |
-| background_path | varchar null | local disk `documents/templates/<app>/<uuid>.pdf`; null = 白紙 |
+| background_path | varchar null | uploads disk (`UPLOADS_DISK`) `documents/templates/<app>/<uuid>.pdf`; null = 白紙. In object storage the PDF reader and qpdf work on a copy under `storage/framework/uploads` |
 | background_name | varchar null | uploaded file name |
 | pages | jsonb | `[{"width": 210, "height": 297}, …]` mm |
 | layout | jsonb | `{"elements": [...]}` (`TemplateLayout`) |

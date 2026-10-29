@@ -20,6 +20,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
+use Modules\Core\Application\Files\Uploads;
 use Modules\Core\Domain\Money\RoundingMode;
 use Modules\Core\Domain\Tax\TaxRate;
 use Modules\Core\Filament\Records\RecordTable;
@@ -87,7 +88,7 @@ final class DocumentParts
                 }),
             $name === 'lines' => self::linesForm($labels, $invoice),
             $name === 'notes' => Textarea::make($name)->label($label)->rows(3)->maxLength(4000),
-            $name === 'pdf_files' => FileUpload::make($name)->label($label)->multiple()->disk('local')->directory($invoice ? 'sales/invoices' : 'sales/delivery-notes')
+            $name === 'pdf_files' => FileUpload::make($name)->label($label)->multiple()->disk(Uploads::disk())->directory($invoice ? 'sales/invoices' : 'sales/delivery-notes')
                 ->visibility('private')->acceptedFileTypes(['application/pdf'])->maxSize(20480),
             $name === 'customer_code' => TextEntry::make($name)->label($label)->placeholder('')->state(fn (Get $get): ?string => $customer($get)?->code),
             $name === 'customer_rounding' => TextEntry::make($name)->label($label)->placeholder('')->state(fn (Get $get, ?Model $record): string => self::rounding($get, $record)->value),

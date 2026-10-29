@@ -75,14 +75,30 @@ Environment (`.env` of the server):
 | `TRUSTED_PROXIES` | the load balancer / TLS proxy addresses (or `*` behind a private proxy) | HTTPS and client IPs (login lockout) are seen correctly |
 | `VIEW_CHECK_CACHE_TIMESTAMPS` | `false` | views are compiled on deploy; no file check per rendered view |
 | `LOG_LEVEL` | `warning` | |
+| `UPLOADS_DISK` | `local` on a server of our own; the bucket's disk name on Laravel Cloud | where uploaded files are kept (`Modules\Core\Application\Files\Uploads`) |
 
 On every deploy: `composer install --no-dev --classmap-authoritative`, `php artisan migrate --force`,
 `php artisan optimize` (config, routes, events, views and modules cached), `php artisan filament:cache-components`,
 then reload PHP-FPM. OPcache with `opcache.validate_timestamps=0` (as in `docker/php/php.ini`).
 
+### Laravel Cloud (production host)
+
+Region Tokyo. Resources: Serverless Postgres 17 (same region; `CREATE EXTENSION pg_trgm` must work — list search),
+Laravel Valkey (`SESSION_DRIVER` / `CACHE_STORE` / `QUEUE_CONNECTION` = `redis`), a managed queue, the scheduler, and a
+**private** Object Storage bucket (location hint Asia-Pacific) whose disk name goes into `UPLOADS_DISK`.
+
+- Do not make the bucket the default disk: `FILESYSTEM_DISK` stays `local`, so Livewire keeps its temporary uploads on
+  the app server. With more than one app replica, set `LIVEWIRE_TEMPORARY_FILE_UPLOAD_DISK` to the bucket as well.
+- The servers keep no files between deploys: never write uploads to `disk('local')` — use `Uploads::disk()`.
+- qpdf is not on Laravel Cloud's image: an uploaded 帳票 background the PDF reader cannot open is refused with a message
+  (save it again as a plain PDF). No other system program or extra container is needed.
+- Build: `composer install --no-dev --classmap-authoritative`, `npm ci && npm run build`. Deploy: `php artisan migrate --force`,
+  `php artisan optimize`, `php artisan filament:cache-components`.
+
 Security built in: browser protections on every response (Content-Security-Policy, no framing by other sites,
 nosniff, no referrer to other sites, HSTS over HTTPS — `Modules\Core\Http\Middleware\SecurityHeaders`), login lockout
-per account and address, CSRF on every form, private uploads served only through signed URLs with a sandbox CSP,
+per account and address, CSRF on every form, private uploads opened only through temporary signed URLs (with a sandbox CSP when this system serves them; from the
+private bucket on Laravel Cloud),
 app / record / field access rights on every screen, list, related list and PDF. Check dependencies with
 `composer audit` before each release.
 

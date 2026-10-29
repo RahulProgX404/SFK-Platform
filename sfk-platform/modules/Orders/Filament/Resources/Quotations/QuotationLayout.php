@@ -19,6 +19,7 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
+use Modules\Core\Application\Files\Uploads;
 use Modules\Core\Filament\Records\RecordSections;
 use Modules\Core\Filament\Records\RecordTable;
 use Modules\Core\Filament\Support\AppFormat;
@@ -101,7 +102,7 @@ final class QuotationLayout
             )))),
             $name === 'lines' => self::linesForm(),
             $name === 'notes' => Textarea::make($name)->label($label)->rows(4)->maxLength(4000),
-            $name === 'pdf_files' => FileUpload::make($name)->label($label)->multiple()->disk('local')->directory('orders/quotations')->visibility('private')
+            $name === 'pdf_files' => FileUpload::make($name)->label($label)->multiple()->disk(Uploads::disk())->directory('orders/quotations')->visibility('private')
                 ->acceptedFileTypes(['application/pdf'])->maxSize(20480)->downloadable(),
             $name === 'customer_code' => $text(fn (Get $get): ?string => $customer($get)?->code),
             $name === 'file_name' => $text(fn (Get $get): string => $get('quote_number').'_'.$customer($get)?->name),

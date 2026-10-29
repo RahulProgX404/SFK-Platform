@@ -12,6 +12,7 @@ use Modules\Core\Application\Documents\DocumentPrinter;
 use Modules\Core\Application\Documents\DocumentSource;
 use Modules\Core\Application\Documents\PrintedFile;
 use Modules\Core\Application\Documents\PrintJobs;
+use Modules\Core\Application\Documents\TemplateBackgrounds;
 use Modules\Core\Domain\Documents\OutputDelivery;
 use Modules\Core\Domain\Documents\TemplateLayout;
 use Modules\Core\Filament\AppResource;
@@ -32,10 +33,10 @@ use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
  */
 final class DocumentController
 {
-    public function background(DocumentTemplate $template): SymfonyResponse
+    public function background(DocumentTemplate $template, TemplateBackgrounds $backgrounds): SymfonyResponse
     {
         $this->administrator();
-        $file = $template->backgroundFile();
+        $file = $backgrounds->file($template);
         abort_if($file === null, 404);
 
         return response()->file($file, ['Content-Type' => 'application/pdf', 'Cache-Control' => 'private, no-store']);

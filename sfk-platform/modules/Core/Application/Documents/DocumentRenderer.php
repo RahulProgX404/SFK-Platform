@@ -18,6 +18,8 @@ use Modules\Core\Models\DocumentTemplate;
  */
 final class DocumentRenderer
 {
+    public function __construct(private readonly TemplateBackgrounds $backgrounds) {}
+
     /**
      * @param  iterable<RecordData>  $records
      * @param  list<array<string, mixed>>|null  $elements  elements to draw instead of the saved ones (preview)
@@ -28,7 +30,7 @@ final class DocumentRenderer
         $pdf->SetTitle($template->name, true);
         $pdf->SetAutoPageBreak(false);
 
-        $backgrounds = ($file = $template->backgroundFile()) !== null ? $pdf->importBackground($file) : [];
+        $backgrounds = ($file = $this->backgrounds->file($template)) !== null ? $pdf->importBackground($file) : [];
         $pages = $template->pages !== [] ? $template->pages : [['width' => 210.0, 'height' => 297.0]];
         $elements ??= $template->elements();
         $today = CarbonImmutable::today();

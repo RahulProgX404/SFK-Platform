@@ -22,6 +22,9 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
 - Speed: nothing large goes into every page — panel CSS / JS live in the theme views served as one cached file
   (`ThemeAssets`), big data of a dialog is fetched when it opens (e.g. 絞り込む). Modules are cached
   (`php artisan module:cache`, part of `optimize`); a new conventional folder in a module needs it rebuilt.
+- Uploaded files go on `Modules\Core\Application\Files\Uploads::disk()` (private; object storage on Laravel Cloud, whose
+  servers keep no files) — never `disk('local')`; a tool that needs a file path reads `Uploads::localFile()`. No new
+  system programs or extra containers (the host runs only the PHP app, Postgres, Valkey and the queue).
 - No user names/emails in code; use the ユーザー種別 `user_type` (`super_admin` / `admin` / `employee`) for system rights and
   user / 従業員カテゴリ dashboards (`Modules\Core\Access\DashboardAccess`) for panel access. There are no roles and no
   organizations; never gate features on a category or 役職 name.

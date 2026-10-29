@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Core\Application\Documents;
 
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Modules\Core\Domain\Documents\OutputDelivery;
 use Modules\Core\Domain\Documents\OutputMode;
 use Modules\Core\Domain\Documents\OutputPlacement;
@@ -25,7 +24,7 @@ final class DocumentSettings
     public function __construct(private readonly TemplateBackgrounds $backgrounds) {}
 
     /**
-     * テンプレートを追加する: name, and either background (uploaded PDF on the local disk) + background_name, or paper.
+     * テンプレートを追加する: name, and either background (uploaded PDF on the uploads disk) + background_name, or paper.
      *
      * @param  array<string, mixed>  $data
      */
@@ -89,8 +88,8 @@ final class DocumentSettings
             'updated_by' => $userId,
         ])->save();
 
-        if ($old !== null && $old !== $template->background_path) {
-            Storage::disk(DocumentTemplate::DISK)->delete($old);
+        if ($old !== $template->background_path) {
+            $this->backgrounds->delete($old);
         }
 
         return $template;
@@ -118,7 +117,7 @@ final class DocumentSettings
         ]);
     }
 
-    /** 削除; a template still printed by a 出力設定 stays. */
+    /** 削除 with its background (a copy has its own file); a template still printed by a 出力設定 stays. */
     public function deleteTemplate(DocumentTemplate $template): void
     {
         $outputs = $template->outputs()->pluck('name')->all();
@@ -127,6 +126,7 @@ final class DocumentSettings
         }
 
         $template->delete();
+        $this->backgrounds->delete($template->background_path);
     }
 
     /**

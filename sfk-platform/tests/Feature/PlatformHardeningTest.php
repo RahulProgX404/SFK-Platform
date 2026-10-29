@@ -25,6 +25,27 @@ it('sends the browser protections with every page', function () {
     expect($this->get('https://localhost/login')->headers->get('Strict-Transport-Security'))->toBe('max-age=31536000; includeSubDomains');
 });
 
+it('lets pages load the attachments from the object storage of the uploads, and from nowhere else', function () {
+    expect($this->get('/login')->headers->get('Content-Security-Policy'))
+        ->toContain("img-src 'self' data: blob:; ")
+        ->toContain("connect-src 'self'; ");
+
+    // Laravel Cloud: a private bucket; the attachments open through its temporary URLs
+    config([
+        'filesystems.disks.uploads-bucket' => [
+            'driver' => 's3', 'key' => 'key', 'secret' => 'secret', 'region' => 'auto', 'bucket' => 'sfk-uploads',
+            'endpoint' => 'https://storage.example.com', 'use_path_style_endpoint' => true,
+        ],
+        'filesystems.uploads' => 'uploads-bucket',
+    ]);
+
+    expect($this->get('/login')->headers->get('Content-Security-Policy'))
+        ->toContain("img-src 'self' data: blob: https://storage.example.com; ")
+        ->toContain("connect-src 'self' https://storage.example.com; ")
+        ->toContain("default-src 'self'; ")
+        ->toContain("frame-src 'self'; ");
+});
+
 it('serves the look of the panels as a stylesheet and a script the browser keeps', function () {
     $this->actingAs(User::factory()->superAdmin()->create());
     $bundle = ThemeAssets::bundle();

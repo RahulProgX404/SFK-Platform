@@ -19,6 +19,7 @@ use Modules\Core\Application\Apps\AppLifecycle;
 use Modules\Core\Application\Apps\FieldPermissionService;
 use Modules\Core\Application\Documents\DocumentSettings;
 use Modules\Core\Application\Documents\Pdf\JapanesePdf;
+use Modules\Core\Application\Documents\TemplateBackgrounds;
 use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\AppStatus;
 use Modules\Core\Domain\Apps\PermissionSubject;
@@ -412,6 +413,77 @@ it('rewrites an uploaded PDF the reader cannot open (compressed cross-references
 
     expect($template->pages)->toBe([['width' => 210, 'height' => 297]])
         ->and(OutputPlacement::ListChecked->isList())->toBeTrue();
+});
+
+it('keeps the backgrounds in object storage where the servers keep no files (Laravel Cloud)', function () {
+    config([
+        'filesystems.disks.uploads-bucket' => ['driver' => 's3', 'key' => 'key', 'secret' => 'secret', 'region' => 'auto', 'bucket' => 'sfk-uploads'],
+        'filesystems.uploads' => 'uploads-bucket',
+    ]);
+    // stands in for the bucket: an object storage disk is read through the storage API, never by path
+    Storage::fake('uploads-bucket');
+    $this->actingAs($this->admin);
+    $this->travelBack();
+
+    Livewire::withQueryParams(['tab' => 'documents'])->test(DeliveryNoteSettings::class)
+        ->callAction('addTemplate', data: [
+            'name' => '納品書（縦型）',
+            'source' => 'pdf',
+            'background' => UploadedFile::fake()->createWithContent('nouhinsho.pdf', backgroundPdf()),
+        ])
+        ->assertHasNoActionErrors();
+
+    $template = DocumentTemplate::query()->sole();
+    $path = (string) $template->background_path;
+    $copy = app(TemplateBackgrounds::class)->file($template);
+    expect($template->pages)->toBe([['width' => 210, 'height' => 297]])
+        ->and(Storage::disk('uploads-bucket')->exists($path))->toBeTrue()
+        ->and(Storage::disk('uploads-bucket')->allFiles('documents/uploads'))->toBe([])
+        ->and($copy)->toStartWith(storage_path('framework/uploads/'))
+        ->and(file_get_contents((string) $copy))->toBe(Storage::disk('uploads-bucket')->get($path));
+
+    // a server without the copy (another one, or after a deploy) fetches it again
+    unlink((string) $copy);
+    $this->get(route('core.documents.background', ['template' => $template]))->assertOk()->assertHeader('Content-Type', 'application/pdf');
+    $output = app(DocumentSettings::class)->saveOutput($this->documents, null, ['name' => '納品書', 'document_template_id' => $template->id, 'placements' => ['record_menu']]);
+    $note = documentNote('株式会社得意先');
+    $this->get(route('core.documents.record', ['output' => $output, 'record' => $note->id]))->assertOk()->assertHeader('Content-Type', 'application/pdf');
+    expect(is_file((string) $copy))->toBeTrue();
+
+    // 白紙 instead: the old background and its copy go
+    app(DocumentSettings::class)->replaceBackground($template, null, null, 'a4_portrait', null);
+    expect(Storage::disk('uploads-bucket')->exists($path))->toBeFalse()
+        ->and(is_file((string) $copy))->toBeFalse();
+});
+
+it('stores the PDF qpdf rewrote back into object storage', function () {
+    if (! is_executable('/usr/bin/qpdf')) {
+        $this->markTestSkipped('qpdf is not installed here.');
+    }
+    config([
+        'filesystems.disks.uploads-bucket' => ['driver' => 's3', 'key' => 'key', 'secret' => 'secret', 'region' => 'auto', 'bucket' => 'sfk-uploads'],
+        'filesystems.uploads' => 'uploads-bucket',
+    ]);
+    Storage::fake('uploads-bucket');
+
+    $source = tempnam(sys_get_temp_dir(), 'pdf');
+    $compressed = $source.'-compressed.pdf';
+    file_put_contents($source, backgroundPdf());
+    exec('qpdf --object-streams=generate '.escapeshellarg($source).' '.escapeshellarg($compressed));
+    $upload = (string) file_get_contents($compressed);
+    Storage::disk('uploads-bucket')->put('documents/uploads/compressed.pdf', $upload);
+    unlink($source);
+    unlink($compressed);
+
+    $template = app(DocumentSettings::class)->createTemplate($this->documents, ['name' => '圧縮PDF', 'background' => 'documents/uploads/compressed.pdf', 'background_name' => 'compressed.pdf'], null);
+    $stored = Storage::disk('uploads-bucket')->get((string) $template->background_path);
+
+    expect($template->pages)->toBe([['width' => 210, 'height' => 297]])
+        ->and($stored)->not->toBe($upload)
+        ->and($stored)->toBe(file_get_contents((string) app(TemplateBackgrounds::class)->file($template)));
+
+    app(DocumentSettings::class)->deleteTemplate($template);
+    expect(Storage::disk('uploads-bucket')->allFiles())->toBe([]);
 });
 
 it('lists another app\'s records on a page only as far as the viewer may see them (related lists)', function () {

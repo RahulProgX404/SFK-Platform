@@ -6,13 +6,15 @@ namespace Modules\Core\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Modules\Core\Application\Files\Uploads;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Browser protections on every response (global middleware, so they hold wherever the system is hosted):
  * - pages may only load scripts, styles, images, fonts and connections from this system (Content-Security-Policy;
- *   inline scripts and eval stay allowed: Livewire, Alpine and Filament need them), may not be framed by other sites
- *   and may only post forms here;
+ *   inline scripts and eval stay allowed: Livewire, Alpine and Filament need them) — images and connections also from
+ *   the object storage of the uploads (Uploads::origin(), temporary URLs of the attachments) —, may not be framed by
+ *   other sites and may only post forms here;
  * - no MIME sniffing, no referrer to other sites, no camera / microphone / location / payment APIs, a window of its own
  *   (no access from pages that opened it);
  * - over HTTPS, browsers keep using HTTPS for a year (HSTS).
@@ -24,9 +26,9 @@ final class SecurityHeaders
     private const CONTENT_SECURITY_POLICY = "default-src 'self'; "
         ."script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
         ."style-src 'self' 'unsafe-inline'; "
-        ."img-src 'self' data: blob:; "
+        ."img-src 'self' data: blob:{uploads}; "
         ."font-src 'self' data: blob:; "
-        ."connect-src 'self'; "
+        ."connect-src 'self'{uploads}; "
         ."worker-src 'self' blob:; "
         ."frame-src 'self'; "
         ."frame-ancestors 'self'; "
@@ -47,7 +49,8 @@ final class SecurityHeaders
         $headers->remove('X-Powered-By');
 
         if (! $headers->has('Content-Security-Policy') && str_starts_with((string) $headers->get('Content-Type', 'text/html'), 'text/html')) {
-            $headers->set('Content-Security-Policy', self::CONTENT_SECURITY_POLICY);
+            $uploads = Uploads::origin();
+            $headers->set('Content-Security-Policy', str_replace('{uploads}', $uploads !== null ? ' '.$uploads : '', self::CONTENT_SECURITY_POLICY));
         }
 
         if ($request->isSecure()) {

@@ -25,6 +25,8 @@ use Modules\Core\Application\Documents\AppDocuments;
 use Modules\Core\Application\Documents\DocumentSettings;
 use Modules\Core\Application\Documents\DocumentSettingsInvalid;
 use Modules\Core\Application\Documents\DocumentSource;
+use Modules\Core\Application\Documents\TemplateBackgrounds;
+use Modules\Core\Application\Files\Uploads;
 use Modules\Core\Domain\Documents\OutputDelivery;
 use Modules\Core\Domain\Documents\OutputMode;
 use Modules\Core\Domain\Documents\OutputPlacement;
@@ -103,7 +105,7 @@ trait ManagesDocuments
             'name' => $template->name,
             'pages' => $template->pages,
             'elements' => $template->elements(),
-            'background' => $template->backgroundFile() !== null ? route('core.documents.background', ['template' => $template, 'v' => $template->updated_at?->timestamp]) : null,
+            'background' => app(TemplateBackgrounds::class)->exists($template) ? route('core.documents.background', ['template' => $template, 'v' => $template->updated_at?->timestamp]) : null,
             'pdfjs' => asset('vendor/pdfjs/pdf.min.js'),
             'pdfjsWorker' => asset('vendor/pdfjs/pdf.worker.min.js'),
             'pdfjsCmaps' => asset('vendor/pdfjs/cmaps').'/',
@@ -355,7 +357,7 @@ trait ManagesDocuments
                 ->required(),
             FileUpload::make('background')
                 ->label('PDFファイル')
-                ->disk(DocumentTemplate::DISK)
+                ->disk(Uploads::disk())
                 ->directory('documents/uploads')
                 ->acceptedFileTypes(['application/pdf'])
                 ->maxSize(20480)

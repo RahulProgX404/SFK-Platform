@@ -16,6 +16,7 @@ use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use LogicException;
+use Modules\Core\Application\Files\Uploads;
 use Modules\Core\Domain\Billing\ClosingDay;
 use Modules\Core\Domain\Billing\CollectionDay;
 use Modules\Core\Domain\Billing\CollectionMonth;
@@ -74,7 +75,7 @@ final class PartnerForm
             'contract_files', 'supplier_contract_files' => FileUpload::make($name)
                 ->label($label)
                 ->multiple()
-                ->disk('local')
+                ->disk(Uploads::disk())
                 ->directory('partners/contracts')
                 ->visibility('private')
                 ->downloadable()

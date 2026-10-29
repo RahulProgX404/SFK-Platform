@@ -21,6 +21,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
 use LogicException;
+use Modules\Core\Application\Files\Uploads;
 use Modules\Core\Domain\Money\RoundingMode;
 use Modules\Core\Domain\People\EmploymentStatus;
 use Modules\Core\Filament\Records\RecordTable;
@@ -195,7 +196,7 @@ final class OrderForm
             str_starts_with($name, 'work_sheet_') => FileUpload::make($name)
                 ->label($label)
                 ->multiple()
-                ->disk('local')
+                ->disk(Uploads::disk())
                 ->directory('orders/work-sheets')
                 ->visibility('private')
                 ->downloadable()
