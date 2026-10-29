@@ -9,8 +9,8 @@ namespace Modules\Core\Domain\Documents;
  * corner of the page, font sizes in pt:
  * - フィールド (field): the value of a field of the record, with 書式 and text before / after it;
  * - 固定テキスト (text): a fixed text;
- * - テーブル (table): the rows of a table field (サブテーブル), one line per row with its columns side by side; rows
- *   beyond a page continue on a copy of the template's pages.
+ * - テーブル (table): the rows of a table field (サブテーブル), one line per row with its columns side by side, each
+ *   column with 書式 and text before / after its value; rows beyond a page continue on a copy of the template's pages.
  * Every element has its font (ゴシック / 明朝), size, 太字, colour, alignment, what happens to text longer than its box
  * (縮小 / 折り返し / 切り取り) and an optional frame (罫線). normalize() turns the designer's input into that shape,
  * clamping numbers and dropping what it cannot read; field names are kept as written so a field another
@@ -156,6 +156,8 @@ final class TemplateLayout
                 'width' => self::mm($column['width'] ?? 20, 1),
                 'align' => self::choice($column['align'] ?? null, self::ALIGNS, 'left'),
                 'format' => (ValueFormat::tryFrom(is_string($column['format'] ?? null) ? $column['format'] : '') ?? ValueFormat::Display)->value,
+                'prefix' => self::string($column['prefix'] ?? '', 40),
+                'suffix' => self::string($column['suffix'] ?? '', 40),
             ];
         }
 

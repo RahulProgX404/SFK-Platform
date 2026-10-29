@@ -1,8 +1,8 @@
 {{--
     アプリの設定 → 帳票出力 (Modules\Core\Filament\AppPages\Concerns\ManagesDocuments):
     - 帳票テンプレート: ＋ テンプレートを追加する; rows with 用紙 (the PDF's name or 白紙) and 編集 (designer) / 複製 / 削除.
-    - 出力設定: ＋ 出力設定を追加する; rows in button order (ドラッグして並び替え) with テンプレート, 表示する場所 and
-      編集 / 削除.
+    - 出力設定: ＋ 出力設定を追加する; rows in button order (ドラッグして並び替え) with ボタン名 › サブボタン名, テンプレート,
+      表示する場所 and 編集 / 削除.
 --}}
 @php
     use Filament\Support\Icons\Heroicon;
@@ -64,7 +64,7 @@
                     </button>
                     <x-filament::icon :icon="Heroicon::OutlinedPrinter" class="sfk-views-type" />
                     <span class="sfk-docs-output-body">
-                        <span class="sfk-views-name">{{ $output->name }}</span>
+                        <span class="sfk-views-name">{{ $output->name }}@if ($output->sub_name !== '')<span class="sfk-docs-sub-name">{{ $output->sub_name }}</span>@endif</span>
                         <span class="sfk-docs-tags">
                             <span class="sfk-docs-tag">{{ $output->template->name }}</span>
                             @foreach ($output->placementLabels() as $placement)

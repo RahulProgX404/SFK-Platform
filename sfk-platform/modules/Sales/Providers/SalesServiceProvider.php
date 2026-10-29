@@ -7,6 +7,13 @@ namespace Modules\Sales\Providers;
 use App\Modules\ModuleServiceProvider;
 use Filament\Support\Facades\FilamentView;
 use Filament\Tables\View\TablesRenderHook;
+use Modules\Core\Application\Legacy\LegacyImporter;
+use Modules\Sales\Application\Legacy\LegacyCycleReceivableImport;
+use Modules\Sales\Application\Legacy\LegacyDeliveryNoteImport;
+use Modules\Sales\Application\Legacy\LegacyInvoiceImport;
+use Modules\Sales\Application\Legacy\LegacyReceiptImport;
+use Modules\Sales\Application\Legacy\LegacyReceivableImport;
+use Modules\Sales\Application\Legacy\LegacySaleImport;
 use Modules\Sales\Application\SalesObserver;
 use Modules\Sales\Filament\Resources\Receivables\Pages\ListReceivableMonths;
 use Modules\Sales\Filament\Resources\Sales\Pages\ListSales;
@@ -23,7 +30,15 @@ final class SalesServiceProvider extends ModuleServiceProvider
 
     protected function registerModule(): void
     {
-        // Bind module services / repositories here.
+        // 移行 (legacy:import): 06 売上入力, 10 納品書管理, 11 請求書管理, 21 売入金管理, 23 売掛管理, 23-2 売掛管理(締日別)
+        $this->app->tag([
+            LegacySaleImport::class,
+            LegacyDeliveryNoteImport::class,
+            LegacyInvoiceImport::class,
+            LegacyReceiptImport::class,
+            LegacyReceivableImport::class,
+            LegacyCycleReceivableImport::class,
+        ], LegacyImporter::TAG);
     }
 
     protected function bootModule(): void

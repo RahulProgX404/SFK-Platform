@@ -4,7 +4,8 @@
     - left: フィールド / テーブル / その他 (固定テキスト, 出力日 …): drag onto the page, or click to add at the top left;
     - page: drag an element to move it, its corner to resize it; arrow keys move the selected one (Shift: 5 mm),
       Delete removes it, Ctrl+D copies it, Esc unselects;
-    - right: the selected element's properties (position, size, font, alignment, 書式, table columns);
+    - right: the selected element's properties (position, size, font, alignment, 書式, table columns with text before /
+      after their values); its left edge is dragged (or moved with the arrow keys) to change its width, kept per browser;
     - top: テンプレート名, pages, 表示倍率, 1mm単位, 背景を差し替える, プレビュー (the unsaved layout with a record or the
       field labels, new tab), キャンセル / 保存.
     Behaviour: sfkDocumentDesigner (core::filament.documents.designer-script).
@@ -79,7 +80,7 @@
         </div>
     </div>
 
-    <div class="sfk-designer-body">
+    <div class="sfk-designer-body" x-ref="body" :style="'--sfk-designer-props-width:' + propsWidth + 'px'">
         {{-- palette --}}
         <aside class="sfk-designer-palette" aria-label="フィールド">
             <label class="sfk-view-search">
@@ -150,7 +151,7 @@
                         <template x-if="element.type === 'table'">
                             <span class="sfk-designer-table" :style="tableStyle(element)">
                                 <template x-for="(column, index) in element.columns" :key="index">
-                                    <span class="sfk-designer-column" :style="columnStyle(element, column)" x-text="columnLabel(element, column.field)"></span>
+                                    <span class="sfk-designer-column" :style="columnStyle(element, column)" x-text="columnText(element, column)"></span>
                                 </template>
                             </span>
                         </template>
@@ -160,6 +161,14 @@
                 </template>
             </div>
         </div>
+
+        {{-- the width of the properties: drag its left edge --}}
+        <div class="sfk-designer-splitter" role="separator" aria-orientation="vertical" aria-label="プロパティの幅" tabindex="0"
+            :aria-valuenow="propsWidth" :aria-valuemin="propsMin" :aria-valuemax="propsMax()"
+            :class="{ 'is-dragging': resizingProps }"
+            x-on:pointerdown.prevent="startPropsResize($event)"
+            x-on:keydown.left.prevent.stop="setPropsWidth(propsWidth + 20)"
+            x-on:keydown.right.prevent.stop="setPropsWidth(propsWidth - 20)"></div>
 
         {{-- properties of the selected element --}}
         <aside class="sfk-designer-props" aria-label="プロパティ">
@@ -347,6 +356,16 @@
                                                 <option :value="format.value" x-text="format.label" :selected="column.format === format.value"></option>
                                             </template>
                                         </select>
+                                    </span>
+                                    <span class="sfk-designer-column-affixes">
+                                        <label class="sfk-designer-prop">
+                                            <span class="sfk-designer-caption">前に付ける文字</span>
+                                            <input type="text" class="sfk-filter-input" x-model="column.prefix" maxlength="40">
+                                        </label>
+                                        <label class="sfk-designer-prop">
+                                            <span class="sfk-designer-caption">後に付ける文字</span>
+                                            <input type="text" class="sfk-filter-input" x-model="column.suffix" maxlength="40">
+                                        </label>
                                     </span>
                                     <span class="sfk-designer-column-tools">
                                         <button type="button" class="sfk-designer-icon-btn" x-on:click="moveColumn(index, -1)" :disabled="index === 0" title="左へ移動">

@@ -27,8 +27,9 @@ use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
  * - GET  /documents/templates/{template}/background  the background PDF, for the designer (administrators)
  * - GET|POST /documents/templates/{template}/preview  プレビュー of a template — the saved layout, or the designer's
  *   unsaved one (POST layout) — with a record (?record=) or the field labels (administrators)
- * - GET  /documents/outputs/{output}/records/{record}  the 帳票 of one record (its record page's buttons)
- * - GET  /documents/print/{token}  the 帳票 of the records chosen on a list (PrintJobs)
+ * - GET  /documents/outputs/{output}/records/{record}  the 帳票 of one record (its record page's buttons;
+ *   ?name_field= the field the user chose for 「{ユーザー選択}」 of the ファイル名)
+ * - GET  /documents/print/{token}  the 帳票 of the records chosen on a list (PrintJobs, with the chosen field)
  * Records are read through the app's screens: app permissions, レコード and フィールド access rights apply.
  */
 final class DocumentController
@@ -60,7 +61,7 @@ final class DocumentController
         return self::respond($printer->preview($template, $source, $record, $user, $elements), download: false);
     }
 
-    public function record(DocumentOutput $output, string $record, DocumentPrinter $printer): Response
+    public function record(Request $request, DocumentOutput $output, string $record, DocumentPrinter $printer): Response
     {
         $user = $this->user();
         abort_unless($output->isForRecord() && $output->isAvailableTo($user), 403);
@@ -68,9 +69,10 @@ final class DocumentController
         $resource = $this->resource($output->app);
         abort_unless($resource::canViewAny(), 403);
         $model = $this->findRecord($resource, $record) ?? abort(404);
+        $source = DocumentSource::for($resource, $user);
 
         return self::respond(
-            $printer->single($output, DocumentSource::for($resource, $user), $model, $user),
+            $printer->single($output, $source, $model, $user, self::nameField($source, $request->query('name_field'))),
             download: $output->delivery === OutputDelivery::Download,
         );
     }
@@ -98,8 +100,10 @@ final class DocumentController
             }
         }
 
+        $source = DocumentSource::for($resource, $user);
+
         return self::respond(
-            $printer->many($output, DocumentSource::for($resource, $user), $ordered, $user),
+            $printer->many($output, $source, $ordered, $user, self::nameField($source, $job['nameField'] ?? null)),
             download: $output->delivery === OutputDelivery::Download,
         );
     }
@@ -113,6 +117,12 @@ final class DocumentController
             'Content-Disposition' => HeaderUtils::makeDisposition($download || ! $file->isPdf() ? 'attachment' : 'inline', $file->name, $fallback),
             'Cache-Control' => 'private, no-store',
         ]);
+    }
+
+    /** The field the user chose for the file name (FileNamePattern::CHOSEN): one of the app's fields, else none. */
+    private static function nameField(DocumentSource $source, mixed $field): ?string
+    {
+        return is_string($field) && array_key_exists($field, $source->fields()) ? $field : null;
     }
 
     /** @return class-string<AppResource> */

@@ -27,12 +27,15 @@ use Illuminate\Support\Facades\Event;
 use Modules\Core\Access\DashboardAccess;
 use Modules\Core\Application\Apps\AppDiscovery;
 use Modules\Core\Application\Comments\RecordComments;
+use Modules\Core\Application\Legacy\LegacyPartners;
+use Modules\Core\Application\Legacy\LegacyUsers;
 use Modules\Core\Application\Notifications\NotificationKind;
 use Modules\Core\Application\Notifications\NotificationKinds;
 use Modules\Core\Application\Notifications\Notifier;
 use Modules\Core\Application\Notifications\RecordDirectory;
 use Modules\Core\Application\Numbering\DocumentNumberGenerator;
 use Modules\Core\Application\Search\SearchQuery;
+use Modules\Core\Console\ImportLegacyDataCommand;
 use Modules\Core\Console\PruneNotificationsCommand;
 use Modules\Core\Console\RunNotificationChecksCommand;
 use Modules\Core\Console\SyncAppsCommand;
@@ -53,12 +56,17 @@ final class CoreServiceProvider extends ModuleServiceProvider
         SyncAppsCommand::class,
         RunNotificationChecksCommand::class,
         PruneNotificationsCommand::class,
+        ImportLegacyDataCommand::class,
     ];
 
     protected function registerModule(): void
     {
         $this->app->singleton(DocumentNumberGenerator::class);
         $this->app->singleton(RelatedLists::class);
+
+        // 移行: the legacy logins are looked up once for all the apps of an import (legacy:import)
+        $this->app->singleton(LegacyUsers::class);
+        $this->app->singleton(LegacyPartners::class);
 
         // 通知: the kinds the modules register, the sender, and the records seen through the app screens
         $this->app->singleton(NotificationKinds::class);

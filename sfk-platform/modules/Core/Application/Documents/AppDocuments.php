@@ -33,6 +33,23 @@ final class AppDocuments
             ->all());
     }
 
+    /**
+     * The outputs of a place as buttons: those with the same ボタン名 together (one button with a menu of their
+     * サブボタン名), at the place of the first of them; each group in button order.
+     *
+     * @param  list<DocumentOutput>  $outputs
+     * @return list<list<DocumentOutput>>
+     */
+    public static function groups(array $outputs): array
+    {
+        $groups = [];
+        foreach ($outputs as $output) {
+            $groups[$output->name][] = $output;
+        }
+
+        return array_values($groups);
+    }
+
     /** @return Collection<int, DocumentOutput> the app's outputs with their templates, in button order */
     private static function of(BusinessApp $app): Collection
     {

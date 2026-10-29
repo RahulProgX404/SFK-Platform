@@ -60,6 +60,7 @@ use Modules\Core\Domain\Filters\RecordFilter;
 use Modules\Core\Domain\Search\SearchText;
 use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
 use Modules\Core\Filament\Support\DeleteImpact;
+use Modules\Core\Filament\Support\DocumentNameField;
 use Modules\Core\Filament\Support\MenuButtons;
 use Modules\Core\Filament\Tables\InlineField;
 use Modules\Core\Models\DocumentOutput;
@@ -967,35 +968,65 @@ abstract class AppListRecords extends ListRecords
 
     /**
      * 帳票出力 (アプリの設定 → 帳票出力): a button per 出力設定 of 一覧画面のメニュー — for the records of the list as
-     * filtered and searched (asking 「N件のレコードを出力しますか？」), or for the checked rows.
+     * filtered and searched (asking 「N件のレコードを出力しますか？」), or for the checked rows. 出力設定 with the same
+     * ボタン名 are one button with a menu of their サブボタン名. A ZIP whose ファイル名 has 「{ユーザー選択}」 asks for the
+     * field of the names.
      *
-     * @return list<Action>
+     * @return list<Action|ActionGroup>
      */
     private function documentActions(): array
     {
-        $actions = [];
-        foreach ($this->documentOutputsAt(OutputPlacement::ListMenu) as $output) {
-            $actions[] = $this->listedDocumentAction(Action::make('documentList'.$output->id), fn (): DocumentOutput => $output)
-                ->label($output->name);
+        $buttons = [];
+        foreach (AppDocuments::groups($this->documentOutputsAt(OutputPlacement::ListMenu)) as $group) {
+            $actions = array_map(
+                fn (DocumentOutput $output): Action => $this->listedDocumentAction(Action::make('documentList'.$output->id), fn (): DocumentOutput => $output)
+                    ->label(count($group) > 1 ? $output->optionLabel() : $output->name),
+                $group,
+            );
+            $buttons[] = self::documentButton($actions, $group);
         }
-        foreach ($this->documentOutputsAt(OutputPlacement::ListChecked) as $output) {
-            $actions[] = MenuButtons::withCheckedCount(self::onCheckedRows(
-                Action::make('documentChecked'.$output->id)
-                    ->label($output->name)
-                    ->icon(Heroicon::OutlinedPrinter)
-                    ->action(function (Collection $records) use ($output): void {
-                        if ($records->count() > DocumentOutput::MAX_RECORDS) {
-                            Notification::make()->danger()->title(DocumentOutput::MAX_RECORDS.'件以下になるようにレコードを選択してください。')->send();
-
-                            return;
-                        }
-
-                        $this->openDocuments($output, $records->map(fn (Model $record): int|string => $record->getKey())->values()->all());
-                    }),
-            ));
+        foreach (AppDocuments::groups($this->documentOutputsAt(OutputPlacement::ListChecked)) as $group) {
+            $actions = array_map(fn (DocumentOutput $output): Action => $this->checkedDocumentAction($output, count($group) > 1 ? $output->optionLabel() : $output->name), $group);
+            $buttons[] = MenuButtons::withCheckedCount(self::documentButton($actions, $group));
         }
 
-        return $actions;
+        return $buttons;
+    }
+
+    /**
+     * One action as it is, several (the same ボタン名) as a button with a menu of them.
+     *
+     * @param  list<Action>  $actions
+     * @param  list<DocumentOutput>  $group
+     */
+    private static function documentButton(array $actions, array $group): Action|ActionGroup
+    {
+        return count($actions) === 1
+            ? $actions[0]
+            : ActionGroup::make($actions)->label($group[0]->name)->icon(Heroicon::OutlinedPrinter);
+    }
+
+    private function checkedDocumentAction(DocumentOutput $output, string $label): Action
+    {
+        $action = Action::make('documentChecked'.$output->id)->label($label)->icon(Heroicon::OutlinedPrinter);
+        if ($output->asksForNameField(forList: true)) {
+            $action->modalIcon(Heroicon::OutlinedPrinter)
+                ->modalWidth('md')
+                ->modalHeading($output->name)
+                ->modalSubmitActionLabel('出力する')
+                ->modalCancelActionLabel('キャンセル')
+                ->schema([DocumentNameField::make($this->appResource())]);
+        }
+
+        return self::onCheckedRows($action->action(function (Collection $records, array $data) use ($output): void {
+            if ($records->count() > DocumentOutput::MAX_RECORDS) {
+                Notification::make()->danger()->title(DocumentOutput::MAX_RECORDS.'件以下になるようにレコードを選択してください。')->send();
+
+                return;
+            }
+
+            $this->openDocuments($output, $records->map(fn (Model $record): int|string => $record->getKey())->values()->all(), self::chosenField($data));
+        }));
     }
 
     /** 一覧画面の上部スペース: 出力 of the 帳票 chosen in the drop-down (core::filament.documents.bar; arguments: output). */
@@ -1009,16 +1040,23 @@ abstract class AppListRecords extends ListRecords
     }
 
     /**
-     * 一覧画面の上部スペース: the 出力設定 offered in the 帳票 drop-down + 出力 under the toolbar.
+     * 一覧画面の上部スペース: the 出力設定 offered in the 帳票 drop-down + 出力 under the toolbar; those with the same
+     * ボタン名 listed under it by サブボタン名.
      *
-     * @return list<array{key: string, name: string}>
+     * @return list<array{key: string, name: string, label: string}>
      */
     public function documentBar(): array
     {
         return array_map(
-            fn (DocumentOutput $output): array => ['key' => (string) $output->id, 'name' => $output->name],
+            fn (DocumentOutput $output): array => ['key' => (string) $output->id, 'name' => $output->name, 'label' => $output->optionLabel()],
             $this->documentOutputsAt(OutputPlacement::ListSpace),
         );
+    }
+
+    /** @param  array<string, mixed>  $data */
+    private static function chosenField(array $data): ?string
+    {
+        return is_string($data['name_field'] ?? null) && $data['name_field'] !== '' ? $data['name_field'] : null;
     }
 
     /** @return list<DocumentOutput> the 出力設定 the user gets at the place */
@@ -1044,7 +1082,11 @@ abstract class AppListRecords extends ListRecords
             ->modalHeading(fn (): string => number_format($this->getFilteredTableQuery()?->count() ?? 0).'件のレコードを出力しますか？')
             ->modalSubmitActionLabel('出力する')
             ->modalCancelActionLabel('キャンセル')
-            ->mountUsing(function (array $arguments) use ($output): void {
+            // a ZIP named with 「{ユーザー選択}」: which field
+            ->schema(fn (array $arguments): array => $output($arguments)?->asksForNameField(forList: true) === true
+                ? [DocumentNameField::make($this->appResource())]
+                : [])
+            ->mountUsing(function (array $arguments, ?Schema $schema) use ($output): void {
                 $count = $output($arguments) === null ? 0 : ($this->getFilteredTableQuery()?->count() ?? 0);
                 if ($count === 0) {
                     Notification::make()->warning()->title('出力するレコードがありません。')->send();
@@ -1056,15 +1098,17 @@ abstract class AppListRecords extends ListRecords
 
                     throw new Cancel;
                 }
+
+                $schema?->fill();
             })
-            ->action(function (array $arguments) use ($output): void {
+            ->action(function (array $arguments, array $data) use ($output): void {
                 $document = $output($arguments);
                 $query = $this->getFilteredSortedTableQuery();
                 if ($document === null || $query === null) {
                     return;
                 }
 
-                $this->openDocuments($document, $query->limit(DocumentOutput::MAX_RECORDS)->pluck($query->getModel()->getQualifiedKeyName())->all());
+                $this->openDocuments($document, $query->limit(DocumentOutput::MAX_RECORDS)->pluck($query->getModel()->getQualifiedKeyName())->all(), self::chosenField($data));
             });
     }
 
@@ -1072,15 +1116,16 @@ abstract class AppListRecords extends ListRecords
      * Keeps the records for the 出力設定 (PrintJobs) and opens their 帳票 in a new tab, or downloads it.
      *
      * @param  list<int|string>  $keys
+     * @param  string|null  $nameField  the field chosen for 「{ユーザー選択}」 of the ファイル名
      */
-    private function openDocuments(DocumentOutput $output, array $keys): void
+    private function openDocuments(DocumentOutput $output, array $keys, ?string $nameField = null): void
     {
         $user = auth()->user();
         if (! $user instanceof User) {
             return;
         }
 
-        $url = route('core.documents.print', ['token' => app(PrintJobs::class)->store($user->id, $output->id, $keys)]);
+        $url = route('core.documents.print', ['token' => app(PrintJobs::class)->store($user->id, $output->id, $keys, $nameField)]);
         $opens = $output->delivery === OutputDelivery::Open && $output->mode === OutputMode::Merged;
 
         $this->js($opens ? 'window.open('.Js::from($url).', "_blank")' : 'window.location.href = '.Js::from($url));

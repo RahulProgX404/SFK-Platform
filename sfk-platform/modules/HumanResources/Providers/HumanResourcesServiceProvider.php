@@ -7,10 +7,14 @@ namespace Modules\HumanResources\Providers;
 use App\Models\User;
 use App\Modules\ModuleServiceProvider;
 use Filament\Support\Icons\Heroicon;
+use Modules\Core\Application\Legacy\LegacyImporter;
 use Modules\Core\Application\Notifications\NotificationKind;
 use Modules\Core\Application\Notifications\NotificationKinds;
 use Modules\HumanResources\Application\AlcoholChecks\AlcoholAlert;
 use Modules\HumanResources\Application\LeaveRequests\LeaveRequestWorkflow;
+use Modules\HumanResources\Application\Legacy\LegacyAlcoholCheckImport;
+use Modules\HumanResources\Application\Legacy\LegacyLeaveRequestImport;
+use Modules\HumanResources\Application\Legacy\LegacySafetyCheckImport;
 use Modules\HumanResources\Models\AlcoholCheck;
 
 final class HumanResourcesServiceProvider extends ModuleServiceProvider
@@ -19,7 +23,8 @@ final class HumanResourcesServiceProvider extends ModuleServiceProvider
 
     protected function registerModule(): void
     {
-        // Bind module services / repositories here.
+        // 移行 (legacy:import): 16 申請管理, 17 安全衛生チェック, 18 アルコールチェック
+        $this->app->tag([LegacyLeaveRequestImport::class, LegacySafetyCheckImport::class, LegacyAlcoholCheckImport::class], LegacyImporter::TAG);
     }
 
     protected function bootModule(): void

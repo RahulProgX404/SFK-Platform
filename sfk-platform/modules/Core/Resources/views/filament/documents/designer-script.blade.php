@@ -1,7 +1,8 @@
 {{--
     sfkDocumentDesigner: the Alpine component of the 帳票テンプレート designer (core::filament.documents.designer).
     Positions and sizes are in mm (as saved, Modules\Core\Domain\Documents\TemplateLayout); the page is drawn at
-    96 dpi × 表示倍率. The background is drawn by pdf.js (public/vendor/pdfjs, Apache-2.0), loaded only here.
+    96 dpi × 表示倍率 (75% when the designer opens). The background is drawn by pdf.js (public/vendor/pdfjs, Apache-2.0),
+    loaded only here. The width of the properties is kept in the browser (localStorage; without it, 340 px).
 --}}
 <script>
     window.sfkDocumentDesigner = (config) => {
@@ -16,17 +17,48 @@
             align: 'left', valign: 'middle', overflow: 'shrink',
         }
 
+        const columnDefaults = { align: 'left', format: 'display', prefix: '', suffix: '' }
+
         const newId = () => 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
 
         const round1 = (value) => Math.round(value * 10) / 10
+
+        /** an element as the designer edits it: every property present (templates saved earlier lack newer ones) */
+        const editable = (element) => {
+            const copy = { ...defaults, ...JSON.parse(JSON.stringify(element)) }
+            if (Array.isArray(copy.columns)) {
+                copy.columns = copy.columns.map((column) => ({ ...columnDefaults, ...column }))
+            }
+
+            return copy
+        }
+
+        // the width of the properties (px), kept per browser
+        const PROPS_KEY = 'sfk-designer-props-width'
+        const PROPS_DEFAULT = 340
+        const PROPS_MIN = 280
+
+        const storedPropsWidth = () => {
+            try {
+                const width = Number(window.localStorage.getItem(PROPS_KEY))
+
+                return Number.isFinite(width) && width >= PROPS_MIN ? width : PROPS_DEFAULT
+            } catch (error) {
+                return PROPS_DEFAULT
+            }
+        }
 
         return {
             config,
             name: config.name,
             pages: config.pages.length ? config.pages : [{ width: 210, height: 297 }],
-            elements: config.elements.map((element) => ({ ...defaults, ...JSON.parse(JSON.stringify(element)) })),
+            elements: config.elements.map(editable),
             page: 0,
-            zoom: 1,
+            zoom: 0.75,
+            propsWidth: storedPropsWidth(),
+            propsMin: PROPS_MIN,
+            propsGesture: null,
+            resizingProps: false,
             snap: true,
             search: '',
             selectedId: null,
@@ -44,13 +76,65 @@
             init() {
                 this.onPointerMove = (event) => this.pointerMove(event)
                 this.onPointerUp = () => this.pointerUp()
+                this.onPropsMove = (event) => this.propsMove(event)
+                this.onPropsUp = () => this.propsUp()
+                this.onWindowResize = () => this.setPropsWidth(this.propsWidth, false)
+                window.addEventListener('resize', this.onWindowResize)
+                this.$nextTick(() => this.setPropsWidth(this.propsWidth, false))
                 this.loadBackground()
             },
 
             destroy() {
                 this.pointerUp()
+                this.propsUp()
+                window.removeEventListener('resize', this.onWindowResize)
                 renderTask?.cancel()
                 pdf?.destroy()
+            },
+
+            // --- the width of the properties ----------------------------------------------------------------
+
+            /** widest: the palette (240 px) and at least 240 px of the page stay in view */
+            propsMax() {
+                const body = this.$refs.body?.clientWidth ?? 0
+
+                return Math.max(PROPS_MIN, body > 0 ? body - 240 - 240 : 800)
+            },
+
+            setPropsWidth(width, keep = true) {
+                this.propsWidth = Math.round(Math.max(PROPS_MIN, Math.min(this.propsMax(), Number(width) || PROPS_DEFAULT)))
+                if (!keep) {
+                    return
+                }
+                try {
+                    window.localStorage.setItem(PROPS_KEY, String(this.propsWidth))
+                } catch (error) {
+                    // storage blocked: the width lasts until the page is left
+                }
+            },
+
+            startPropsResize(event) {
+                this.propsGesture = { x0: event.clientX, width: this.propsWidth }
+                this.resizingProps = true
+                window.addEventListener('pointermove', this.onPropsMove)
+                window.addEventListener('pointerup', this.onPropsUp)
+            },
+
+            propsMove(event) {
+                if (this.propsGesture) {
+                    // the panel is on the right: dragging its edge to the left widens it
+                    this.setPropsWidth(this.propsGesture.width - (event.clientX - this.propsGesture.x0), false)
+                }
+            },
+
+            propsUp() {
+                if (this.propsGesture) {
+                    this.setPropsWidth(this.propsWidth)
+                }
+                this.propsGesture = null
+                this.resizingProps = false
+                window.removeEventListener('pointermove', this.onPropsMove)
+                window.removeEventListener('pointerup', this.onPropsUp)
             },
 
             /** px per mm at the chosen 表示倍率 */
@@ -145,6 +229,11 @@
                 return this.tableColumns(element.table).find((column) => column.name === field)?.label ?? field
             },
 
+            /** a column on the page: its label with the text before / after it */
+            columnText(element, column) {
+                return (column.prefix || '') + this.columnLabel(element, column.field) + (column.suffix || '')
+            },
+
             typeLabel(element) {
                 if (element.type === 'table') {
                     return 'テーブル：' + (this.config.tables.find((item) => item.name === element.table)?.label ?? element.table)
@@ -221,7 +310,7 @@
 
                     return {
                         ...base, type: 'table', table: payload.table, rowHeight: 7, rows: 10,
-                        columns: columns.map((column) => ({ field: column.name, width: round1(width / Math.max(1, columns.length)), align: 'left', format: 'display' })),
+                        columns: columns.map((column) => ({ ...columnDefaults, field: column.name, width: round1(width / Math.max(1, columns.length)) })),
                     }
                 }
 
@@ -387,7 +476,7 @@
                 const used = this.sel.columns.map((column) => column.field)
                 const next = options.find((option) => !used.includes(option.name)) ?? options[0]
                 if (next) {
-                    this.sel.columns.push({ field: next.name, width: 20, align: 'left', format: 'display' })
+                    this.sel.columns.push({ ...columnDefaults, field: next.name, width: 20 })
                     this.dirty = true
                 }
             },

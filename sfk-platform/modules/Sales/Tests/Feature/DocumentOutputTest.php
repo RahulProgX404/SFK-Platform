@@ -10,6 +10,8 @@
  */
 
 use App\Models\User;
+use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Http\UploadedFile;
@@ -18,12 +20,15 @@ use Livewire\Livewire;
 use Modules\Core\Application\Apps\AppLifecycle;
 use Modules\Core\Application\Apps\FieldPermissionService;
 use Modules\Core\Application\Documents\DocumentSettings;
+use Modules\Core\Application\Documents\DocumentSettingsInvalid;
 use Modules\Core\Application\Documents\Pdf\JapanesePdf;
 use Modules\Core\Application\Documents\TemplateBackgrounds;
 use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\AppStatus;
 use Modules\Core\Domain\Apps\PermissionSubject;
+use Modules\Core\Domain\Documents\FileNamePattern;
 use Modules\Core\Domain\Documents\OutputPlacement;
+use Modules\Core\Filament\Support\MenuButtons;
 use Modules\Core\Models\BusinessApp;
 use Modules\Core\Models\DocumentOutput;
 use Modules\Core\Models\DocumentTemplate;
@@ -498,4 +503,121 @@ it('lists another app\'s records on a page only as far as the viewer may see the
 
     $this->actingAs($this->admin);
     expect(DeliveryNoteResource::onlyVisible(DeliveryNote::query())->count())->toBe(1);
+});
+
+/** The URL a Livewire action opened (window.open / location.href). */
+function openedUrl(mixed $component): string
+{
+    $expression = (string) ($component->effects['xjs'][0]['expression'] ?? '');
+    preg_match('#[\'"](https?:[^\'"]+)[\'"]#', $expression, $match);
+
+    // Js::from() escapes / and & as in JSON
+    return (string) json_decode('"'.($match[1] ?? '').'"');
+}
+
+/** @return list<string> the files in a ZIP of a list job */
+function zipNames(mixed $test, string $token): array
+{
+    $file = tempnam(sys_get_temp_dir(), 'zip');
+    file_put_contents($file, (string) $test->get(route('core.documents.print', ['token' => $token]))->assertOk()->getContent());
+    $zip = new ZipArchive;
+    $zip->open($file);
+    $names = [];
+    for ($index = 0; $index < $zip->numFiles; $index++) {
+        $names[] = $zip->getNameIndex($index);
+    }
+    $zip->close();
+    unlink($file);
+
+    return $names;
+}
+
+it('groups 出力設定 with the same ボタン名 into one button with a menu of their サブボタン名 (legacy 作業明細表 variants)', function () {
+    $this->actingAs($this->admin);
+    $settings = app(DocumentSettings::class);
+    $order = documentOutput($this->documents, ['record_menu', 'list_menu', 'record_space'], ['name' => '作業明細表', 'sub_name' => '注文書']);
+    $copy = $settings->saveOutput($this->documents, null, ['name' => '作業明細表', 'sub_name' => '営業控', 'document_template_id' => $order->document_template_id, 'placements' => ['record_menu', 'list_menu', 'record_space']]);
+    $single = documentOutput($this->documents, ['record_menu'], ['name' => '納品書']);
+
+    // a ボタン名 is unique with its サブボタン名
+    expect(fn () => $settings->saveOutput($this->documents, null, ['name' => '作業明細表', 'sub_name' => '営業控', 'document_template_id' => $order->document_template_id, 'placements' => ['record_menu']]))
+        ->toThrow(DocumentSettingsInvalid::class)
+        ->and(fn () => $settings->saveOutput($this->documents, null, ['name' => '納品書', 'document_template_id' => $order->document_template_id, 'placements' => ['record_menu']]))
+        ->toThrow(DocumentSettingsInvalid::class);
+
+    Livewire::withQueryParams(['tab' => 'documents'])->test(DeliveryNoteSettings::class)
+        ->assertSeeInOrder(['作業明細表', '注文書', '作業明細表', '営業控', '納品書']);
+
+    $note = documentNote('株式会社得意先');
+    $page = Livewire::test(ViewDeliveryNote::class, ['record' => $note->getRouteKey()]);
+    $groups = array_values(array_filter($page->instance()->getCachedHeaderActions(), fn ($action): bool => $action instanceof ActionGroup && $action->getLabel() === '作業明細表'));
+    expect($groups)->toHaveCount(1)
+        ->and(array_map(fn (Action $action): string => (string) $action->getLabel(), array_values($groups[0]->getActions())))->toBe(['注文書', '営業控'])
+        ->and(MenuButtons::isMenuButton($groups[0]))->toBeTrue();
+    $page->assertActionVisible('document'.$single->id)
+        ->assertActionHasUrl('document'.$copy->id, route('core.documents.record', ['output' => $copy, 'record' => $note->id]));
+
+    $this->get(DeliveryNoteResource::getUrl('view', ['record' => $note]))->assertOk()
+        ->assertSee('<optgroup label="作業明細表">', false)
+        ->assertSeeInOrder(['注文書', '営業控']);
+
+    // an entry of the list menu puts out the listed records
+    $component = Livewire::test(ListDeliveryNotes::class)->callAction('documentList'.$copy->id);
+    $this->get(route('core.documents.print', ['token' => printToken($component)]))->assertOk()->assertHeader('Content-Type', 'application/pdf');
+});
+
+it('lets the user choose the field of the file name when putting a 帳票 out (ユーザーが選択するフィールド)', function () {
+    $this->actingAs($this->admin);
+    $output = documentOutput($this->documents, ['record_menu', 'record_space'], ['name' => '納品書', 'file_name' => '納品書_'.FileNamePattern::CHOSEN, 'delivery' => 'download']);
+    $note = documentNote('株式会社得意先');
+
+    // ファイル名にフィールドを追加 → ユーザーが選択するフィールド
+    Livewire::withQueryParams(['tab' => 'documents'])->test(DeliveryNoteSettings::class)
+        ->mountAction(TestAction::make('output')->arguments(['output' => $output->id]))
+        ->set('mountedActions.0.data.file_name', '{number}_')
+        ->set('mountedActions.0.data.file_name_field', FileNamePattern::CHOSEN)
+        ->assertSet('mountedActions.0.data.file_name', '{number}_'.FileNamePattern::CHOSEN);
+
+    // the record button asks for the field, then downloads the file named by it
+    $component = Livewire::test(ViewDeliveryNote::class, ['record' => $note->getRouteKey()])
+        ->mountAction('document'.$output->id)
+        ->assertActionMounted('document'.$output->id)
+        ->callMountedAction()
+        ->assertHasActionErrors(['name_field' => 'required'])
+        ->fillForm(['name_field' => 'customer_id'])
+        ->callMountedAction();
+    $url = openedUrl($component);
+    expect($url)->toContain('name_field=customer_id')
+        ->and($this->get($url)->assertOk()->headers->get('Content-Disposition'))->toContain("utf-8''".rawurlencode('納品書_株式会社得意先.pdf'));
+
+    // the 上部スペース asks too; a field that is not on the record page is ignored
+    $this->get(DeliveryNoteResource::getUrl('view', ['record' => $note]))->assertSee("mountAction('printDocument'", false);
+    $component = Livewire::test(ViewDeliveryNote::class, ['record' => $note->getRouteKey()])
+        ->callAction(TestAction::make('printDocument')->arguments(['output' => $output->id]), ['name_field' => 'number']);
+    expect($this->get(openedUrl($component))->headers->get('Content-Disposition'))->toContain("utf-8''".rawurlencode('納品書_'.$note->number.'.pdf'))
+        ->and($this->get(route('core.documents.record', ['output' => $output, 'record' => $note->id, 'name_field' => 'password']))->headers->get('Content-Disposition'))
+        ->toContain("utf-8''".rawurlencode('納品書.pdf'));
+});
+
+it('asks for the field of the names of a ZIP of the listed or checked records', function () {
+    $this->actingAs($this->admin);
+    $listed = documentOutput($this->documents, ['list_menu'], ['name' => '一覧', 'mode' => 'zip', 'file_name' => FileNamePattern::CHOSEN]);
+    $checked = documentOutput($this->documents, ['list_checked'], ['name' => 'チェック', 'mode' => 'zip', 'file_name' => FileNamePattern::CHOSEN]);
+    $merged = documentOutput($this->documents, ['list_menu'], ['name' => 'まとめて', 'file_name' => FileNamePattern::CHOSEN]);
+    $first = documentNote('株式会社一番');
+    documentNote('株式会社二番');
+
+    $component = Livewire::test(ListDeliveryNotes::class)->callAction('documentList'.$listed->id, ['name_field' => 'customer_id']);
+    expect(zipNames($this, printToken($component)))->toEqualCanonicalizing(['株式会社一番.pdf', '株式会社二番.pdf']);
+
+    $component = Livewire::test(ListDeliveryNotes::class)
+        ->set('selectedTableRecords', [(string) $first->id])
+        ->callAction('documentChecked'.$checked->id, ['name_field' => 'number']);
+    expect(zipNames($this, printToken($component)))->toBe([$first->number.'.pdf']);
+
+    // one PDF of the listed records is named by the button: nothing to choose
+    Livewire::test(ListDeliveryNotes::class)
+        ->mountAction('documentList'.$merged->id)
+        ->assertActionMounted('documentList'.$merged->id)
+        ->assertMountedActionModalDontSee('ファイル名にするフィールド');
 });

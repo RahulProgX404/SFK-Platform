@@ -27,6 +27,7 @@ use Modules\Core\Application\Documents\DocumentSettingsInvalid;
 use Modules\Core\Application\Documents\DocumentSource;
 use Modules\Core\Application\Documents\TemplateBackgrounds;
 use Modules\Core\Application\Files\Uploads;
+use Modules\Core\Domain\Documents\FileNamePattern;
 use Modules\Core\Domain\Documents\OutputDelivery;
 use Modules\Core\Domain\Documents\OutputMode;
 use Modules\Core\Domain\Documents\OutputPlacement;
@@ -271,6 +272,7 @@ trait ManagesDocuments
                     ]
                     : [
                         'name' => $output->name,
+                        'sub_name' => $output->sub_name,
                         'document_template_id' => $output->document_template_id,
                         'placements' => $output->placements,
                         'mode' => $output->mode->value,
@@ -281,6 +283,8 @@ trait ManagesDocuments
             })
             ->schema([
                 TextInput::make('name')->label('ボタン名')->required()->maxLength(64),
+                // 出力設定 with the same ボタン名: one button, its menu lists them by サブボタン名
+                TextInput::make('sub_name')->label('サブボタン名')->maxLength(64),
                 Select::make('document_template_id')
                     ->label('テンプレート')
                     ->options(fn (): array => $this->app()->documentTemplates()->pluck('name', 'id')->all())
@@ -292,14 +296,15 @@ trait ManagesDocuments
                 TextInput::make('file_name')->label('ファイル名')->maxLength(200)->placeholder('{'.(array_key_first($this->documentSource()->fields()) ?? 'id').'}'),
                 Select::make('file_name_field')
                     ->label('ファイル名にフィールドを追加')
-                    ->options(fn (): array => $this->documentSource()->fields())
+                    // ユーザーが選択するフィールド: the user picks the field when putting the 帳票 out
+                    ->options(fn (): array => [FileNamePattern::CHOSEN => 'ユーザーが選択するフィールド', ...$this->documentSource()->fields()])
                     ->native(false)
                     ->searchable()
                     ->live()
                     ->dehydrated(false)
                     ->afterStateUpdated(function (?string $state, Get $get, Set $set): void {
                         if (filled($state)) {
-                            $set('file_name', $get('file_name').'{'.$state.'}');
+                            $set('file_name', $get('file_name').($state === FileNamePattern::CHOSEN ? $state : '{'.$state.'}'));
                             $set('file_name_field', null);
                         }
                     }),

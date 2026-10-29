@@ -130,7 +130,8 @@ final class DocumentSettings
     }
 
     /**
-     * 出力設定 → 保存 (new when $output is null): name, template, placements, mode, delivery, file_name, admin_only.
+     * 出力設定 → 保存 (new when $output is null): name, sub_name, template, placements, mode, delivery, file_name,
+     * admin_only. Several 出力設定 may share a ボタン名 (one button with a menu) when their サブボタン名 differ.
      *
      * @param  array<string, mixed>  $data
      */
@@ -139,12 +140,19 @@ final class DocumentSettings
         $errors = [];
 
         $name = trim((string) ($data['name'] ?? ''));
+        $subName = trim((string) ($data['sub_name'] ?? ''));
         if ($name === '') {
             $errors['name'] = 'ボタン名を入力してください。';
         } elseif (mb_strlen($name) > 64) {
             $errors['name'] = 'ボタン名は64文字以内で入力してください。';
-        } elseif ($app->documentOutputs()->where('name', $name)->when($output !== null, fn ($query) => $query->whereKeyNot($output?->id))->exists()) {
-            $errors['name'] = '同じ名前の出力設定があります。';
+        }
+        if (mb_strlen($subName) > 64) {
+            $errors['sub_name'] = 'サブボタン名は64文字以内で入力してください。';
+        }
+        if ($errors === [] && $app->documentOutputs()->where('name', $name)->where('sub_name', $subName)->when($output !== null, fn ($query) => $query->whereKeyNot($output?->id))->exists()) {
+            $errors['sub_name'] = $subName === ''
+                ? '同じボタン名の出力設定があります。サブボタン名を入力してください。'
+                : '同じボタン名とサブボタン名の出力設定があります。';
         }
 
         $template = $app->documentTemplates()->whereKey((int) ($data['document_template_id'] ?? 0))->first();
@@ -175,6 +183,7 @@ final class DocumentSettings
         ]);
         $output->fill([
             'name' => $name,
+            'sub_name' => $subName,
             'document_template_id' => $template?->id,
             'placements' => $placements,
             'mode' => (OutputMode::tryFrom((string) ($data['mode'] ?? '')) ?? OutputMode::Merged)->value,

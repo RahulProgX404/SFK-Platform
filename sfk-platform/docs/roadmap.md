@@ -31,4 +31,4 @@ Each phase runs in parallel with the legacy system until reconciled.
 `hr` (16, 17, 18) ✅ · `analytics` (22 with its graphs, 25 with actuals from 06) ✅ · 09 見積書管理 in `orders` ✅ · extension products (Sns, SeoAnalyzer, …)
 
 ## Phase 5: Migration & cut-over
-legacy data import (keep legacy record numbers), sequence continuation (`ensureNextAtLeast`), reconciliation reports (stored legacy totals vs derived totals), parallel run, cut-over.
+legacy data import (keep legacy record numbers) ✅, sequence continuation (`ensureNextAtLeast`) ✅, reconciliation reports (stored legacy totals vs derived totals) ✅ — `php artisan legacy:import`, docs/migration.md; parallel run, cut-over.

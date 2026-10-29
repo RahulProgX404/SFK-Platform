@@ -852,6 +852,14 @@
         outline-offset: 1px;
     }
 
+    /* a button with a menu (MenuButtons::mark() of an ActionGroup, e.g. 帳票 with サブボタン名): ▾ after the label */
+    .sfk-app-toolbar .sfk-menu-btn.fi-btn[data-sfk-menu-group]::after {
+        content: '';
+        border-top: 5px solid currentColor;
+        border-right: 4px solid transparent;
+        border-left: 4px solid transparent;
+    }
+
     /* 「N件」 badge of the checked rows on the corner of a button (MenuButtons::withCheckedCount()); red once rows are checked */
     .sfk-menu-btn-counted {
         position: relative;
@@ -3044,6 +3052,11 @@
     /* the toolbar (sticky: a layer of its own) above the rows, so its lists (e.g. the search column) are not covered */
     .sfk-app-page-list .fi-ta-header-ctn {
         z-index: 20;
+    }
+
+    /* …and the menus of the app toolbar above it (e.g. 帳票 with サブボタン名, 「…」): they open over the search row */
+    .sfk-app-toolbar .fi-dropdown-panel {
+        z-index: 30;
     }
 
     .sfk-search-column-item {

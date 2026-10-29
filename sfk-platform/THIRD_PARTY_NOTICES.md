@@ -60,6 +60,12 @@ Japanese text in the generated PDFs uses the standard Japanese CID fonts by name
 | mtdowling/jmespath.php 2.9 (Michael Dowling) | MIT | Composer, with the above |
 | symfony/filesystem 8.1 (Symfony) | MIT | Composer, with the above |
 
+## Legacy data import (2026-10-29, docs/migration.md)
+
+| Component | License | Where |
+|---|---|---|
+| halaxa/json-machine 1.2 (Filip Halaxa) | Apache-2.0 | Composer — reads the records of the legacy app exports one at a time (`legacy:import`) |
+
 ## Dependency license review (2026-10-22)
 
 PHP (Composer, production — `composer licenses --no-dev`, 118 packages): all permissive.

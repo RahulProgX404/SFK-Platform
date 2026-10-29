@@ -15,14 +15,23 @@ token in client code and R-04 SaaS dependency). Every app gets it from Core — 
 | Who | Screen | What |
 | --- | --- | --- |
 | Administrators | アプリの設定 → **帳票出力** (`…/settings?tab=documents`, also in the gear ▾ menu) | 帳票テンプレート: ＋ (PDF or 白紙 + 用紙), 編集 (designer), 複製, 削除 (refused while an 出力設定 prints it). 出力設定: ＋ / 編集 / 削除, drag to reorder (= button order) |
-| Administrators | Designer (`…/settings?tab=documents&template=<id>`) | テンプレート名, pages, 表示倍率, 1mm単位, 背景を差し替える, プレビュー (unsaved layout, with a chosen record or the field labels), キャンセル / 保存 |
+| Administrators | Designer (`…/settings?tab=documents&template=<id>`) | テンプレート名, pages, 表示倍率 (75% when it opens), 1mm単位, 背景を差し替える, プレビュー (unsaved layout, with a chosen record or the field labels), キャンセル / 保存 |
 | Users | Record page | a button per 出力設定 at **レコード詳細画面のメニュー** (before 編集), or the **上部スペース** drop-down + 出力 |
 | Users | List page | a button per 出力設定 at **一覧画面のメニュー** (listed records, asks 「N件のレコードを出力しますか？」) or **（チェックしたレコード）** (check boxes appear), or the **上部スペース** drop-down + 出力 |
 
-出力設定 options: ボタン名, テンプレート, 表示する場所 (several of the five places above), 複数のレコードを出力するとき
-(1つのPDFにまとめる / レコードごとのPDF（ZIP）), 出力したファイル (新しいタブで開く / ダウンロードする), ファイル名
-(fields in braces, e.g. `{number}_{customer_id}` for the legacy 見積書番号_得意先名; 「ファイル名にフィールドを追加」 inserts
-one), 管理者にだけ表示する (the legacy 06 PrintCreator buttons were for one administrator only).
+出力設定 options: ボタン名, サブボタン名 (optional), テンプレート, 表示する場所 (several of the five places above),
+複数のレコードを出力するとき (1つのPDFにまとめる / レコードごとのPDF（ZIP）), 出力したファイル (新しいタブで開く /
+ダウンロードする), ファイル名 (fields in braces, e.g. `{number}_{customer_id}` for the legacy 見積書番号_得意先名;
+「ファイル名にフィールドを追加」 inserts one, or 「ユーザーが選択するフィールド」 = `{ユーザー選択}`), 管理者にだけ表示する
+(the legacy 06 PrintCreator buttons were for one administrator only).
+
+- **Same ボタン名**: 出力設定 sharing a ボタン名 (each with its own サブボタン名; a ボタン名 is unique with its サブボタン名)
+  are one button ▾ at each place, whose menu lists them by サブボタン名 (the template's name when it has none) — e.g.
+  the legacy 作業明細表 of 04. 受注入力: 注文書 / 営業控 / 原稿添付用 (SYSTEM_BRAIN 08_PRINTCREATOR). In the 上部スペース
+  drop-down they are listed under the ボタン名 (`<optgroup>`).
+- **`{ユーザー選択}`**: when putting the 帳票 out the user first chooses 「ファイル名にするフィールド」 (one of the fields of the
+  record page) and it takes the place of `{ユーザー選択}`. Asked for one record and for a list put out as a ZIP; one PDF
+  of several records is named by the ボタン名 and the time, so nothing is asked there.
 
 ### Designer
 
@@ -33,7 +42,9 @@ one), 管理者にだけ表示する (the legacy 06 PrintCreator buttons were fo
 - Properties: X / Y / 幅 / 高さ (mm), ページ, フォント (ゴシック / 明朝), サイズ (pt), 文字の色, 太字, 横 / 縦の配置,
   長い文字 (縮小して全体を表示 / 折り返して表示 / はみ出す部分を表示しない), 罫線を引く; fields: 書式 (表示どおり, 数値,
   金額, 日付, 日付（年月日）, 和暦, 日時) and text before / after; tables: 行の高さ, 1ページの行数 and the columns
-  (field, width, alignment, 書式; reorder / remove / 列を追加).
+  (field, width, alignment, 書式, 前に付ける文字 / 後に付ける文字 — like a field, nothing is added to an empty value;
+  reorder / remove / 列を追加). The panel's left edge is dragged (or moved with ← / →) to change its width, kept in the
+  browser.
 - A table with more rows than its lines continues on another copy of all the template's pages (header fields repeated);
   ページ番号 / 総ページ数 count the pages of each record.
 
@@ -91,7 +102,8 @@ AppListRecords / AppViewRecord          GET  …/background                Docum
 | id | bigint | |
 | business_app_id | FK business_apps, cascade | |
 | document_template_id | FK document_templates, restrict | the template printed |
-| name | varchar(64), unique per app | ボタン名 |
+| name | varchar(64) | ボタン名 |
+| sub_name | varchar(64), default '' | サブボタン名; unique per app with name |
 | placements | jsonb | `record_menu`, `record_space`, `list_menu`, `list_checked`, `list_space` |
 | mode | varchar | `merged` / `zip` |
 | delivery | varchar | `open` / `download` |
@@ -107,7 +119,7 @@ Layout element (mm from the top left of the page; sizes in pt):
  "color": "#000000", "align": "left", "valign": "middle", "overflow": "shrink", "border": false}
 {"id": "e2", "type": "text", "text": "御中", "...": "same box and text properties"}
 {"id": "e3", "type": "table", "table": "lines", "x": 15, "y": 98, "rowHeight": 8, "rows": 12,
- "columns": [{"field": "product_name", "width": 80, "align": "left", "format": "display"}], "...": "font properties"}
+ "columns": [{"field": "product_name", "width": 80, "align": "left", "format": "display", "prefix": "", "suffix": ""}], "...": "font properties"}
 ```
 
 ## HTTP endpoints (web session, signed-in users; `core.documents.*`)
@@ -116,8 +128,8 @@ Layout element (mm from the top left of the page; sizes in pt):
 | --- | --- | --- | --- |
 | GET | `/documents/templates/{template}/background` | administrators | the background PDF (designer) |
 | GET / POST | `/documents/templates/{template}/preview` | administrators | PDF of the saved layout, or of `layout` (JSON, POST); `record` = key of a record, else field labels |
-| GET | `/documents/outputs/{output}/records/{record}` | users who may view the record | the record's PDF (`inline` or `attachment` by 出力したファイル) |
-| GET | `/documents/print/{token}` | the user who chose the records | PDF or ZIP of the records of a list job |
+| GET | `/documents/outputs/{output}/records/{record}` | users who may view the record | the record's PDF (`inline` or `attachment` by 出力したファイル); `name_field` = the field chosen for `{ユーザー選択}` (ignored unless a field of the record page) |
+| GET | `/documents/print/{token}` | the user who chose the records | PDF or ZIP of the records of a list job (with the chosen field) |
 
 Settings and the designer's 保存 are Livewire calls on the アプリの設定 page (`saveDesign`, actions `addTemplate`,
 `replaceBackground`, `deleteTemplate`, `output`, `deleteOutput`, `reorderOutputs`), as for the other app settings.

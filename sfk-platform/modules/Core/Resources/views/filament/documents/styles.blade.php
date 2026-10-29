@@ -20,6 +20,13 @@
         min-width: 0;
     }
 
+    /* サブボタン名 after the ボタン名: 「納品書 › 控え」 */
+    .sfk-docs-sub-name::before {
+        content: '›';
+        margin: 0 6px;
+        color: var(--kt-muted);
+    }
+
     .sfk-docs-tags {
         display: flex;
         flex-wrap: wrap;
@@ -203,12 +210,52 @@
     }
 
     .sfk-designer-body {
+        position: relative;
         display: grid;
-        grid-template-columns: 240px minmax(0, 1fr) 340px;
+        /* the properties' width: dragged with .sfk-designer-splitter (sfkDocumentDesigner.propsWidth) */
+        grid-template-columns: 240px minmax(0, 1fr) var(--sfk-designer-props-width, 340px);
         height: calc(100vh - 280px);
         min-height: 560px;
         border: 1px solid var(--kt-border);
         background: #ffffff;
+    }
+
+    /* the left edge of the properties: drag (or ← / →) to change their width */
+    .sfk-designer-splitter {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: calc(var(--sfk-designer-props-width, 340px) - 4px);
+        z-index: 5;
+        width: 8px;
+        cursor: col-resize;
+        touch-action: none;
+    }
+
+    .sfk-designer-splitter::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 3px;
+        width: 2px;
+        background: transparent;
+        transition: background-color .15s;
+    }
+
+    .sfk-designer-splitter:hover::after,
+    .sfk-designer-splitter:focus-visible::after,
+    .sfk-designer-splitter.is-dragging::after {
+        background: var(--kt-blue);
+    }
+
+    .sfk-designer-splitter:focus-visible {
+        outline: none;
+    }
+
+    .sfk-designer-body:has(.sfk-designer-splitter.is-dragging) {
+        cursor: col-resize;
+        user-select: none;
     }
 
     .sfk-designer-palette,
@@ -428,7 +475,7 @@
         gap: 6px;
     }
 
-    /* a column of a table: [field][width] / [alignment][書式] / tools */
+    /* a column of a table: [field][width] / [alignment][書式] / [前に付ける文字][後に付ける文字] / tools */
     .sfk-designer-column-row {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 64px;
@@ -444,6 +491,13 @@
 
     .sfk-designer-column-format {
         grid-column: span 2;
+    }
+
+    .sfk-designer-column-affixes {
+        display: grid;
+        grid-column: 1 / -1;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 4px;
     }
 
     .sfk-designer-column-tools {

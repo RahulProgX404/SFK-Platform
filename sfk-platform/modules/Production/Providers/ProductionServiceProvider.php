@@ -7,11 +7,16 @@ namespace Modules\Production\Providers;
 use App\Modules\ModuleServiceProvider;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Application\Legacy\LegacyImporter;
 use Modules\Core\Application\Notifications\NotificationKind;
 use Modules\Core\Application\Notifications\NotificationKinds;
 use Modules\Core\Filament\Records\RelatedLists;
 use Modules\Orders\Models\Order;
 use Modules\Production\Application\AccidentReports\AccidentAlert;
+use Modules\Production\Application\Legacy\LegacyAccidentReportImport;
+use Modules\Production\Application\Legacy\LegacyBagScheduleImport;
+use Modules\Production\Application\Legacy\LegacyDailyReportImport;
+use Modules\Production\Application\Legacy\LegacyNewDailyReportImport;
 use Modules\Production\Application\ProductionObserver;
 use Modules\Production\Filament\Resources\DailyReports\DailyReportRows;
 use Modules\Production\Models\DailyReport;
@@ -22,7 +27,13 @@ final class ProductionServiceProvider extends ModuleServiceProvider
 
     protected function registerModule(): void
     {
-        // Bind module services / repositories here.
+        // 移行 (legacy:import): 12 製袋予定管理, 08 日報入力 (+ 08N 【新】日報入力), 14 事故報告管理
+        $this->app->tag([
+            LegacyBagScheduleImport::class,
+            LegacyDailyReportImport::class,
+            LegacyNewDailyReportImport::class,
+            LegacyAccidentReportImport::class,
+        ], LegacyImporter::TAG);
     }
 
     protected function bootModule(): void

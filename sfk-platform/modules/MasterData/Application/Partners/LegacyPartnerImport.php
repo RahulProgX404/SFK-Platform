@@ -10,15 +10,14 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Application\History\RecordHistory;
+use Modules\Core\Application\Legacy\LegacyUsers;
 use Modules\Core\Application\Numbering\DocumentNumberGenerator;
-use Modules\Core\Application\Users\UserAccountService;
 use Modules\Core\Domain\Billing\ClosingDay;
 use Modules\Core\Domain\Billing\CollectionDay;
 use Modules\Core\Domain\Billing\CollectionMonth;
 use Modules\Core\Domain\Money\RoundingMode;
 use Modules\Core\Domain\Tax\TaxCalculationUnit;
 use Modules\Core\Domain\Tax\TaxMode;
-use Modules\Core\Models\Position;
 use Modules\Core\Models\RecordVersion;
 use Modules\MasterData\Domain\Partners\CustomerClassification;
 use Modules\MasterData\Domain\Partners\CustomerStatus;
@@ -52,16 +51,11 @@ final class LegacyPartnerImport
     /** Legacy app id of 01. 取引先マスタ (SYSTEM_BRAIN APP_01). */
     public const LEGACY_APP_ID = '6';
 
-    private const TITLES = ['会長', '社長', '副社長', '専務', '常務'];
-
-    /** @var array<string, User|null> legacy login => user */
-    private array $users = [];
-
     /** @var list<string> */
     private array $warnings = [];
 
     public function __construct(
-        private readonly UserAccountService $accounts,
+        private readonly LegacyUsers $users,
         private readonly DocumentNumberGenerator $numbers,
         private readonly RecordHistory $history,
     ) {}
@@ -74,7 +68,6 @@ final class LegacyPartnerImport
             throw new InvalidArgumentException('01. 取引先マスタ（得意先・仕入先）のエクスポートではありません。');
         }
 
-        $this->users = [];
         $this->warnings = [];
         $usersBefore = User::query()->count();
         $created = 0;
@@ -305,38 +298,16 @@ final class LegacyPartnerImport
     }
 
     /**
-     * The user of a legacy login ({code, name}), created when missing; null for unknown logins (e.g. Administrator).
+     * The user of a legacy login ({code, name}): the employee of 02 of that name, else created (LegacyUsers); null for
+     * logins that are no email (e.g. Administrator).
      */
     private function user(mixed $legacyUser): ?User
     {
-        if (! is_array($legacyUser)) {
+        if (! is_array($legacyUser) || ! is_string($legacyUser['code'] ?? null)) {
             return null;
         }
 
-        $email = trim((string) ($legacyUser['code'] ?? ''));
-        if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return null;
-        }
-
-        if (array_key_exists($email, $this->users)) {
-            return $this->users[$email];
-        }
-
-        $user = User::query()->where('email', $email)->first();
-        if ($user === null) {
-            [$code, $title, $name] = self::splitLegacyName((string) ($legacyUser['name'] ?? $email));
-            $parts = preg_split('/[\s　]+/u', $name, 2) ?: [$name];
-            $user = $this->accounts->create([
-                'name' => $name,
-                'email' => $email,
-                'sales_staff_code' => $code !== null && ! User::query()->where('sales_staff_code', $code)->exists() ? $code : null,
-                'last_name' => $parts[0],
-                'first_name' => $parts[1] ?? null,
-                'position_id' => $title !== null ? Position::query()->firstOrCreate(['name' => $title])->id : null,
-            ])->user;
-        }
-
-        return $this->users[$email] = $user;
+        return $this->users->login(['code' => $legacyUser['code'], 'name' => (string) ($legacyUser['name'] ?? $legacyUser['code'])]);
     }
 
     /**
@@ -346,23 +317,7 @@ final class LegacyPartnerImport
      */
     public static function splitLegacyName(string $name): array
     {
-        $name = trim($name);
-        $code = null;
-        if (preg_match('/^【([^】]+)】\s*(.*)$/u', $name, $m) === 1) {
-            $code = $m[1];
-            $name = $m[2];
-        }
-
-        $title = null;
-        foreach (self::TITLES as $candidate) {
-            if (preg_match('/^'.$candidate.'[\s　]+(.+)$/u', $name, $m) === 1) {
-                $title = $candidate;
-                $name = $m[1];
-                break;
-            }
-        }
-
-        return [$code, $title, trim($name)];
+        return LegacyUsers::splitName($name);
     }
 
     private function highestNumericCode(): int

@@ -9,10 +9,13 @@ use Filament\Support\Facades\FilamentView;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\View\TablesRenderHook;
 use Filament\View\PanelsRenderHook;
+use Modules\Core\Application\Legacy\LegacyImporter;
 use Modules\Core\Application\Notifications\NotificationKind;
 use Modules\Core\Application\Notifications\NotificationKinds;
 use Modules\Orders\Application\FaxImport\ClaudeFaxOrderReader;
 use Modules\Orders\Application\FaxImport\FaxOrderReader;
+use Modules\Orders\Application\Legacy\LegacyOrderImport;
+use Modules\Orders\Application\Legacy\LegacyQuotationImport;
 use Modules\Orders\Application\Orders\OrderDueCheck;
 use Modules\Orders\Filament\Resources\Orders\Pages\ListOrders;
 
@@ -24,6 +27,9 @@ final class OrdersServiceProvider extends ModuleServiceProvider
     {
         // 受注書を読み込む: the Claude API reader (tests bind a fake)
         $this->app->bind(FaxOrderReader::class, fn (): FaxOrderReader => new ClaudeFaxOrderReader((array) config('orders.fax_import')));
+
+        // 移行 (legacy:import): 09 見積書管理, 04 受注入力
+        $this->app->tag([LegacyQuotationImport::class, LegacyOrderImport::class], LegacyImporter::TAG);
     }
 
     protected function bootModule(): void

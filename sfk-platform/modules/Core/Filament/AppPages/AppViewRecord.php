@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Filament\AppPages;
 
 use App\Models\User;
+use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
@@ -25,6 +26,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
+use Illuminate\Support\Js;
 use Livewire\Attributes\Url;
 use Modules\Core\Application\Comments\HasRecordComments;
 use Modules\Core\Application\Comments\RecordComments;
@@ -37,6 +39,7 @@ use Modules\Core\Domain\Documents\OutputPlacement;
 use Modules\Core\Domain\People\EmploymentStatus;
 use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
 use Modules\Core\Filament\Support\DeleteImpact;
+use Modules\Core\Filament\Support\DocumentNameField;
 use Modules\Core\Filament\Support\GuardedDelete;
 use Modules\Core\Filament\Support\MenuButtons;
 use Modules\Core\Models\DocumentOutput;
@@ -343,7 +346,7 @@ abstract class AppViewRecord extends ViewRecord
 
         return [
             // the app's legacy record buttons and its 帳票出力 buttons, not on an old version of the record
-            ...array_map(fn (Action $action): Action => MenuButtons::mark($action)->hidden(fn (): bool => $this->historyVersion !== null), [
+            ...array_map(fn (Action|ActionGroup $action): Action|ActionGroup => MenuButtons::mark($action)->hidden(fn (): bool => $this->historyVersion !== null), [
                 ...$this->menuActions(),
                 ...$this->documentActions(),
             ]),
@@ -429,33 +432,57 @@ abstract class AppViewRecord extends ViewRecord
 
     /**
      * 帳票出力 (アプリの設定 → 帳票出力): a button per 出力設定 shown in レコード詳細画面のメニュー, putting out this record
-     * (a new tab, or a download).
+     * (a new tab, or a download). 出力設定 with the same ボタン名 are one button with a menu of their サブボタン名 (e.g. the
+     * legacy 作業明細表 — 注文書 / 営業控 / 原稿添付用, SYSTEM_BRAIN 08_PRINTCREATOR). When the ファイル名 has
+     * 「{ユーザー選択}」 the user first chooses the field of the name.
      *
-     * @return list<Action>
+     * @return list<Action|ActionGroup>
      */
     private function documentActions(): array
     {
-        $user = auth()->user();
+        $buttons = [];
+        foreach (AppDocuments::groups($this->documentOutputsAt(OutputPlacement::RecordMenu)) as $group) {
+            if (count($group) === 1) {
+                $buttons[] = $this->recordDocumentAction($group[0], $group[0]->name);
 
-        return array_map(
-            fn (DocumentOutput $output): Action => Action::make('document'.$output->id)
-                ->label($output->name)
-                ->icon(Heroicon::OutlinedPrinter)
-                ->url(fn (): string => route('core.documents.record', ['output' => $output, 'record' => $this->record->getKey()]))
-                ->openUrlInNewTab($output->delivery === OutputDelivery::Open),
-            AppDocuments::at($this->appResource()::app(), $user instanceof User ? $user : null, OutputPlacement::RecordMenu),
+                continue;
+            }
+
+            $buttons[] = ActionGroup::make(array_map(fn (DocumentOutput $output): Action => $this->recordDocumentAction($output, $output->optionLabel()), $group))
+                ->label($group[0]->name)
+                ->icon(Heroicon::OutlinedPrinter);
+        }
+
+        return $buttons;
+    }
+
+    private function recordDocumentAction(DocumentOutput $output, string $label): Action
+    {
+        $action = Action::make('document'.$output->id)->label($label)->icon(Heroicon::OutlinedPrinter);
+
+        return $output->asksForNameField()
+            ? $this->askingNameField($action, fn (): DocumentOutput => $output)
+            : $action->url(fn (): string => $this->documentUrl($output))->openUrlInNewTab($output->delivery === OutputDelivery::Open);
+    }
+
+    /** レコード詳細画面の上部スペース: 出力 of a 出力設定 whose ファイル名 has 「{ユーザー選択}」 (arguments: output). */
+    public function printDocumentAction(): Action
+    {
+        return $this->askingNameField(
+            Action::make('printDocument'),
+            fn (array $arguments): ?DocumentOutput => collect($this->documentOutputsAt(OutputPlacement::RecordSpace))->firstWhere('id', (int) ($arguments['output'] ?? 0)),
         );
     }
 
     /**
      * レコード詳細画面の上部スペース: the 出力設定 offered in the 帳票 drop-down + 出力 under the toolbar
-     * (core::filament.documents.bar), with the file of this record.
+     * (core::filament.documents.bar), with the file of this record; those with the same ボタン名 listed under it by
+     * サブボタン名.
      *
-     * @return list<array{key: string, name: string, url: string, newTab: bool}>
+     * @return list<array{key: string, name: string, label: string, url: string, newTab: bool, asks: bool}>
      */
     public function documentBar(): array
     {
-        $user = auth()->user();
         if ($this->printMode || $this->historyVersion !== null) {
             return [];
         }
@@ -463,9 +490,57 @@ abstract class AppViewRecord extends ViewRecord
         return array_map(fn (DocumentOutput $output): array => [
             'key' => (string) $output->id,
             'name' => $output->name,
-            'url' => route('core.documents.record', ['output' => $output, 'record' => $this->record->getKey()]),
+            'label' => $output->optionLabel(),
+            'url' => $this->documentUrl($output),
             'newTab' => $output->delivery === OutputDelivery::Open,
-        ], AppDocuments::at($this->appResource()::app(), $user instanceof User ? $user : null, OutputPlacement::RecordSpace));
+            'asks' => $output->asksForNameField(),
+        ], $this->documentOutputsAt(OutputPlacement::RecordSpace));
+    }
+
+    /** @return list<DocumentOutput> the 出力設定 the user gets at the place */
+    private function documentOutputsAt(OutputPlacement $placement): array
+    {
+        $user = auth()->user();
+
+        return AppDocuments::at($this->appResource()::app(), $user instanceof User ? $user : null, $placement);
+    }
+
+    private function documentUrl(DocumentOutput $output, ?string $nameField = null): string
+    {
+        return route('core.documents.record', array_filter([
+            'output' => $output,
+            'record' => $this->record->getKey(),
+            'name_field' => $nameField,
+        ], fn (mixed $value): bool => $value !== null));
+    }
+
+    /**
+     * 出力 asking first which field goes into the ファイル名 (「{ユーザー選択}」), then opening this record's 帳票 in a
+     * new tab, or downloading it.
+     *
+     * @param  Closure(array<string, mixed>): ?DocumentOutput  $output
+     */
+    private function askingNameField(Action $action, Closure $output): Action
+    {
+        return $action
+            ->icon(Heroicon::OutlinedPrinter)
+            ->modalIcon(Heroicon::OutlinedPrinter)
+            ->modalWidth('md')
+            ->modalHeading(fn (array $arguments): string => $output($arguments)->name ?? '帳票出力')
+            ->modalSubmitActionLabel('出力する')
+            ->modalCancelActionLabel('キャンセル')
+            ->schema([DocumentNameField::make($this->appResource())])
+            ->action(function (array $data, array $arguments) use ($output): void {
+                $document = $output($arguments);
+                if ($document === null) {
+                    return;
+                }
+
+                $url = $this->documentUrl($document, is_string($data['name_field'] ?? null) ? $data['name_field'] : null);
+                $this->js($document->delivery === OutputDelivery::Open
+                    ? 'window.open('.Js::from($url).', "_blank")'
+                    : 'window.location.href = '.Js::from($url));
+            });
     }
 
     /**

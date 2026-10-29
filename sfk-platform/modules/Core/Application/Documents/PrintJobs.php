@@ -16,16 +16,19 @@ final class PrintJobs
 {
     private const TTL_MINUTES = 30;
 
-    /** @param  list<int|string>  $keys  the records' keys, in list order */
-    public function store(int $userId, int $outputId, array $keys): string
+    /**
+     * @param  list<int|string>  $keys  the records' keys, in list order
+     * @param  string|null  $nameField  the field the user chose for the file name (FileNamePattern::CHOSEN)
+     */
+    public function store(int $userId, int $outputId, array $keys, ?string $nameField = null): string
     {
         $token = Str::random(40);
-        Cache::put(self::key($token), ['user' => $userId, 'output' => $outputId, 'keys' => $keys], now()->addMinutes(self::TTL_MINUTES));
+        Cache::put(self::key($token), ['user' => $userId, 'output' => $outputId, 'keys' => $keys, 'nameField' => $nameField], now()->addMinutes(self::TTL_MINUTES));
 
         return $token;
     }
 
-    /** @return array{user: int, output: int, keys: list<int|string>}|null */
+    /** @return array{user: int, output: int, keys: list<int|string>, nameField?: string|null}|null */
     public function find(string $token): ?array
     {
         if (preg_match('/^[A-Za-z0-9]{40}$/', $token) !== 1) {

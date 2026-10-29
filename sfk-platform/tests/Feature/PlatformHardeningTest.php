@@ -63,6 +63,8 @@ it('serves the look of the panels as a stylesheet and a script the browser keeps
     expect($css->headers->get('Content-Type'))->toStartWith('text/css')
         ->and($css->headers->get('Cache-Control'))->toContain('immutable')
         ->and($css->getContent())->toContain('--kt-blue: #3498db')
+        // the menus of the app toolbar (e.g. 帳票 サブボタン名) open above the list's sticky search row (z-index 20)
+        ->and($css->getContent())->toMatch('/\.sfk-app-toolbar \.fi-dropdown-panel \{\s*z-index: 30;/')
         ->and($css->headers->has('Content-Security-Policy'))->toBeFalse();
 
     expect($this->get(route('core.theme.js', ['v' => $bundle['version']]))->assertOk()->getContent())

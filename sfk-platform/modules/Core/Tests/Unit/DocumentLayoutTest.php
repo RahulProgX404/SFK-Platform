@@ -57,7 +57,7 @@ it('keeps what the designer may save: known types, clamped numbers, unique ids, 
     $elements = TemplateLayout::normalize([
         ['id' => 'a', 'type' => 'field', 'field' => 'customer_id', 'x' => -5, 'y' => 20, 'w' => 0, 'h' => 7, 'size' => 200, 'page' => 9, 'format' => 'yen', 'color' => 'red'],
         ['id' => 'a', 'type' => 'text', 'text' => "御中\r\n", 'x' => 100, 'y' => 30],
-        ['type' => 'table', 'table' => 'lines', 'columns' => [['field' => 'product_name', 'width' => 60], ['field' => 'bad name']], 'rows' => 500],
+        ['type' => 'table', 'table' => 'lines', 'columns' => [['field' => 'product_name', 'width' => 60, 'suffix' => str_repeat('様', 50)], ['field' => 'bad name']], 'rows' => 500],
         ['type' => 'table', 'table' => 'lines', 'columns' => []],
         ['type' => 'field', 'field' => '<script>'],
         ['type' => 'image'],
@@ -69,7 +69,7 @@ it('keeps what the designer may save: known types, clamped numbers, unique ids, 
         ->and($elements[1]['id'])->not->toBe('a')
         ->and($elements[1]['text'])->toBe("御中\n")
         ->and($elements[2]['rows'])->toBe(200)
-        ->and($elements[2]['columns'])->toBe([['field' => 'product_name', 'width' => 60.0, 'align' => 'left', 'format' => 'display']]);
+        ->and($elements[2]['columns'])->toBe([['field' => 'product_name', 'width' => 60.0, 'align' => 'left', 'format' => 'display', 'prefix' => '', 'suffix' => str_repeat('様', 40)]]);
 });
 
 it('names files from fields like the legacy 見積書番号_得意先名, without characters a file name cannot hold', function () {
@@ -79,6 +79,41 @@ it('names files from fields like the legacy 見積書番号_得意先名, withou
         ->and(FileNamePattern::render('{missing}', fn (): string => ''))->toBeNull()
         ->and(FileNamePattern::fields('見積書_{number}_{customer_id}'))->toBe(['number', 'customer_id'])
         ->and(FileNamePattern::clean(' a:b*c? '))->toBe('a_b_c');
+});
+
+it('puts the text before / after a table column around its values, not around empty ones', function () {
+    $template = new DocumentTemplate([
+        'name' => '納品書',
+        'pages' => [['width' => 210, 'height' => 297]],
+        'layout' => ['elements' => TemplateLayout::normalize([
+            ['type' => 'table', 'table' => 'lines', 'x' => 20, 'y' => 60, 'rows' => 3, 'rowHeight' => 7, 'columns' => [
+                ['field' => 'product_name', 'width' => 80, 'prefix' => '品：'],
+                ['field' => 'quantity', 'width' => 30, 'suffix' => '枚'],
+            ]],
+        ], 1)],
+    ]);
+    $record = new RecordData('1', '0000001', [], ['lines' => [
+        ['product_name' => DocumentValue::text('長3封筒'), 'quantity' => new DocumentValue('500', 500)],
+        ['product_name' => DocumentValue::text('角2封筒'), 'quantity' => DocumentValue::empty()],
+    ]]);
+
+    $content = pdfContent(app(DocumentRenderer::class)->render($template, [$record]));
+
+    expect($content)->toContain(ucs2('品：長3封筒'))
+        ->and($content)->toContain(ucs2('500枚'))
+        ->and($content)->toContain(ucs2('品：角2封筒'))
+        ->and(substr_count($content, ucs2('枚')))->toBe(1);
+});
+
+it('names a file by the field the user chose for {ユーザー選択}, else leaves it out', function () {
+    $values = ['number' => '0000123', 'customer_id' => '株式会社得意先'];
+    $value = fn (string $field): string => $values[$field] ?? '';
+
+    expect(FileNamePattern::render('見積書_'.FileNamePattern::CHOSEN, $value, 'customer_id'))->toBe('見積書_株式会社得意先')
+        ->and(FileNamePattern::render('{number}_'.FileNamePattern::CHOSEN, $value))->toBe('0000123')
+        ->and(FileNamePattern::render(FileNamePattern::CHOSEN, $value, '{bad}'))->toBeNull()
+        ->and(FileNamePattern::asksForField('{number}_'.FileNamePattern::CHOSEN))->toBeTrue()
+        ->and(FileNamePattern::asksForField('{number}'))->toBeFalse();
 });
 
 it('measures Japanese text with half-width Latin, digits and kana', function () {

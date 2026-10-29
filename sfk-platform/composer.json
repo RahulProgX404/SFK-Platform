@@ -12,6 +12,7 @@
         "php": "^8.4",
         "anthropic-ai/sdk": "^0.59.0",
         "filament/filament": "^5.9",
+        "halaxa/json-machine": "^1.2",
         "laravel/framework": "^13.17",
         "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.0",

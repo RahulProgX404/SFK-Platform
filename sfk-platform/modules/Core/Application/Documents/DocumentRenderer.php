@@ -117,7 +117,8 @@ final class DocumentRenderer
     }
 
     /**
-     * The rows of this copy, one line each: the columns side by side from the table's left edge.
+     * The rows of this copy, one line each: the columns side by side from the table's left edge (templates saved
+     * before columns had text before / after have none).
      *
      * @param  array<string, mixed>  $element
      * @param  array<string, mixed>  $style
@@ -139,6 +140,10 @@ final class DocumentRenderer
             foreach ($element['columns'] as $column) {
                 $value = $row[$column['field']] ?? DocumentValue::empty();
                 $text = $row === null ? '' : (ValueFormat::tryFrom((string) $column['format']) ?? ValueFormat::Display)->apply($value);
+                // text before / after the value, as for a field: nothing around an empty value
+                if ($text !== '') {
+                    $text = ($column['prefix'] ?? '').$text.($column['suffix'] ?? '');
+                }
                 $pdf->textBox($x, $y, (float) $column['width'], $height, $text, [
                     ...$style, 'align' => $column['align'], 'valign' => 'middle', 'overflow' => $element['overflow'],
                 ]);

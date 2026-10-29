@@ -30,3 +30,6 @@ Thumbs.db
 # Platform
 /storage/framework/phpstan
 /storage/framework/testing
+
+# Legacy system backup (business and personal data): never committed
+/data_json

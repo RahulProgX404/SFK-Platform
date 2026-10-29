@@ -18,25 +18,26 @@ use ZipArchive;
 /**
  * Puts out the 帳票 of a 出力設定 (replaces the legacy PrintCreator output, SYSTEM_BRAIN 08_PRINTCREATOR / I-01): one
  * record as a PDF, several records as one PDF or — レコードごとのPDF（ZIP） — a ZIP of one PDF per record. Files are
- * named by the 出力設定's ファイル名 (fields of the record in braces), else by the button name and the record's title.
+ * named by the 出力設定's ファイル名 (fields of the record in braces; 「{ユーザー選択}」 = the field the user chose when
+ * putting it out, $nameField), else by the button name and the record's title.
  */
 final class DocumentPrinter
 {
     public function __construct(private readonly DocumentRenderer $renderer) {}
 
-    public function single(DocumentOutput $output, DocumentSource $source, Model $record, ?User $user): PrintedFile
+    public function single(DocumentOutput $output, DocumentSource $source, Model $record, ?User $user, ?string $nameField = null): PrintedFile
     {
         $data = $source->data($record);
 
         return new PrintedFile(
-            $this->fileName($output, $data).'.pdf',
+            $this->fileName($output, $data, $nameField).'.pdf',
             'application/pdf',
             $this->renderer->render($output->template, [$data], $user?->name),
         );
     }
 
     /** @param  iterable<Model>  $records */
-    public function many(DocumentOutput $output, DocumentSource $source, iterable $records, ?User $user): PrintedFile
+    public function many(DocumentOutput $output, DocumentSource $source, iterable $records, ?User $user, ?string $nameField = null): PrintedFile
     {
         // one record's data at a time: a long list is not held in memory twice
         $data = (function () use ($records, $source): Generator {
@@ -53,7 +54,7 @@ final class DocumentPrinter
             );
         }
 
-        return $this->zip($output, $output->template, $data, $user);
+        return $this->zip($output, $output->template, $data, $user, $nameField);
     }
 
     /**
@@ -73,7 +74,7 @@ final class DocumentPrinter
     }
 
     /** @param  iterable<RecordData>  $records */
-    private function zip(DocumentOutput $output, DocumentTemplate $template, iterable $records, ?User $user): PrintedFile
+    private function zip(DocumentOutput $output, DocumentTemplate $template, iterable $records, ?User $user, ?string $nameField): PrintedFile
     {
         $path = tempnam(sys_get_temp_dir(), 'sfk-zip');
         if ($path === false) {
@@ -84,7 +85,7 @@ final class DocumentPrinter
         $zip->open($path, ZipArchive::OVERWRITE);
         $names = [];
         foreach ($records as $record) {
-            $name = $this->fileName($output, $record);
+            $name = $this->fileName($output, $record, $nameField);
             $unique = $name;
             for ($number = 2; isset($names[$unique]); $number++) {
                 $unique = $name.'_'.$number;
@@ -108,10 +109,10 @@ final class DocumentPrinter
     }
 
     /** The file name of a record's document, without extension. */
-    private function fileName(DocumentOutput $output, RecordData $record): string
+    private function fileName(DocumentOutput $output, RecordData $record, ?string $nameField): string
     {
         $name = filled($output->file_name)
-            ? FileNamePattern::render((string) $output->file_name, fn (string $field): string => $record->value($field)->text)
+            ? FileNamePattern::render((string) $output->file_name, fn (string $field): string => $record->value($field)->text, $nameField)
             : null;
 
         return $name ?? FileNamePattern::clean($output->name.'_'.($record->title !== '' ? $record->title : $record->key)) ?? 'document';

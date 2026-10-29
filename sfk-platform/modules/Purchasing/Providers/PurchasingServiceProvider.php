@@ -9,11 +9,17 @@ use Filament\Support\Facades\FilamentView;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\View\TablesRenderHook;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Application\Legacy\LegacyImporter;
 use Modules\Core\Application\Notifications\NotificationKind;
 use Modules\Core\Application\Notifications\NotificationKinds;
 use Modules\Core\Filament\Records\RelatedLists;
 use Modules\Purchasing\Application\ConsumableOrders\ConsumableOrderWorkflow;
 use Modules\Purchasing\Application\ConsumableOrders\ConsumableReceipt;
+use Modules\Purchasing\Application\Legacy\LegacyConsumableOrderImport;
+use Modules\Purchasing\Application\Legacy\LegacyFreightImport;
+use Modules\Purchasing\Application\Legacy\LegacyPayableImport;
+use Modules\Purchasing\Application\Legacy\LegacyPaymentImport;
+use Modules\Purchasing\Application\Legacy\LegacyPurchaseImport;
 use Modules\Purchasing\Application\Purchases\OverrunAlert;
 use Modules\Purchasing\Application\PurchasingObserver;
 use Modules\Purchasing\Filament\Resources\Payables\Pages\ListPayables;
@@ -30,7 +36,14 @@ final class PurchasingServiceProvider extends ModuleServiceProvider
 
     protected function registerModule(): void
     {
-        // Bind module services / repositories here.
+        // 移行 (legacy:import): 05 納品(仕入)入力, 15 運送請求データ取込, 20 消耗品発注, 07 支払入力, 23 買掛管理
+        $this->app->tag([
+            LegacyPurchaseImport::class,
+            LegacyFreightImport::class,
+            LegacyConsumableOrderImport::class,
+            LegacyPaymentImport::class,
+            LegacyPayableImport::class,
+        ], LegacyImporter::TAG);
     }
 
     protected function bootModule(): void
