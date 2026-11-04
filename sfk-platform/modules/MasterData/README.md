@@ -37,8 +37,7 @@ Not rebuilt yet: the records in 見積履歴 / 納品履歴 / 請求履歴 and t
 
 ### Taking over the legacy data
 
-`php artisan master-data:import-partners [seed.json] [--warnings]` (also run by `db:seed` when `seed.json` is at the
-project root) imports the record export of legacy app 6 (`Application/Partners/LegacyPartnerImport`). It is safe to
+`php artisan legacy:import` (docs/migration.md) imports the record export of legacy app 6 (`Application/Partners/LegacyPartnerImport`). It is safe to
 run again: partners are matched by 得意先ID, which also stays their `id`. 取引先名 is kept exactly (some legacy names
 differ only by a trailing space); 自社担当者 / 作成者 / 更新者 become users by their legacy login, and missing people
 are created without sign-in (【NN】 → 営業担当者コード, 会長 / 社長 / 専務 → 役職). The live app's options that the

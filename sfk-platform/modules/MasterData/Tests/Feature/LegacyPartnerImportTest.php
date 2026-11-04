@@ -7,7 +7,6 @@
  */
 
 use App\Models\User;
-use Illuminate\Support\Facades\Artisan;
 use Modules\Core\Application\Numbering\DocumentNumberGenerator;
 use Modules\Core\Models\RecordVersion;
 use Modules\MasterData\Application\Partners\LegacyPartnerImport;
@@ -182,18 +181,9 @@ it('reports what it could not take over', function () {
         ->and(implode("\n", $result->warnings))->toContain('住所(仕入先) が得意先と異なります');
 });
 
-it('refuses exports of other apps and runs from the command', function () {
+it('refuses exports of other apps', function () {
     expect(fn () => app(LegacyPartnerImport::class)->import(['app' => ['appId' => '7'], 'records' => []]))
         ->toThrow(InvalidArgumentException::class);
-
-    $file = tempnam(sys_get_temp_dir(), 'partners');
-    file_put_contents($file, json_encode(legacyPartnerExport([legacyPartnerRecord(9)])));
-
-    expect(Artisan::call('master-data:import-partners', ['file' => $file]))->toBe(0)
-        ->and(Artisan::output())->toContain('Partners created: 1 / updated: 0 / users created: 1')
-        ->and(Partner::query()->whereKey(9)->exists())->toBeTrue();
-
-    unlink($file);
 });
 
 it('keeps disabled グループ名 on their records but offers only the active ones (C-12)', function () {

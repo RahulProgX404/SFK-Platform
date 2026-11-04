@@ -21,7 +21,7 @@ not taken over, reconciliation differences).
 | --- | --- | --- | --- |
 | 10 | 02 従業員マスタ | users | matched by 作業員コード, else name; new ones get `<作業員コード>@employees.invalid` (the app holds no emails) |
 | 20 | 03 機械マスタ | machines | |
-| 30 | 01 取引先マスタ | partners | `LegacyPartnerImport` (also `master-data:import-partners`) |
+| 30 | 01 取引先マスタ | partners | `LegacyPartnerImport` |
 | 40 | 19 消耗品マスタ | consumables | 仕入先 by 得意先ID |
 | 45 | 13 在庫管理 (not rebuilt) | consumables + one 調整 stock movement | |
 | 50 | 09 見積書管理 | quotations | |

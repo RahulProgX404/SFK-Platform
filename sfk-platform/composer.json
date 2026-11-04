@@ -17,9 +17,7 @@
         "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.0",
         "setasign/fpdf": "^1.8",
-        "setasign/fpdi": "^2.6",
-        "spatie/laravel-activitylog": "^5.1",
-        "spatie/laravel-permission": "^8.3"
+        "setasign/fpdi": "^2.6"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -51,13 +49,7 @@
             "composer install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
             "@php artisan key:generate",
-            "@php artisan migrate --force",
-            "npm install --ignore-scripts",
-            "npm run build"
-        ],
-        "dev": [
-            "Composer\\Config::disableProcessTimeout",
-            "@php artisan dev"
+            "@php artisan migrate --force"
         ],
         "test": [
             "@php artisan config:clear --ansi",

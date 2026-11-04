@@ -68,5 +68,5 @@ Run `php artisan module:list` to see the state and the reason a module is disabl
 - [ ] Document numbers via `Core\Application\Numbering\DocumentNumberGenerator`, inside the saving transaction.
 - [ ] Aggregates (job cost, AR/AP balances, stock) are derived, not incremented.
 - [ ] Every table has foreign keys and the unique constraints the business needs.
-- [ ] Business models use `LogsActivity` (audit) where the legacy system kept history.
+- [ ] Business models implement `HasRecordHistory` with `RecordsHistory` (変更履歴).
 - [ ] Cross-module access only through declared dependencies.

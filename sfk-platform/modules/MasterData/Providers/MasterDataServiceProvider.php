@@ -15,17 +15,12 @@ use Modules\MasterData\Application\Legacy\LegacyEmployeeImport;
 use Modules\MasterData\Application\Legacy\LegacyMachineImport;
 use Modules\MasterData\Application\Legacy\LegacyPartnerImporter;
 use Modules\MasterData\Application\Legacy\LegacyStockImport;
-use Modules\MasterData\Console\ImportLegacyPartnersCommand;
 use Modules\MasterData\Models\Consumable;
 use Modules\MasterData\Models\ConsumableStockMovement;
 
 final class MasterDataServiceProvider extends ModuleServiceProvider
 {
     protected string $slug = 'master-data';
-
-    protected array $commands = [
-        ImportLegacyPartnersCommand::class,
-    ];
 
     protected function registerModule(): void
     {

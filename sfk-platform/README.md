@@ -5,7 +5,7 @@ Replacement for SFK's legacy system, built as a **modular monolith** on Laravel 
 - **ERP core**: masters, orders (注番), production, purchasing, sales → delivery notes → invoices, receivables/payables. Implemented step by step from the reverse-engineered knowledge base in `../SYSTEM_BRAIN`.
 - **Extension products** (SNS management, SEO analyzer, …): live in the same codebase and share users and the core kernel, but each has its own panel (URL or domain) and its own API, so it can be used outside the ERP.
 
-> Status: **foundation only**. No business screens yet; see [docs/roadmap.md](docs/roadmap.md).
+> Status: the business apps of phases 1–3 are built; see [docs/roadmap.md](docs/roadmap.md).
 
 ## Stack
 
@@ -15,8 +15,8 @@ Replacement for SFK's legacy system, built as a **modular monolith** on Laravel 
 | Admin UI                | Filament 5 (Livewire 4) — one panel per product                          |
 | Database                | PostgreSQL 17 (SQLite works for a quick local look and the test suite)   |
 | Queue / cache / session | Redis                                                                    |
-| Permissions / audit     | spatie/laravel-permission 8, spatie/laravel-activitylog 5                |
-| PDF                     | 帳票出力: FPDF + FPDI over uploaded PDF forms (docs/documents.md); Gotenberg for HTML → PDF |
+| Permissions / history   | Core: ユーザー種別, app / record / field rights, 変更履歴 (`RecordsHistory`) |
+| PDF                     | 帳票出力: FPDF + FPDI over uploaded PDF forms (docs/documents.md) |
 | Quality                 | Pest 4, Larastan 3 (level 6), Pint, GitHub Actions (SQLite + PostgreSQL) |
 
 ## Quick start
@@ -92,7 +92,7 @@ Laravel Valkey (`SESSION_DRIVER` / `CACHE_STORE` / `QUEUE_CONNECTION` = `redis`)
 - The servers keep no files between deploys: never write uploads to `disk('local')` — use `Uploads::disk()`.
 - qpdf is not on Laravel Cloud's image: an uploaded 帳票 background the PDF reader cannot open is refused with a message
   (save it again as a plain PDF). No other system program or extra container is needed.
-- Build: `composer install --no-dev --classmap-authoritative`, `npm ci && npm run build`. Deploy: `php artisan migrate --force`,
+- Build: `composer install --no-dev --classmap-authoritative` (no npm step: Filament ships its built assets). Deploy: `php artisan migrate --force`,
   `php artisan optimize`, `php artisan filament:cache-components`.
 
 Security built in: browser protections on every response (Content-Security-Policy, no framing by other sites,

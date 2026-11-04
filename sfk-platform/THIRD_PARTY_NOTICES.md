@@ -78,8 +78,6 @@ PHP (Composer, production — `composer licenses --no-dev`, 118 packages): all p
 | Apache-2.0 | 3 (open-telemetry/api, open-telemetry/context, phpoption/phpoption) |
 | MIT OR Apache-2.0 | 1 (chillerlan/php-qrcode) — used under MIT |
 
-JavaScript (npm): build tools only (`devDependencies`: Tailwind CSS, Vite, laravel-vite-plugin, concurrently;
-`optionalDependencies`: @laravel/multiplex) — all MIT, nothing from npm is shipped to the browser.
+JavaScript (npm): none (removed 2026-11-04; Filament ships its built assets).
 
-To repeat the review: `docker compose exec app composer licenses --no-dev` (and `npm ls --all` once `node_modules`
-is installed). A new dependency with a copyleft-only or unknown license needs a decision before it is added.
+To repeat the review: `docker compose exec app composer licenses --no-dev`. A new dependency with a copyleft-only or unknown license needs a decision before it is added.

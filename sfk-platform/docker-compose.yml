@@ -91,10 +91,6 @@ services:
     ports:
       - "${FORWARD_MAILPIT_UI_PORT:-8025}:8025"
 
-  # HTML → PDF rendering (delivery notes, invoices, work instructions). Replaces PrintCreator.
-  gotenberg:
-    image: gotenberg/gotenberg:8
-
 volumes:
   pgsql-data:
   redis-data:

@@ -104,8 +104,8 @@ modules/Sales/
 
 | Concern         | Implementation                                                                                 |
 | --------------- | ---------------------------------------------------------------------------------------------- |
-| Audit trail     | spatie/laravel-activitylog (add `LogsActivity` to business models)                             |
-| Permissions     | spatie/laravel-permission                                                                      |
+| Record history  | 変更履歴: `Core\Application\History\HasRecordHistory` + `Models\Concerns\RecordsHistory`        |
+| Permissions     | ユーザー種別 (`user_type`) + app / record / field rights — see [permissions.md](permissions.md)   |
 | Background work | Laravel queues (Redis) for bulk invoicing, month opening, imports; scheduler for periodic jobs |
 | PDF documents   | 帳票出力 (Core, every app): uploaded PDF forms + fields placed in a designer, FPDF/FPDI renderer — see [documents.md](documents.md) |
 | Notifications   | 通知 in the bell + optional e-mail through Core `Notifier` (kinds, 通知設定, visibility, daily checks) — see [notifications.md](notifications.md) |
