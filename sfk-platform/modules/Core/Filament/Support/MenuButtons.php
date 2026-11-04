@@ -19,6 +19,10 @@ final class MenuButtons
 
     private const COUNT_MARKER = 'data-sfk-menu-count';
 
+    private const EXPORT_MARKER = 'data-sfk-export';
+
+    private const SETTINGS_MARKER = 'data-sfk-settings';
+
     /**
      * @template T of Action|ActionGroup
      *
@@ -39,6 +43,66 @@ final class MenuButtons
     public static function isMenuButton(mixed $action): bool
     {
         return ($action instanceof Action || $action instanceof ActionGroup) && ($action->getExtraAttributes()[self::MARKER] ?? null) === 'true';
+    }
+
+    /**
+     * The エクスポート menu of a page (帳票出力 of アプリの設定 → 帳票出力): one drop-down at the top right listing the 出力設定
+     * of the page; null without any.
+     *
+     * @param  list<Action|ActionGroup>  $actions  entries; an ActionGroup is one with a sub-menu (exportEntry())
+     */
+    public static function export(array $actions): ?ActionGroup
+    {
+        if ($actions === []) {
+            return null;
+        }
+
+        return ActionGroup::make($actions)
+            ->label('エクスポート')
+            ->icon('heroicon-o-arrow-up-on-square')
+            ->button()
+            ->color('gray')
+            ->dropdownPlacement('bottom-end')
+            ->extraAttributes([self::EXPORT_MARKER => 'true', 'class' => 'sfk-app-export'], merge: true);
+    }
+
+    /**
+     * An entry of エクスポート: one 出力設定 as it is, several with the same ボタン名 as a sub-menu of their サブボタン名.
+     *
+     * @param  list<Action>  $actions
+     */
+    public static function exportEntry(array $actions, string $label): Action|ActionGroup
+    {
+        return count($actions) === 1
+            ? $actions[0]
+            : ActionGroup::make($actions)->label($label)->icon('heroicon-o-printer');
+    }
+
+    public static function isExport(mixed $action): bool
+    {
+        return ($action instanceof Action || $action instanceof ActionGroup) && ($action->getExtraAttributes()[self::EXPORT_MARKER] ?? null) === 'true';
+    }
+
+    /**
+     * The ⚙ menu of an app list (right of 列): the app's option actions (e.g. ファイルに書き出す), 一括削除 and, for
+     * administrators, the shortcuts of アプリの設定.
+     *
+     * @param  list<Action|ActionGroup>  $actions
+     */
+    public static function settings(array $actions): ActionGroup
+    {
+        return ActionGroup::make($actions)
+            ->label('設定')
+            ->icon('heroicon-o-cog-6-tooth')
+            ->iconButton()
+            ->color('gray')
+            ->dropdownPlacement('bottom-end')
+            ->extraAttributes([self::SETTINGS_MARKER => 'true', 'class' => 'sfk-app-settings-btn'], merge: true);
+    }
+
+    public static function isSettings(mixed $action): bool
+    {
+        return ($action instanceof Action || $action instanceof ActionGroup) && ($action->getExtraAttributes()[self::SETTINGS_MARKER] ?? null) === 'true';
     }
 
     /** A colour for a kind of button (e.g. 納品書 'green', 請求書 'orange'; core::filament.theme): left edge, icon, tint. */

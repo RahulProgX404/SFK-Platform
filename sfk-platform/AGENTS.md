@@ -42,15 +42,32 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   `RecordSections::gate()` and AppListRecords). Keep them working: overrides of `getEloquentQuery()` call the parent,
   forms and record pages build their fields through `RecordSections::rows()` (or call `RecordSections::gate()`), list
   column names are the form's attribute names, and records that have a 作成者 store it in `created_by`.
-- Look: no rounded corners anywhere (the theme forces `border-radius: 0`; only radio buttons and the toasts — their
-  own design, `toad-notification.png`, top middle — stay round) — never add a radius. Text: Filament's `text-sm` is 16px (the theme redefines `--text-xs` … `--text-3xl` × 16/14); give new
+- Look (since 2026-11, `../design_ref/*.png`, `core::filament.design` over `core::filament.theme`): white surfaces with
+  hairline borders and small rounded corners (`--sfk-radius` 6px, cards `--sfk-radius-lg` 10px), the brand blue
+  (`BasePanelProvider::BRAND_BLUE`, #05467E) as primary — through the `--sfk-primary` / `--kt-blue` tokens, never a
+  hard-coded colour; dark text, soft grey table headers. No top bar except on the ERP home (/erp, ErpPanelProvider) —
+  elsewhere the sidebar (search, bell, user menu inside) collapses fully and a floating button opens it. While the
+  server works, three dots move over a transparent blur (no text). Style new parts with the `--sfk-*` tokens in
+  `core::filament.design`. Text: Filament's `text-sm` is 16px (the theme redefines `--text-xs` … `--text-3xl` × 16/14); give new
   styles sizes from that scale — 16px (1rem) everyday text, 15px (.9375rem) labels / toolbar buttons, 14px (.875rem)
   small notes, 13px (.8125rem) badges. Table headers and field labels (key names on record / edit / new pages) are black (`--kt-label`), never
   grey. No table column is bold (no `->weight()` on table columns; the theme forces normal weight in table cells —
-  only the header row is bold). App lists show the paging 「1 - 100（N件中）」 at the right end of the search row (Core render hook). On a record page every toolbar button sits on the right: 編集, 再利用, 「…」 (印刷 / 削除), gear, ‹ ›
-  (Core `app-header`, nothing per app).
+  only the header row is bold).
+- App screens (Core `app-header`, nothing per app): only the app name — on a list after the home link, on a record / form
+  after ← — with (i) for the description popup. List: エクスポート (帳票出力; same ボタン名 = sub-menu) and 新規 at the
+  top right, summary cards (`summaryCards()` with `SummaryCard::make()` — never a toolbar render hook of your own), the
+  一覧 as tabs, then search, 絞り込む, the switch of the legacy buttons (+ ボタンの説明 popup), 並び替え, 列 and ⚙ (the
+  app's `optionActions()`, 一括削除, アプリの設定); rows end with 「…」 (編集する → edit page, 削除する); 表示件数 and the page
+  numbers under the table, which fills the screen; cell values stay on one line (full text on hover). Record page:
+  編集, 再利用, 「…」 (印刷 / 削除), エクスポート, ⚙, ‹ › at the top right; the page's other buttons and the legacy buttons
+  under the name. Create / edit: キャンセル (left) and 保存 (right) in the form's footer, which stays at the bottom of the
+  screen; other buttons (e.g. FAX 読込) under the name. Every table on a record / form / dialog has the dark header row
+  (`kt-subtable`, `sfk-related-table`, `sfk-data-table`).
+- A record page of another module's app can get tabs and cards from other modules (`Core\Filament\Records\RecordTabs`,
+  e.g. 受注 / 請求書 / 売掛明細 on 01. 取引先マスタ, `ViewPartner::TABS`), read through the providing app's `onlyVisible()`;
+  fields shown in such a head respect フィールドのアクセス権.
 - Field order (create, edit and record page — one layout per app, `<App>Layout` rows): related fields in labelled
-  groups (string rows = blue group bars, left out when nothing under them is shown), the most important first (who /
+  groups (string rows = group headings, left out when nothing under them is shown), the most important first (who /
   when / what, then details, amounts, notes and attachments; derived and internal fields last), each row filling the
   12-column grid of the 1,500 px canvas (125 px a column: 250 dates / amounts / codes, 375 users / selects, 500–750
   names, 1,500 notes and tables) and every field wide enough for its content at 16px. Legacy labels, drop-downs
@@ -80,7 +97,8 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   「メニュー位置に文字を表示する」 text goes in `menuHelp()` as button label => explanation (the collapsible 「ボタンの説明」
   panel, shown to the users the legacy text was shown to). Core draws the buttons as the app's button bar (MenuButtons,
   core::filament.app-menu: icon + label; a checked-row button may carry a live 「N件」 badge via
-  `MenuButtons::withCheckedCount()`); give each one an icon. Do not hide legacy buttons in 「…」 or in bulk actions.
+  `MenuButtons::withCheckedCount()`); give each one an icon. On a list they sit behind the switch next to 絞り込む
+  (user's design, 2026-11); do not move them into 「…」 or bulk actions.
   Buttons of the legacy JavaScript (`../js-customization/<app>/`) are legacy buttons too: keep their labels, including
   the 【新】 / [新] / (新) trial ones, as separate buttons next to the Customine ones (after them, in the script's order).
 - 検索 of the app lists (Core): an app marks its default columns `->searchable()` on AppTextColumn (a related record's
@@ -135,6 +153,9 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   Conditions found by looking (dates, thresholds) are daily `NotificationCheck`s with `once()` keys.
 - A Filament action put straight into a Blade view (`{{ $this->fooAction }}`, `{{ ($page->fooAction)([...]) }}`) is drawn
   even when it is hidden — disabled, but visible. Wrap it: `@if (($a = ($this->fooAction)([...]))->isVisible()) {{ $a }} @endif`.
+- プロフィール: employees see only 一般設定 (their own 氏名 / 住所・連絡先); 通知設定, 従業員マスタ情報, パスワード設定 and
+  利用可能なダッシュボード are for administrators (user's decision, 2026-11). お知らせ is shown on /portal (edited on the
+  dashboard's ポータル, `?action=editNotice`).
 - Never write the word for the old product anywhere; call it 旧システム in the UI and "legacy system" in English.
 - Cite the SYSTEM_BRAIN rule id in tests/docblocks when implementing a rule.
 

@@ -31,7 +31,7 @@ it('lets a super admin choose between the ERP and the settings dashboards', func
     $this->actingAs($admin)
         ->get('/portal')
         ->assertOk()
-        ->assertSee("{$admin->name} さん、ようこそ")
+        ->assertSee("{$admin->name} さん")
         ->assertDontSee('ダッシュボードを選択してください')
         ->assertSee('白石封筒')
         ->assertSee('共通管理');

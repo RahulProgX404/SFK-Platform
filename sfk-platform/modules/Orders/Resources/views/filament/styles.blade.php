@@ -1,12 +1,10 @@
 {{--
-    Look of 04. 受注入力 parts on top of core::filament.theme (same colours, square corners, black labels): the wide
-    legacy sub-tables scroll sideways, the 製袋 toggle, 集計サマリー above the list, 過去の受注履歴検索 and the
-    受注書 preview.
+    Look of 04. 受注入力 parts on top of core::filament.theme / design (same colours, black labels): the section labels,
+    the wide legacy sub-tables scroll sideways, the 製袋 toggle, 過去の受注履歴検索 and the 受注書 preview.
 --}}
 <style>
-    /* legacy label fields: the section labels carry the orange mark of the legacy form, group labels are plain */
+    /* the section labels of the legacy form, as the group headings of every app (core::filament.design) */
     .sfk-order-label { display: flex; align-items: center; gap: 8px; color: var(--kt-label); font-size: 1.125rem; font-weight: 700; letter-spacing: .05em; }
-    .sfk-order-label::before { content: ""; display: inline-block; width: 12px; height: 18px; background: rgb(255, 153, 0); }
     .sfk-order-sublabel { color: var(--kt-label); font-size: 1.0625rem; font-weight: 700; }
     .sfk-app-page-view .kt-subtable .fi-in-entry-content { padding: 4px 6px; }
 
@@ -18,25 +16,6 @@
     .sfk-order-toggle:hover { color: var(--kt-blue-dark); text-decoration: underline; }
     .sfk-order-toggle:focus-visible { outline: 2px solid var(--kt-blue); outline-offset: 2px; }
     .sfk-app-page-print .sfk-order-toggle { display: none; }
-
-    /* 集計サマリー */
-    .sfk-order-summary { border-bottom: 2px solid var(--kt-blue-dark); background: var(--kt-blue); }
-    .sfk-order-summary-bar {
-        display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 16px; background: none; border: 0; color: #ffffff;
-        font-size: .9375rem; text-align: start; cursor: pointer;
-    }
-    .sfk-order-summary-bar:focus-visible { outline: 2px solid #ffffff; outline-offset: -2px; }
-    .sfk-order-summary-title { font-weight: 700; }
-    .sfk-order-summary-count { padding: 1px 8px; background: rgba(255, 255, 255, .2); font-size: .875rem; }
-    .sfk-order-summary-chevron { margin-inline-start: auto; font-size: .875rem; }
-    .sfk-order-summary-body { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); margin: 0; background: #ffffff; border-top: 1px solid #ccdcef; }
-    @media (max-width: 1024px) { .sfk-order-summary-body { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-    .sfk-order-summary-cell { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; padding: 8px 14px; border-inline-end: 1px solid #e5edf5; }
-    .sfk-order-summary-cell:last-child { border-inline-end: 0; }
-    .sfk-order-summary-cell dt { color: var(--kt-label); font-size: .875rem; white-space: nowrap; }
-    .sfk-order-summary-cell dd { margin: 0; color: var(--kt-text); font-size: 1rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .sfk-order-summary-cell dd.is-positive { color: #1a6e33; }
-    .sfk-order-summary-cell dd.is-negative { color: var(--kt-red); }
 
     /* 過去の受注履歴検索 */
     .sfk-order-past { border: 1px solid #d8e2ed; background: #ffffff; }

@@ -42,6 +42,7 @@ final class DashboardDirectory
             label: DashboardAccess::label($panel),
             icon: (string) ($card['icon'] ?? 'default'),
             url: (string) $panel->getUrl(),
+            subtitle: isset($card['subtitle']) ? (string) $card['subtitle'] : null,
         );
     }
 }

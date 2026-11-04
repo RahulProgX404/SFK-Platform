@@ -161,7 +161,7 @@ final class ListBagSchedules extends AppListRecords
 
         return [
             'url' => BagScheduleResource::canView($booking) ? BagScheduleResource::getUrl('view', ['record' => $booking]) : null,
-            'color' => ProductionChoices::USAGE_STATUSES[(string) $booking->usage_status] ?? '#3498db',
+            'color' => ProductionChoices::USAGE_STATUSES[(string) $booking->usage_status] ?? '#05467E',
             'status' => (string) $booking->usage_status,
             'label' => implode('　', $parts),
             'title' => trim(($booking->starts_at?->format('n/j H:i') ?? '').' ～ '.($booking->ends_at?->format('n/j H:i') ?? '')."\n".implode("\n", $parts)),

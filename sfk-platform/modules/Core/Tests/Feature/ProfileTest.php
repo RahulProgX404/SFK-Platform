@@ -81,15 +81,18 @@ it('ignores fields the user may not change, even if sent', function () {
         ->and($user->isSuperAdmin())->toBeFalse();
 });
 
-it('changes the password with the current one', function () {
+it('changes the password with the current one under パスワード設定 (administrators)', function () {
+    $this->user->forceFill(['user_type' => 'admin'])->save();
     $this->actingAs($this->user);
 
     Livewire::test(ProfilePage::class)
+        ->call('showSection', 'password')
         ->fillForm(['password' => 'New-56789', 'passwordConfirmation' => 'New-56789', 'currentPassword' => 'wrong'])
         ->call('save')
         ->assertHasFormErrors(['currentPassword']);
 
     Livewire::test(ProfilePage::class)
+        ->call('showSection', 'password')
         ->fillForm(['password' => 'New-56789', 'passwordConfirmation' => 'New-56789', 'currentPassword' => 'Old-12345'])
         ->call('save')
         ->assertHasNoFormErrors();
@@ -98,6 +101,21 @@ it('changes the password with the current one', function () {
     expect(Hash::check('New-56789', $user->password))->toBeTrue()
         ->and($user->password_changed_at)->not->toBeNull()
         ->and($user->must_change_password)->toBeFalse();
+});
+
+it('offers employees only 一般設定: no 通知設定, 従業員マスタ情報, パスワード設定 or 利用可能なダッシュボード', function () {
+    $this->actingAs($this->user);
+
+    Livewire::test(ProfilePage::class)
+        ->assertSee('一般設定')
+        ->assertDontSee(['通知設定', '従業員マスタ情報', 'パスワード設定', '利用可能なダッシュボード'])
+        ->call('showSection', 'password')
+        ->assertSet('section', 'general')
+        ->set('section', 'password')
+        ->fillForm(['password' => 'New-56789', 'passwordConfirmation' => 'New-56789', 'currentPassword' => 'Old-12345'])
+        ->call('save');
+
+    expect(Hash::check('Old-12345', $this->user->fresh()->password))->toBeTrue();
 });
 
 it('logs out from the profile page', function () {

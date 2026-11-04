@@ -11,7 +11,6 @@ use Closure;
 use DateTimeInterface;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
-use Filament\Forms\Components\Radio;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\EmbeddedTable;
@@ -62,14 +61,17 @@ use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
 use Modules\Core\Filament\Support\DeleteImpact;
 use Modules\Core\Filament\Support\DocumentNameField;
 use Modules\Core\Filament\Support\MenuButtons;
+use Modules\Core\Filament\Support\SummaryCard;
 use Modules\Core\Filament\Tables\InlineField;
 use Modules\Core\Models\DocumentOutput;
 
 /**
- * Record list of an app, in the legacy layout: app frame; the 一覧 dropdown (the app's views from アプリの設定 → 一覧,
- * ListViewService, the topmost being the default, （すべて） last); the 絞り込む funnel (filterFields(),
- * core::filament.app-filter); ＋ / gear (アプリの設定) / 「…」 (optionActions() and 表示件数); 「1 - 100（N件中）」 paging.
- * Every database column sorts by a click on its header (昇順 ⇄ 降順); the search box sits on the left.
+ * Record list of an app (design_ref/app-index.png): the app name with the home link and the description popup,
+ * エクスポート (帳票出力) and 新規 at the top right; the app's summary cards (summaryCards()); the 一覧 as tabs (the app's
+ * views from アプリの設定 → 一覧, ListViewService, the topmost being the default, （すべて） last); the toolbar — search,
+ * 絞り込む (filterFields(), core::filament.app-filter), the switch showing the app's legacy buttons (menuActions(), with
+ * ボタンの説明), then 並び替え, 列 (the columns shown) and ⚙ (optionActions(), 一括削除, アプリの設定); under the table
+ * 表示件数 and the page numbers. Every database column sorts by a click on its header (昇順 ⇄ 降順).
  * A 表形式 view shows its columns in its order (viewColumns(), read by the app's table), a カレンダー形式 view a month
  * calendar of the records by its 日付 field (core::filament.app-calendar), a カスタマイズ形式 view the app's screen of
  * customListViews() over the records of the view (core::filament.app-custom-view; e.g. a Gantt chart).
@@ -333,7 +335,17 @@ abstract class AppListRecords extends ListRecords
     {
         $this->appFilter = null;
         $this->cancelInlineEdit();
+        // the table of the view now shown, with its 列 (each view keeps its own choice)
+        $this->bootedInteractsWithTable();
+        $this->cachedDefaultTableColumnState = null;
+        $this->setTableColumns($this->loadTableColumnsFromSession());
         $this->resetTable();
+    }
+
+    /** 列: the columns hidden by the user are kept per 一覧 (views have different columns). */
+    public function getTableColumnsSessionKey(): string
+    {
+        return parent::getTableColumnsSessionKey().'_'.md5($this->listView);
     }
 
     public function appPageKind(): string
@@ -355,6 +367,10 @@ abstract class AppListRecords extends ListRecords
             if (! $column->isSortable() && in_array($column->getName(), $fields, true)) {
                 $column->sortable();
             }
+            // 列: every column can be hidden from the list
+            if (! $column->isToggleable()) {
+                $column->toggleable();
+            }
         }
 
         // check boxes for 帳票出力 of the checked rows and for 選択したレコードを削除
@@ -370,7 +386,45 @@ abstract class AppListRecords extends ListRecords
             ->searchUsing(fn (Builder $query, string $search) => $this->applySearch($query, $search))
             ->searchPlaceholder(fn (): string => ($label = $this->searchColumnOptions()[$this->activeSearchColumn() ?? ''] ?? null) !== null ? $label.'で検索' : '検索')
             ->searchDebounce('300ms')
-            ->striped();
+            ->columnManagerTriggerAction(fn (Action $action): Action => $action->button()->label('列')->icon(Heroicon::OutlinedViewColumns)->color('gray'));
+    }
+
+    /**
+     * 並び替え (right of the search row): the columns of the list that sort, name => label.
+     *
+     * @return array<string, string>
+     */
+    public function sortOptions(): array
+    {
+        $options = [];
+        foreach ($this->getTable()->getVisibleColumns() as $name => $column) {
+            if ($column->isSortable() && filled($column->getLabel())) {
+                $options[(string) $name] = (string) $column->getLabel();
+            }
+        }
+
+        return $options;
+    }
+
+    /**
+     * The summary of the listed records (filtered and searched) shown as cards above the 一覧 tabs; none by default.
+     * tone: blue | green | amber | red | purple | slate; icon: a Heroicon name.
+     *
+     * @return list<array{label: string, value: string, tone?: string, icon?: string}>
+     */
+    public function summaryCards(): array
+    {
+        return [];
+    }
+
+    /**
+     * A card of summaryCards() (Support\SummaryCard::make()).
+     *
+     * @return array{label: string, value: string, tone: string, icon: string}
+     */
+    protected static function summaryCard(string $label, int|float|string|null $value, string $kind = 'yen', ?string $tone = null, ?string $icon = null): array
+    {
+        return SummaryCard::make($label, $value, $kind, $tone, $icon);
     }
 
     /**
@@ -569,6 +623,13 @@ abstract class AppListRecords extends ListRecords
         parent::sortTable($column, $direction);
     }
 
+    /** 並び替え → 標準: back to the order of the view / the app (no column sort). */
+    public function useDefaultSort(): void
+    {
+        $this->tableSort = null;
+        $this->updatedTableSort();
+    }
+
     public function content(Schema $schema): Schema
     {
         return $schema->components([
@@ -701,7 +762,7 @@ abstract class AppListRecords extends ListRecords
         return null;
     }
 
-    /** @return array{from: int, to: int, total: int, previous: bool, next: bool}|null */
+    /** @return array{from: int, to: int, total: int, previous: bool, next: bool, current: int, pages: list<int|null>}|null pages: null = 「…」 */
     public function appPager(): ?array
     {
         if (! $this->currentView()->isTable()) {
@@ -720,7 +781,33 @@ abstract class AppListRecords extends ListRecords
             'total' => $records->total(),
             'previous' => $records->currentPage() > 1,
             'next' => $records->hasMorePages(),
+            'current' => $records->currentPage(),
+            'pages' => self::pageNumbers($records->currentPage(), $records->lastPage()),
         ];
+    }
+
+    /**
+     * The page buttons: the first and the last page and two on each side of the current one; null (「…」) for a gap.
+     *
+     * @return list<int|null>
+     */
+    public static function pageNumbers(int $current, int $last): array
+    {
+        $pages = [];
+        foreach (range(1, max(1, $last)) as $page) {
+            if ($page === 1 || $page === $last || abs($page - $current) <= 2) {
+                $pages[] = $page;
+            } elseif (end($pages) !== null) {
+                $pages[] = null;
+            }
+        }
+
+        return $pages;
+    }
+
+    public function gotoAppPage(int $page): void
+    {
+        $this->gotoPage(max(1, $page), $this->getTablePaginationPageName());
     }
 
     public function previousAppPage(): void
@@ -734,27 +821,38 @@ abstract class AppListRecords extends ListRecords
     }
 
     /**
-     * 「1 - 100（N件中）」 at the right end of the table toolbar, in the row of the search box (render hook of every
-     * panel, BasePanelProvider); empty outside app lists and for calendar views.
+     * A part of the table toolbar (render hooks of every panel, BasePanelProvider; empty outside app lists,
+     * core::filament.app-list-tools): 'start' — right of the search box: the search column, 絞り込む and the switch of
+     * the legacy buttons; 'sort' — 並び替え before 列; 'settings' — ⚙ after 列; 'menu' — the legacy buttons under the
+     * toolbar.
      */
-    public static function toolbarPager(): string
+    public static function toolbarPart(string $part): string
     {
         $page = Livewire::current();
 
-        return $page instanceof self ? view('core::filament.app-pager', ['page' => $page, 'position' => 'top'])->render() : '';
+        return $page instanceof self ? view('core::filament.app-list-tools', ['page' => $page, 'part' => $part])->render() : '';
     }
 
-    /** The icon right of the search box choosing the column searched (core::filament.app-search-column); empty outside app lists. */
-    public static function toolbarSearchColumn(): string
+    /**
+     * The header actions by place: the legacy buttons (menu), エクスポート (export) and ⚙ (settings).
+     *
+     * @return array{menu: list<Action|ActionGroup>, export: Action|ActionGroup|null, settings: Action|ActionGroup|null}
+     */
+    public function toolbarActions(): array
     {
-        $page = Livewire::current();
+        $actions = array_values($this->getCachedHeaderActions());
+        $first = fn (Closure $is): Action|ActionGroup|null => array_values(array_filter($actions, fn ($action): bool => $is($action) && $action->isVisible()))[0] ?? null;
 
-        return $page instanceof self ? view('core::filament.app-search-column', ['page' => $page])->render() : '';
+        return [
+            'menu' => array_values(array_filter($actions, fn ($action): bool => MenuButtons::isMenuButton($action) && $action->isVisible())),
+            'export' => $first(MenuButtons::isExport(...)),
+            'settings' => $first(MenuButtons::isSettings(...)),
+        ];
     }
 
     public function getFooter(): View
     {
-        return view('core::filament.app-pager', ['page' => $this, 'position' => 'bottom']);
+        return view('core::filament.app-pager', ['page' => $this]);
     }
 
     public function calendarMonthStart(): CarbonImmutable
@@ -835,48 +933,28 @@ abstract class AppListRecords extends ListRecords
     }
 
     /**
-     * 「…」: the app's option actions (e.g. ファイルに書き出す) and 表示件数.
+     * The app's legacy buttons, エクスポート (帳票出力) and ⚙: the app's option actions (e.g. ファイルに書き出す), 一括削除
+     * and the shortcuts of アプリの設定 (administrators).
      *
      * @return array<Action|ActionGroup>
      */
     protected function getHeaderActions(): array
     {
-        return [
-            ...array_map(MenuButtons::mark(...), [...$this->menuActions(), ...$this->documentActions()]),
-            ActionGroup::make([
+        return array_values(array_filter([
+            ...array_map(MenuButtons::mark(...), $this->menuActions()),
+            MenuButtons::export($this->exportActions()),
+            MenuButtons::settings([
                 ...$this->optionActions(),
-                Action::make('pageSize')
-                    ->label('表示件数')
-                    ->icon(Heroicon::OutlinedQueueList)
-                    ->hidden(fn (): bool => ! $this->currentView()->isTable())
-                    ->modalHeading('表示件数')
-                    ->modalWidth('md')
-                    ->modalSubmitActionLabel('保存')
-                    ->modalCancelActionLabel('キャンセル')
-                    ->fillForm(fn (): array => ['size' => (string) $this->pageSize()])
-                    ->schema([
-                        Radio::make('size')
-                            ->hiddenLabel()
-                            ->options(array_combine(
-                                array_map('strval', self::PAGE_SIZES),
-                                array_map(fn (int $size): string => $size.'件', self::PAGE_SIZES),
-                            ))
-                            ->required(),
-                    ])
-                    ->action(fn (array $data) => $this->setPageSize((int) $data['size'])),
                 $this->bulkDeleteAction(),
+                ...$this->appSettingsActions(),
             ])
-                ->label('その他の操作')
-                ->icon(Heroicon::EllipsisHorizontal)
-                ->color('gray')
                 // wide enough for 「選択したレコードを削除」 on one line
-                ->dropdownWidth(Width::ExtraSmall)
-                ->iconButton(),
-        ];
+                ->dropdownWidth(Width::ExtraSmall),
+        ]));
     }
 
     /**
-     * Entries of the 「…」 menu above 一括削除 and 表示件数.
+     * Entries of the ⚙ menu above 一括削除.
      *
      * @return list<Action>
      */
@@ -967,43 +1045,49 @@ abstract class AppListRecords extends ListRecords
     }
 
     /**
-     * 帳票出力 (アプリの設定 → 帳票出力): a button per 出力設定 of 一覧画面のメニュー — for the records of the list as
+     * エクスポート (帳票出力, アプリの設定 → 帳票出力): an entry per 出力設定 of the list — for the records of the list as
      * filtered and searched (asking 「N件のレコードを出力しますか？」), or for the checked rows. 出力設定 with the same
-     * ボタン名 are one button with a menu of their サブボタン名. A ZIP whose ファイル名 has 「{ユーザー選択}」 asks for the
-     * field of the names.
+     * ボタン名 are one entry with a sub-menu of their サブボタン名. A ZIP whose ファイル名 has 「{ユーザー選択}」 asks for
+     * the field of the names.
      *
      * @return list<Action|ActionGroup>
      */
-    private function documentActions(): array
+    private function exportActions(): array
     {
-        $buttons = [];
-        foreach (AppDocuments::groups($this->documentOutputsAt(OutputPlacement::ListMenu)) as $group) {
-            $actions = array_map(
+        $listed = collect([...$this->documentOutputsAt(OutputPlacement::ListMenu), ...$this->documentOutputsAt(OutputPlacement::ListSpace)])
+            ->unique('id')->values()->all();
+
+        $entries = [];
+        foreach (AppDocuments::groups($listed) as $group) {
+            $entries[] = MenuButtons::exportEntry(array_map(
                 fn (DocumentOutput $output): Action => $this->listedDocumentAction(Action::make('documentList'.$output->id), fn (): DocumentOutput => $output)
                     ->label(count($group) > 1 ? $output->optionLabel() : $output->name),
                 $group,
-            );
-            $buttons[] = self::documentButton($actions, $group);
+            ), $group[0]->name);
         }
         foreach (AppDocuments::groups($this->documentOutputsAt(OutputPlacement::ListChecked)) as $group) {
-            $actions = array_map(fn (DocumentOutput $output): Action => $this->checkedDocumentAction($output, count($group) > 1 ? $output->optionLabel() : $output->name), $group);
-            $buttons[] = MenuButtons::withCheckedCount(self::documentButton($actions, $group));
+            $entries[] = MenuButtons::exportEntry(array_map(
+                fn (DocumentOutput $output): Action => $this->checkedDocumentAction($output, count($group) > 1 ? $output->optionLabel() : $output->name.'（選択したレコード）'),
+                $group,
+            ), $group[0]->name.'（選択したレコード）');
         }
 
-        return $buttons;
+        return $entries;
     }
 
     /**
-     * One action as it is, several (the same ボタン名) as a button with a menu of them.
+     * ⚙ → the shortcuts of アプリの設定 (administrators, HasAppChrome::appSettingsMenu()) under a divider.
      *
-     * @param  list<Action>  $actions
-     * @param  list<DocumentOutput>  $group
+     * @return list<ActionGroup>
      */
-    private static function documentButton(array $actions, array $group): Action|ActionGroup
+    private function appSettingsActions(): array
     {
-        return count($actions) === 1
-            ? $actions[0]
-            : ActionGroup::make($actions)->label($group[0]->name)->icon(Heroicon::OutlinedPrinter);
+        $links = [];
+        foreach ($this->appChrome()['settings_menu'] as $index => $item) {
+            $links[] = Action::make('appSetting'.$index)->label($item['label'])->icon(Heroicon::OutlinedAdjustmentsHorizontal)->url($item['url']);
+        }
+
+        return $links === [] ? [] : [ActionGroup::make($links)->dropdown(false)];
     }
 
     private function checkedDocumentAction(DocumentOutput $output, string $label): Action
@@ -1027,30 +1111,6 @@ abstract class AppListRecords extends ListRecords
 
             $this->openDocuments($output, $records->map(fn (Model $record): int|string => $record->getKey())->values()->all(), self::chosenField($data));
         }));
-    }
-
-    /** 一覧画面の上部スペース: 出力 of the 帳票 chosen in the drop-down (core::filament.documents.bar; arguments: output). */
-    public function printDocumentsAction(): Action
-    {
-        return $this->listedDocumentAction(
-            Action::make('printDocuments'),
-            fn (array $arguments): ?DocumentOutput => collect($this->documentOutputsAt(OutputPlacement::ListSpace))
-                ->firstWhere('id', (int) ($arguments['output'] ?? 0)),
-        );
-    }
-
-    /**
-     * 一覧画面の上部スペース: the 出力設定 offered in the 帳票 drop-down + 出力 under the toolbar; those with the same
-     * ボタン名 listed under it by サブボタン名.
-     *
-     * @return list<array{key: string, name: string, label: string}>
-     */
-    public function documentBar(): array
-    {
-        return array_map(
-            fn (DocumentOutput $output): array => ['key' => (string) $output->id, 'name' => $output->name, 'label' => $output->optionLabel()],
-            $this->documentOutputsAt(OutputPlacement::ListSpace),
-        );
     }
 
     /** @param  array<string, mixed>  $data */

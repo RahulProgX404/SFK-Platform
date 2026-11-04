@@ -7,7 +7,6 @@ namespace Modules\MasterData\Filament\Resources\Partners\Tables;
 use App\Models\User;
 use BackedEnum;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
@@ -91,12 +90,6 @@ final class PartnersTable
         return $table
             ->modifyQueryUsing(fn (Builder $query) => $query->with(['staff.employeeCategories', 'staff.position']))
             ->columns([
-                IconColumn::make('record')
-                    ->label('')
-                    ->state(true)
-                    ->icon(Heroicon::OutlinedDocumentText)
-                    ->color('primary')
-                    ->width('2.5rem'),
                 ...array_map(fn (string $name): AppTextColumn => self::column($name), $names),
             ])
             ->defaultSort('code')

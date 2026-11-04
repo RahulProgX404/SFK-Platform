@@ -15,6 +15,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Infolists\Components\Entry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Group;
@@ -107,7 +108,17 @@ abstract class AppViewRecord extends ViewRecord
 
     public function content(Schema $schema): Schema
     {
-        return $schema->components([
+        return $schema->components($this->recordContentComponents());
+    }
+
+    /**
+     * The record with the コメント | 変更履歴 panel beside it (and relation managers below).
+     *
+     * @return list<Component>
+     */
+    protected function recordContentComponents(): array
+    {
+        return [
             Flex::make([
                 Group::make([EmbeddedSchema::make('infolist')])->grow(),
                 ViewComponent::make('core::filament.record-sidebar')
@@ -115,7 +126,7 @@ abstract class AppViewRecord extends ViewRecord
                     ->grow(false),
             ])->from('lg'),
             $this->getRelationManagersContentComponent(),
-        ]);
+        ];
     }
 
     /** Changed fields of the shown version get the green mark (entries are matched by name). */
@@ -344,17 +355,14 @@ abstract class AppViewRecord extends ViewRecord
     {
         $resource = static::getResource();
 
-        return [
-            // the app's legacy record buttons and its 帳票出力 buttons, not on an old version of the record
-            ...array_map(fn (Action|ActionGroup $action): Action|ActionGroup => MenuButtons::mark($action)->hidden(fn (): bool => $this->historyVersion !== null), [
-                ...$this->menuActions(),
-                ...$this->documentActions(),
-            ]),
+        return array_values(array_filter([
+            // the app's legacy record buttons (under the app name), not on an old version of the record
+            ...array_map(fn (Action $action): Action => MenuButtons::mark($action)->hidden(fn (): bool => $this->historyVersion !== null), $this->menuActions()),
             EditAction::make()
-                ->label('レコードを編集する')
-                ->icon(Heroicon::OutlinedPencil)
-                ->iconButton()
+                ->label('編集')
+                ->icon(Heroicon::OutlinedPencilSquare)
                 ->color('gray')
+                ->extraAttributes(['title' => 'レコードを編集する'])
                 ->visible(fn (): bool => $this->historyVersion === null && $resource::canEdit($this->record)),
             Action::make('duplicate')
                 ->label('レコードを再利用する')
@@ -399,7 +407,8 @@ abstract class AppViewRecord extends ViewRecord
                 ->icon(Heroicon::EllipsisHorizontal)
                 ->color('gray')
                 ->iconButton(),
-        ];
+            MenuButtons::export($this->exportActions()),
+        ]));
     }
 
     /** 削除する, second step: 「この操作は取り消せません」, then the record is deleted with its parts (GuardedDelete). */
@@ -431,29 +440,26 @@ abstract class AppViewRecord extends ViewRecord
     }
 
     /**
-     * 帳票出力 (アプリの設定 → 帳票出力): a button per 出力設定 shown in レコード詳細画面のメニュー, putting out this record
-     * (a new tab, or a download). 出力設定 with the same ボタン名 are one button with a menu of their サブボタン名 (e.g. the
-     * legacy 作業明細表 — 注文書 / 営業控 / 原稿添付用, SYSTEM_BRAIN 08_PRINTCREATOR). When the ファイル名 has
+     * エクスポート (帳票出力, アプリの設定 → 帳票出力): an entry per 出力設定 of the record page, putting out this record
+     * (a new tab, or a download). 出力設定 with the same ボタン名 are one entry with a sub-menu of their サブボタン名 (e.g.
+     * the legacy 作業明細表 — 注文書 / 営業控 / 原稿添付用, SYSTEM_BRAIN 08_PRINTCREATOR). When the ファイル名 has
      * 「{ユーザー選択}」 the user first chooses the field of the name.
      *
      * @return list<Action|ActionGroup>
      */
-    private function documentActions(): array
+    private function exportActions(): array
     {
-        $buttons = [];
-        foreach (AppDocuments::groups($this->documentOutputsAt(OutputPlacement::RecordMenu)) as $group) {
-            if (count($group) === 1) {
-                $buttons[] = $this->recordDocumentAction($group[0], $group[0]->name);
-
-                continue;
-            }
-
-            $buttons[] = ActionGroup::make(array_map(fn (DocumentOutput $output): Action => $this->recordDocumentAction($output, $output->optionLabel()), $group))
-                ->label($group[0]->name)
-                ->icon(Heroicon::OutlinedPrinter);
+        if ($this->printMode || $this->historyVersion !== null) {
+            return [];
         }
 
-        return $buttons;
+        $outputs = collect([...$this->documentOutputsAt(OutputPlacement::RecordMenu), ...$this->documentOutputsAt(OutputPlacement::RecordSpace)])
+            ->unique('id')->values()->all();
+
+        return array_map(fn (array $group): Action|ActionGroup => MenuButtons::exportEntry(array_map(
+            fn (DocumentOutput $output): Action => $this->recordDocumentAction($output, count($group) > 1 ? $output->optionLabel() : $output->name),
+            $group,
+        ), $group[0]->name), AppDocuments::groups($outputs));
     }
 
     private function recordDocumentAction(DocumentOutput $output, string $label): Action
@@ -463,38 +469,6 @@ abstract class AppViewRecord extends ViewRecord
         return $output->asksForNameField()
             ? $this->askingNameField($action, fn (): DocumentOutput => $output)
             : $action->url(fn (): string => $this->documentUrl($output))->openUrlInNewTab($output->delivery === OutputDelivery::Open);
-    }
-
-    /** レコード詳細画面の上部スペース: 出力 of a 出力設定 whose ファイル名 has 「{ユーザー選択}」 (arguments: output). */
-    public function printDocumentAction(): Action
-    {
-        return $this->askingNameField(
-            Action::make('printDocument'),
-            fn (array $arguments): ?DocumentOutput => collect($this->documentOutputsAt(OutputPlacement::RecordSpace))->firstWhere('id', (int) ($arguments['output'] ?? 0)),
-        );
-    }
-
-    /**
-     * レコード詳細画面の上部スペース: the 出力設定 offered in the 帳票 drop-down + 出力 under the toolbar
-     * (core::filament.documents.bar), with the file of this record; those with the same ボタン名 listed under it by
-     * サブボタン名.
-     *
-     * @return list<array{key: string, name: string, label: string, url: string, newTab: bool, asks: bool}>
-     */
-    public function documentBar(): array
-    {
-        if ($this->printMode || $this->historyVersion !== null) {
-            return [];
-        }
-
-        return array_map(fn (DocumentOutput $output): array => [
-            'key' => (string) $output->id,
-            'name' => $output->name,
-            'label' => $output->optionLabel(),
-            'url' => $this->documentUrl($output),
-            'newTab' => $output->delivery === OutputDelivery::Open,
-            'asks' => $output->asksForNameField(),
-        ], $this->documentOutputsAt(OutputPlacement::RecordSpace));
     }
 
     /** @return list<DocumentOutput> the 出力設定 the user gets at the place */

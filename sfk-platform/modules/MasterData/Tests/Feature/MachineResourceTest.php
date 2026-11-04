@@ -161,7 +161,7 @@ it('edits a row in the list with decimal rates (インライン編集) and keeps
     $this->actingAs($this->admin);
 
     Livewire::test(ListMachines::class)
-        ->callTableAction('inlineEdit', $machine)
+        ->call('startInlineEdit', (string) $machine->getKey())
         ->assertSet('inlineData.processing_rate', '0.3500')
         ->set('inlineData.name', '9号機')
         ->set('inlineData.processing_rate', '0.123456')

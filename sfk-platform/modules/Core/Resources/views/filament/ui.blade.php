@@ -17,8 +17,8 @@
         --sfk-ui-tooltip: #1f2326;
         --sfk-ui-zone: #f7f9fa;
         --sfk-ui-file: #f2f4f6;
-        --sfk-ui-chip: #e2f2fe;
-        --sfk-ui-head-rule: #1d6fa5;
+        --sfk-ui-chip: #e6eef5;
+        --sfk-ui-head-rule: #033456;
         --sfk-ui-check: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 10.2l3.2 3.1L15 6.4' fill='none' stroke='%233498db' stroke-width='2.4'/%3E%3C/svg%3E");
         --sfk-ui-check-off: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 10.2l3.2 3.1L15 6.4' fill='none' stroke='%23b8bcbd' stroke-width='2.4'/%3E%3C/svg%3E");
         --sfk-ui-dash: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 10h10' fill='none' stroke='%233498db' stroke-width='2.4'/%3E%3C/svg%3E");

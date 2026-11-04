@@ -249,20 +249,20 @@ it('puts the pencil, 「…」 and ‹ › in the record toolbar, moving in 取�
         ->assertSee(ViewPartnerUrl($middle), false);
 });
 
-it('puts 編集, 再利用 and 「…」 (印刷 / 削除) on the right of the record toolbar, without rounded corners', function () {
+it('puts 編集, 再利用 and 「…」 (印刷 / 削除) at the top right of the record page, with rounded corners', function () {
     publishedPartnerApp();
     $partner = makePartner();
     $this->actingAs($this->admin);
 
     $html = $this->get(ViewPartnerUrl($partner))->assertOk()->getContent();
-    $toolbar = (string) str($html)->after('class="sfk-app-toolbar"')->before('</header>');
+    $actions = (string) str($html)->after('class="sfk-app-head-actions"')->before('</header>');
 
-    expect($toolbar)->not->toContain('sfk-app-toolbar-start')
-        ->and((string) str($toolbar)->after('sfk-app-toolbar-end'))->toContain('レコードを編集する')
-        ->and(strpos($toolbar, 'レコードを編集する'))->toBeLessThan(strpos($toolbar, 'レコードを再利用する'))
-        ->and(strpos($toolbar, 'レコードを再利用する'))->toBeLessThan(strpos($toolbar, 'その他の操作'))
-        ->and(strpos($toolbar, 'その他の操作'))->toBeLessThan(strpos($toolbar, 'レコードの移動'))
-        ->and(compactCss(themeCss()))->toContain(compactCss('*, *::before, *::after { border-radius: 0 !important; }'));
+    expect($actions)->toContain('レコードを編集する')
+        ->and(strpos($actions, 'レコードを編集する'))->toBeLessThan(strpos($actions, 'レコードを再利用する'))
+        ->and(strpos($actions, 'レコードを再利用する'))->toBeLessThan(strpos($actions, 'その他の操作'))
+        ->and(strpos($actions, 'その他の操作'))->toBeLessThan(strpos($actions, 'レコードの移動'))
+        ->and(themeCss())->toContain('--sfk-radius: 6px;')
+        ->and(compactCss(themeCss()))->not->toContain(compactCss('*, *::before, *::after { border-radius: 0 !important; }'));
 });
 
 it('hides the pencil and 削除する from employees who may only view', function () {
@@ -364,7 +364,7 @@ it('hides the collapsed menu completely and lets the app use the full screen wid
         ->assertSee('fi-main fi-width-full', false);
 });
 
-it('frames the list like the legacy app: title bar, breadcrumb, description, views, paging', function () {
+it('heads the list with the app name, its description popup, the views as tabs and the paging (design_ref/app-index.png)', function () {
     $space = Space::query()->create(['panel_id' => 'erp', 'name' => '営業スペース']);
     $app = new BusinessApp(['code' => 'partner-master', 'name' => '01. 取引先マスタ（得意先・仕入先）', 'icon_text' => '取引先']);
     $app->forceFill(['status' => AppStatus::Published])->save();
@@ -376,30 +376,29 @@ it('frames the list like the legacy app: title bar, breadcrumb, description, vie
 
     $this->get('/erp/partners')
         ->assertOk()
-        ->assertSee('sfk-app-titlebar', false)
-        ->assertSeeInOrder(['取引先', '01. 取引先マスタ（得意先・仕入先）', 'スペース: 営業スペース', 'アプリ: 01. 取引先マスタ（得意先・仕入先）'])
-        ->assertSee('得意先の情報を登録・管理するマスタアプリです。')
-        ->assertSeeInOrder(['取引先一覧', '（すべて）'])
+        ->assertDontSee('sfk-app-titlebar', false)
+        ->assertSeeInOrder(['ホーム', '01. 取引先マスタ（得意先・仕入先）', 'アプリの説明', '得意先の情報を登録・管理するマスタアプリです。', 'レコードを追加する'])
+        ->assertSeeInOrder(['sfk-app-tabs', '取引先一覧', '（すべて）'], false)
         ->assertSee('1 - 2（2件中）')
-        ->assertSee('レコードを追加する')
-        ->assertSee('アプリの設定')
+        ->assertSee('この一覧の設定を開く')
         ->assertSee('ファイルに書き出す')
         ->assertSee('取引先名(ふりがな)')
         ->assertSee('【0101】山田太郎');
 });
 
-it('puts the paging right of the search box and shows table headers and field names in black', function () {
+it('puts 表示件数 and the paging under the list and shows table headers and field names in black', function () {
     publishedPartnerApp();
     makePartner();
     $this->actingAs($this->admin);
 
     $html = $this->get('/erp/partners')->assertOk()->getContent();
-    $header = (string) str($html)->after('<header class="sfk-app-header">')->before('</header>');
-    $toolbar = (string) str($html)->after('class="fi-ta-header-toolbar"')->before('fi-ta-main');
+    $header = (string) str($html)->after('<header class="sfk-app-header')->before('</header>');
+    $footer = (string) str($html)->after('class="sfk-list-footer"');
 
-    expect($header)->not->toContain('sfk-app-pager')
-        ->and($toolbar)->toContain('1 - 1（1件中）')
-        ->and(strpos($toolbar, 'fi-ta-search-field'))->toBeLessThan(strpos($toolbar, 'sfk-app-pager'))
+    expect($header)->not->toContain('1 - 1（1件中）')
+        ->and($footer)->toContain('表示件数')
+        ->and($footer)->toContain('1 - 1（1件中）')
+        ->and(strpos($footer, '表示件数'))->toBeLessThan(strpos($footer, '1 - 1（1件中）'))
         ->and(themeCss())->toContain('--kt-label: #000000;')
         ->and(themeCss())->toContain('.fi-ta-header-cell {'."\n".'        color: var(--kt-label);')
         ->and(compactCss(themeCss()))->toContain(compactCss('.kt-record .fi-in-entry-label { font-size: .875rem; font-weight: 400; color: var(--kt-label); }'))
@@ -432,16 +431,16 @@ it('pages through the list 100 records at a time', function () {
         ->assertSee('1 - 100（101件中）');
 });
 
-it('puts キャンセル and 保存 above the form, with the tabs above the fields', function () {
+it('puts キャンセル and 保存 in the footer of the form, with the tabs above the fields', function () {
     $this->actingAs($this->admin);
 
     Livewire::test(CreatePartner::class)
-        ->assertSeeInOrder(['キャンセル', '保存', '基本情報', '仕入先情報', '見積履歴', '納品履歴', '請求履歴', '取引先コード'])
+        ->assertSeeInOrder(['基本情報', '仕入先情報', '見積履歴', '納品履歴', '請求履歴', '取引先コード', 'キャンセル', '保存'])
         ->assertFormFieldDisabled('code')
-        ->callAction('save')
+        ->call('create')
         ->assertHasFormErrors(['name' => 'required', 'name_kana' => 'required'])
         ->fillForm(partnerData())
-        ->callAction('save')
+        ->call('create')
         ->assertHasNoFormErrors();
 
     $partner = Partner::query()->sole();
@@ -450,7 +449,7 @@ it('puts キャンセル and 保存 above the form, with the tabs above the fiel
         ->assertSeeInOrder(['キャンセル', '保存'])
         ->assertFormFieldDisabled('code')
         ->fillForm(['short_name' => '新略名'])
-        ->callAction('saveRecord')
+        ->call('save')
         ->assertHasNoFormErrors();
 
     expect($partner->refresh()->short_name)->toBe('新略名')
@@ -467,7 +466,7 @@ it('opens 絞り込む from the funnel next to the views', function () {
 
     $this->get('/erp/partners')
         ->assertOk()
-        ->assertSeeInOrder(['取引先一覧', '絞り込む', 'レコードを追加する'])
+        ->assertSeeInOrder(['レコードを追加する', '取引先一覧', '絞り込む'])
         ->assertSee('sfkAppFilter', false)
         ->assertSeeInOrder(['条件', 'すべての条件を満たす', 'いずれかの条件を満たす', 'すべてのレコード', 'すべてクリア', 'ソート', 'キャンセル', '保存', '適用']);
 
@@ -489,7 +488,7 @@ it('applies keyword, list-box and number conditions and lights the funnel', func
         ]])
         ->assertCanSeeTableRecords([$match])
         ->assertCanNotSeeTableRecords([$otherDay, $noDay])
-        ->assertSee('sfk-app-tool sfk-app-filter-button', false)
+        ->assertSee('sfk-app-filter-button is-active', false)
         ->assertSee('1 - 1（1件中）')
         ->call('applyAppFilter', ['conditions' => [['field' => 'closing_day', 'operator' => 'in', 'values' => ['']]]])
         ->assertCanSeeTableRecords([$noDay])
@@ -653,7 +652,7 @@ it('opens アプリの設定 → 一覧 from the gear, for administrators only',
 
     $this->get(PartnerListViewSettings::getUrl())
         ->assertOk()
-        ->assertSeeInOrder(['アプリ: 01. 取引先マスタ（得意先・仕入先）', 'アプリの設定', '一覧', '設定', '作成済みの一覧', '一覧を追加する', 'ドラッグして並び替え', '取引先一覧', '編集', '複製', '削除', '（すべて）']);
+        ->assertSeeInOrder(['01. 取引先マスタ（得意先・仕入先）', 'アプリの設定', '一覧', '設定', '作成済みの一覧', '一覧を追加する', 'ドラッグして並び替え', '取引先一覧', '編集', '複製', '削除', '（すべて）']);
 
     $this->actingAs($employee);
     $this->get(PartnerListViewSettings::getUrl())->assertForbidden();
@@ -770,7 +769,7 @@ it('lets each user choose 表示件数 for every app list', function () {
 
     Livewire::test(ListPartners::class)
         ->assertSee('1 - 25（25件中）')
-        ->callAction('pageSize', data: ['size' => '20'])
+        ->call('setPageSize', 20)
         ->assertSee('1 - 20（25件中）');
 
     expect($this->admin->refresh()->list_page_size)->toBe(20);
@@ -825,7 +824,7 @@ it('offers 200 and 300 件 in 表示件数', function () {
 
     expect(AppListRecords::PAGE_SIZES)->toBe([20, 40, 60, 80, 100, 200, 300]);
 
-    Livewire::test(ListPartners::class)->callAction('pageSize', data: ['size' => '300'])->assertHasNoActionErrors();
+    Livewire::test(ListPartners::class)->call('setPageSize', 300);
 
     expect($this->admin->refresh()->list_page_size)->toBe(300);
 });
@@ -944,7 +943,7 @@ it('opens アプリの設定 → 設定 with アクセス権 and その他の設
         ->assertOk()
         ->assertSeeInOrder(['一覧', '設定', 'アクセス権', 'アプリ', '高度な設定', 'その他の設定', '「レコードの再利用」機能を有効にする', 'レコードの変更履歴を記録する', '保存']);
 
-    $this->get('/erp/partners')->assertSeeInOrder(['アプリの設定メニュー', 'この一覧の設定を開く', '一覧', '設定', 'アクセス権', 'その他の設定']);
+    $this->get('/erp/partners')->assertSeeInOrder(['この一覧の設定を開く', '一覧', '設定', 'アクセス権', 'その他の設定']);
 
     $this->actingAs($employee);
     $this->get(PartnerSettings::getUrl())->assertForbidden();
@@ -1019,8 +1018,9 @@ it('edits a row in the list (インライン編集) with the form rules, 取引�
 
     $list = Livewire::test(ListPartners::class)
         ->assertTableActionVisible('inlineEdit', $partner)
+        ->assertTableActionHasUrl('inlineEdit', PartnerResource::getUrl('edit', ['record' => $partner]), $partner)
         ->assertTableActionHidden('inlineSave', $partner)
-        ->callTableAction('inlineEdit', $partner)
+        ->call('startInlineEdit', (string) $partner->getKey())
         ->assertSet('inlineRecordKey', (string) $partner->id)
         ->assertSet('inlineData.name', '旧社名')
         ->assertSet('inlineData.roles', ['得意先'])
@@ -1057,13 +1057,13 @@ it('edits a row in the list (インライン編集) with the form rules, 取引�
     expect(RecordVersion::query()->where('record_id', $partner->id)->sole()->version)->toBe(1);
 
     Livewire::test(ListPartners::class)
-        ->callTableAction('inlineEdit', $partner)
+        ->call('startInlineEdit', (string) $partner->getKey())
         ->set('inlineData.phone', '03-5555-5555')
         ->callTableAction('inlineSave', $partner);
     expect(RecordVersion::query()->where('record_id', $partner->id)->where('version', 2)->sole()->changed)->toBe(['phone']);
 
     Livewire::test(ListPartners::class)
-        ->callTableAction('inlineEdit', $partner)
+        ->call('startInlineEdit', (string) $partner->getKey())
         ->set('inlineData.phone', '03-9999-9999')
         ->callTableAction('inlineCancel', $partner)
         ->assertSet('inlineRecordKey', null);

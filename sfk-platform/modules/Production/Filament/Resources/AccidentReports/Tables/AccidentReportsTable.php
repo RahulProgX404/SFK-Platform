@@ -7,7 +7,6 @@ namespace Modules\Production\Filament\Resources\AccidentReports\Tables;
 use App\Models\User;
 use Closure;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
@@ -72,7 +71,6 @@ final class AccidentReportsTable
         return $table
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['reporter', 'maker1', 'maker2', 'salesUsers', 'machine', 'order.customer']))
             ->columns([
-                IconColumn::make('record')->label('')->state(true)->icon(Heroicon::OutlinedDocumentText)->color('primary')->width('2.5rem'),
                 ...array_map(fn (string $name): AppTextColumn => self::column($name), $names),
             ])
             ->defaultSort('id', 'desc')

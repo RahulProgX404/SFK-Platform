@@ -205,7 +205,7 @@ it('shows the daily reports in 日報一覧 and on the job, without the costs fo
 
     // インライン編集: a changed time costs the task again
     Livewire::test(ListDailyReports::class)
-        ->callTableAction('inlineEdit', $report)
+        ->call('startInlineEdit', (string) $report->getKey())
         ->set('inlineData.ended_at', '13:00')
         ->set('inlineData.gloves', true)
         ->callTableAction('inlineSave', $report)

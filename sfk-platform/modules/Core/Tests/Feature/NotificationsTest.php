@@ -148,15 +148,16 @@ it('follows 通知設定: a kind switched off is not received, メール sends a
     });
 });
 
-it('keeps 通知設定 on the profile page: kinds of the user, 受け取る and メールでも受け取る', function () {
+it('keeps 通知設定 on the profile page (administrators): kinds of the user, 受け取る and メールでも受け取る', function () {
     $user = grantDashboards(User::factory()->create(), 'erp');
+    $user->forceFill(['user_type' => 'admin'])->save();
     Filament::setCurrentPanel('erp');
     $this->actingAs($user);
     $receive = array_values(array_diff(app(NotificationPreferences::class)->receiving($user), ['test.kind']));
 
     Livewire::test(ProfilePage::class)
+        ->call('showSection', 'notifications')
         ->assertSee(['通知設定', '受け取る', 'メールでも受け取る', 'コメント', 'テスト通知', '毎日の通知'])
-        ->assertDontSee('管理者向け')
         ->assertSchemaStateSet(['notifications_mail' => []])
         ->fillForm(['notifications_receive' => $receive, 'notifications_mail' => ['test.daily']])
         ->call('save')
@@ -168,6 +169,17 @@ it('keeps 通知設定 on the profile page: kinds of the user, 受け取る and 
         ['kind' => 'test.kind', 'receive' => false, 'mail' => false],
     ]);
     Livewire::test(ProfilePage::class)->assertSchemaStateSet(['notifications_receive' => $receive, 'notifications_mail' => ['test.daily']]);
+});
+
+it('does not offer 通知設定 to employees', function () {
+    $user = grantDashboards(User::factory()->create(), 'erp');
+    Filament::setCurrentPanel('erp');
+    $this->actingAs($user);
+
+    Livewire::test(ProfilePage::class)
+        ->assertDontSee(['通知設定', 'メールでも受け取る'])
+        ->call('showSection', 'notifications')
+        ->assertSet('section', 'general');
 });
 
 it('runs the daily checks every morning and prunes old 通知 at night', function () {

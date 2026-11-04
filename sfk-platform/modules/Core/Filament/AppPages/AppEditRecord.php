@@ -12,7 +12,8 @@ use Modules\Core\Application\History\RecordHistory;
 use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
 
 /**
- * Editing a record of an app: app frame with キャンセル / 保存 at the top, no buttons below the form. A save that changed
+ * Editing a record of an app (design_ref/add-invoice.png): ← and the app name at the top; キャンセル / 保存 in the footer
+ * of the form, which stays at the bottom of the screen. A save that changed
  * the record adds a version to its 変更履歴 (subclasses with their own afterSave() call parent::afterSave()).
  */
 abstract class AppEditRecord extends EditRecord
@@ -24,7 +25,7 @@ abstract class AppEditRecord extends EditRecord
         return 'edit';
     }
 
-    protected function getHeaderActions(): array
+    protected function getFormActions(): array
     {
         return [
             $this->getCancelFormAction()->label('キャンセル')->color('gray'),
@@ -32,9 +33,9 @@ abstract class AppEditRecord extends EditRecord
         ];
     }
 
-    protected function getFormActions(): array
+    public function areFormActionsSticky(): bool
     {
-        return [];
+        return true;
     }
 
     protected function afterSave(): void

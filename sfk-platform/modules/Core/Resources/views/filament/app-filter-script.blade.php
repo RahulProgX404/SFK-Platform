@@ -7,6 +7,82 @@
     - sfkListScrollbar: the list's horizontal scroll bar at the bottom of the screen (core::filament.app-list-scrollbar).
 --}}
 <script>
+    /*
+     * Loading, shown once the server takes longer than a moment so quick updates do not flicker:
+     * - on an app list with no dialog open (search, 並び替え, paging, tabs, 絞り込む …): the table shows placeholder rows
+     *   (.sfk-table-loading, core::filament.design) — its first load does too, in place of Filament's spinner;
+     * - everywhere else (saving, dialogs, the next page loading): three dots moving in a wave over a transparent blur.
+     */
+    (() => {
+        let bar = null
+        let running = 0
+        let timer = null
+        let tables = []
+        const listTables = () => document.querySelector('.fi-modal.fi-modal-open')
+            ? []
+            : [...document.querySelectorAll('.sfk-app-page-list .fi-ta-content-ctn')].filter((table) => table.querySelector('thead'))
+        const element = () => {
+            if (bar === null) {
+                bar = document.createElement('div')
+                bar.className = 'sfk-loading'
+                bar.setAttribute('role', 'progressbar')
+                bar.setAttribute('aria-label', '読み込み中')
+                bar.innerHTML = '<span></span><span></span><span></span>'
+                document.body.appendChild(bar)
+            }
+            return bar
+        }
+        const start = (inTable = false) => {
+            running++
+            if (timer !== null) return
+            const found = inTable ? listTables() : []
+            timer = setTimeout(() => {
+                if (found.length > 0) {
+                    tables = found
+                    for (const table of tables) {
+                        // the placeholder rows start under the header row
+                        const head = table.querySelector('thead')
+                        table.style.setProperty('--sfk-thead', (head ? head.offsetHeight : 0) + 'px')
+                        table.classList.add('sfk-table-loading')
+                    }
+                } else {
+                    element().classList.add('is-active')
+                }
+            }, 350)
+        }
+        const done = () => {
+            running = Math.max(0, running - 1)
+            if (running > 0) return
+            clearTimeout(timer)
+            timer = null
+            bar?.classList.remove('is-active')
+            tables.forEach((table) => table.classList.remove('sfk-table-loading'))
+            tables = []
+        }
+        document.addEventListener('livewire:init', () => {
+            Livewire.hook('request', ({ succeed, fail }) => {
+                start(true)
+                succeed(() => done())
+                fail(() => done())
+            })
+        })
+        window.addEventListener('beforeunload', () => { running = 0; start() })
+        window.addEventListener('pageshow', () => { running = 1; done() })
+    })()
+
+    /* App lists: a value cut off with 「…」 shows its whole text on hover (title of the cell). */
+    document.addEventListener('mouseover', (event) => {
+        const cell = event.target instanceof Element ? event.target.closest('.sfk-app-page-list .fi-ta-table > tbody td.fi-ta-cell') : null
+        if (cell === null) return
+        const cut = [...cell.querySelectorAll('.fi-ta-text-item-label, .fi-ta-text-item, .fi-ta-text, .fi-ta-col')]
+            .some((part) => part.scrollWidth > part.clientWidth + 1)
+        if (cut) {
+            cell.title = cell.innerText.trim()
+        } else {
+            cell.removeAttribute('title')
+        }
+    })
+
     document.addEventListener('alpine:init', () => {
         /**
          * The number of rows checked in the app list ($store.sfkCheckedRows), for the 「N件」 badges and
@@ -21,6 +97,38 @@
          * (keys are then the unchecked ones). Read by the buttons that need certain rows (AppListRecords::needsRows()).
          */
         Alpine.store('sfkChecked', { count: 0, all: false, keys: [] })
+
+        /**
+         * The app's legacy buttons on a list or record page ($store.sfkAppMenu, core::filament.app-list-tools and
+         * core::filament.app-header): shown or hidden by the switch next to 絞り込む / under the app name, remembered
+         * per screen in the browser; help: the ボタンの説明 popup.
+         */
+        Alpine.store('sfkAppMenu', {
+            key: null,
+            open: false,
+            help: false,
+
+            use(key) {
+                if (this.key === key) {
+                    return
+                }
+                this.key = key
+                this.help = false
+                try {
+                    this.open = localStorage.getItem(key) === 'open'
+                } catch (e) {
+                    this.open = false
+                }
+            },
+
+            toggle() {
+                this.open = ! this.open
+                this.help = this.help && this.open
+                try {
+                    localStorage.setItem(this.key, this.open ? 'open' : 'closed')
+                } catch (e) {}
+            },
+        })
 
         Alpine.data('sfkCheckedRowsWatcher', () => ({
             timer: null,

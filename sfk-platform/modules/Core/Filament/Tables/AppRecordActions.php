@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Filament\Tables;
 
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Contracts\HasTable;
@@ -14,16 +15,15 @@ use Modules\Core\Filament\AppResource;
 use Modules\Core\Filament\Support\GuardedDelete;
 
 /**
- * The actions at the end of an app list row, like the legacy list: the pencil (編集する) edits the row in place
- * (インライン編集, or opens the edit screen when the app has no inline fields) and × (削除する) deletes it; while a
- * row is edited it shows 保存 / キャンセル. Both icons follow the app's permissions and are hidden when インライン編集 is
- * switched off in その他の設定.
+ * The 「…」 at the end of an app list row (design_ref/app-index.png): 編集する opens the record's edit screen and
+ * 削除する deletes it; while a row is edited in place (AppListRecords::startInlineEdit()) it shows 保存 / キャンセル
+ * instead. Both follow the app's permissions and are hidden when インライン編集 is switched off in その他の設定.
  */
 final class AppRecordActions
 {
     /**
      * @param  class-string<AppResource>  $resource
-     * @return list<Action>
+     * @return list<Action|ActionGroup>
      */
     public static function make(string $resource): array
     {
@@ -32,20 +32,24 @@ final class AppRecordActions
             && $livewire->rowActionsEnabled()
             && ! $livewire->isInlineEditing($record);
 
+        $edit = Action::make('inlineEdit')
+            ->label('編集する')
+            ->icon(Heroicon::OutlinedPencilSquare)
+            ->visible(fn (HasTable $livewire, Model $record): bool => $icons($livewire, $record) && $resource::canEdit($record))
+            ->url(fn (Model $record): string => $resource::getUrl('edit', ['record' => $record]));
+        // a record still used elsewhere is not deleted (GuardedDelete)
+        $delete = GuardedDelete::apply(DeleteAction::make())
+            ->label('削除する')
+            ->icon(Heroicon::OutlinedTrash)
+            ->visible(fn (HasTable $livewire, Model $record): bool => $icons($livewire, $record) && $resource::canDelete($record));
+
         return [
-            Action::make('inlineEdit')
-                ->label('編集する')
-                ->icon(Heroicon::OutlinedPencil)
+            ActionGroup::make([$edit, $delete])
+                ->label('操作')
+                ->icon(Heroicon::EllipsisHorizontal)
                 ->iconButton()
-                ->visible(fn (HasTable $livewire, Model $record): bool => $icons($livewire, $record) && $resource::canEdit($record))
-                ->url(fn (HasTable $livewire, Model $record): ?string => $livewire instanceof AppListRecords && $livewire->inlineFields() === []
-                    ? $resource::getUrl('edit', ['record' => $record])
-                    : null)
-                ->action(function (HasTable $livewire, Model $record): void {
-                    if ($livewire instanceof AppListRecords) {
-                        $livewire->startInlineEdit($record);
-                    }
-                }),
+                ->color('gray')
+                ->extraAttributes(['class' => 'sfk-row-menu']),
             Action::make('inlineSave')
                 ->label('保存')
                 ->button()
@@ -67,12 +71,6 @@ final class AppRecordActions
                         $livewire->cancelInlineEdit();
                     }
                 }),
-            // a record still used elsewhere is not deleted (GuardedDelete)
-            GuardedDelete::apply(DeleteAction::make())
-                ->label('削除する')
-                ->icon(Heroicon::XMark)
-                ->iconButton()
-                ->visible(fn (HasTable $livewire, Model $record): bool => $icons($livewire, $record) && $resource::canDelete($record)),
         ];
     }
 }

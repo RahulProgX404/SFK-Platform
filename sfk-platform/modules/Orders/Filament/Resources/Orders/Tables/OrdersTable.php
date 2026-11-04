@@ -7,7 +7,6 @@ namespace Modules\Orders\Filament\Resources\Orders\Tables;
 use App\Models\User;
 use Closure;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
@@ -163,12 +162,6 @@ final class OrdersTable
                 'assignees.employeeCategories', 'assignees.position',
             ]))
             ->columns([
-                IconColumn::make('record')
-                    ->label('')
-                    ->state(true)
-                    ->icon(Heroicon::OutlinedDocumentText)
-                    ->color('primary')
-                    ->width('2.5rem'),
                 ...array_map(fn (string $name): AppTextColumn => self::column($name), $names),
             ])
             ->defaultSort('id', 'desc')

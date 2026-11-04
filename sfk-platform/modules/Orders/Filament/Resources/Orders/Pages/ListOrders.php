@@ -6,9 +6,9 @@ namespace Modules\Orders\Filament\Resources\Orders\Pages;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Livewire\Livewire;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Orders\Domain\Orders\JobCosting;
+use Modules\Orders\Filament\Resources\Orders\OrderLayout;
 use Modules\Orders\Filament\Resources\Orders\OrderResource;
 use Modules\Orders\Filament\Resources\Orders\Tables\OrdersTable;
 use Modules\Orders\Models\Order;
@@ -48,17 +48,17 @@ final class ListOrders extends AppListRecords
         return OrdersTable::inlineFields();
     }
 
-    /**
-     * 集計サマリー directly under the search row, inside the table box so summary and table stay together (render hook
-     * of the table toolbar, OrdersServiceProvider); empty elsewhere and for calendar views.
-     */
-    public static function summaryBar(): string
+    /** 集計サマリー: the cards above the 一覧 tabs (Core), for the list as filtered and searched. */
+    public function summaryCards(): array
     {
-        $page = Livewire::current();
+        $summary = $this->orderSummary();
+        $cards = [self::summaryCard('対象件数', $summary['count'], 'count')];
+        foreach ($summary['sums'] as $column => $sum) {
+            $cards[] = self::summaryCard(OrderLayout::label($column), $sum, $column === 'estimated_profit' ? 'signed' : 'yen');
+        }
+        $cards[] = self::summaryCard('利益率', $summary['margin'], 'percent');
 
-        return $page instanceof self && ! $page->currentView()->isCalendar()
-            ? view('orders::filament.order-summary', ['page' => $page])->render()
-            : '';
+        return $cards;
     }
 
     /**

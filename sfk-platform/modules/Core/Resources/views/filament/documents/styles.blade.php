@@ -51,30 +51,7 @@
         background: #fdecea;
     }
 
-    /* 上部スペース: 帳票 + 出力 */
-    .sfk-docs-bar {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 24px;
-        border-top: 1px solid var(--kt-border);
-        background: #ffffff;
-    }
-
-    .sfk-docs-bar-icon {
-        width: 20px;
-        height: 20px;
-        color: var(--kt-blue);
-    }
-
-    .sfk-docs-bar-select {
-        display: block;
-        width: 280px;
-        max-width: 100%;
-    }
-
-    /* drop-downs fill their box (bar, designer toolbar and properties) */
-    .sfk-docs-bar-select select,
+    /* drop-downs fill their box (designer toolbar and properties) */
     .sfk-designer .sfk-filter-select,
     .sfk-designer .sfk-filter-select select {
         display: block;
@@ -84,15 +61,6 @@
     .sfk-designer .sfk-filter-select select {
         min-width: 0;
         height: 36px;
-    }
-
-    .sfk-docs-bar-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 96px;
-        height: 36px;
-        font-size: .9375rem;
     }
 
     /* the designer */
@@ -353,7 +321,7 @@
     .sfk-designer-element {
         position: absolute;
         outline: 1px dashed var(--kt-blue);
-        background: rgba(52, 152, 219, .08);
+        background: rgba(5, 70, 126, .08);
         cursor: move;
         touch-action: none;
         user-select: none;

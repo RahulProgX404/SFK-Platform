@@ -13,7 +13,6 @@ use Filament\Schemas\Components\Grid;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
-use Livewire\Livewire;
 use Modules\Core\Domain\Calendar\YearMonth;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Purchasing\Application\Payables\PayableLedger;
@@ -59,14 +58,15 @@ final class ListPayables extends AppListRecords
         return PayablesTable::inlineFields();
     }
 
-    /** 合計 under the search row (render hook of the table toolbar, PurchasingServiceProvider); not for calendar views. */
-    public static function totalsBar(): string
+    /** 合計: the cards above the 一覧 tabs (Core), for the list as filtered and searched. */
+    public function summaryCards(): array
     {
-        $page = Livewire::current();
+        $totals = $this->payableTotals();
 
-        return $page instanceof self && ! $page->currentView()->isCalendar()
-            ? view('purchasing::filament.payable-totals', ['page' => $page])->render()
-            : '';
+        return [
+            self::summaryCard('対象件数', $totals['count'], 'count'),
+            ...array_map(fn (array $row): array => self::summaryCard($row[0], $row[1]), $totals['rows']),
+        ];
     }
 
     /** @return array{count: int, rows: list<array{0: string, 1: int}>} */

@@ -10,8 +10,8 @@
 <section class="sfk-order-past" x-data="{ open: true }" aria-labelledby="sfk-order-past-title">
     <div class="sfk-order-past-head">
         <h3 id="sfk-order-past-title" class="sfk-order-past-title">過去の受注履歴検索</h3>
-        <button type="button" class="sfk-order-past-toggle" x-on:click="open = ! open" x-bind:aria-expanded="open ? 'true' : 'false'"
-                x-text="open ? '折りたたみ ▲' : '展開 ▼'">折りたたみ ▲</button>
+        <button type="button" class="sfk-order-past-toggle" x-on:click="open = ! open"
+            x-bind:aria-expanded="open ? 'true' : 'false'" x-text="open ? '折りたたみ ▲' : '展開 ▼'">折りたたみ ▲</button>
     </div>
 
     <div x-show="open">
@@ -32,8 +32,8 @@
                     <input type="date" wire:model="pastTo" aria-label="受注日（まで）">
                 </span>
             </div>
-            <button type="submit" class="sfk-filter-btn sfk-filter-btn-submit">検索</button>
-            <button type="button" class="sfk-filter-btn" wire:click="resetPastOrders">リセット</button>
+            <button type="submit" class="sfk-filter-btn sfk-filter-btn-submit ">検索</button>
+            <button type="button" class="sfk-filter-btn" wire:click="resetPastOrders ">リセット</button>
         </form>
 
         @if ($page->pastSearched)
@@ -41,9 +41,13 @@
                 <span>全{{ number_format($result['total']) }}件中 {{ $result['from'] }}～{{ $result['to'] }}件を表示</span>
                 @if ($result['pages'] > 1)
                     <span class="sfk-order-past-pager">
-                        <button type="button" class="sfk-order-past-page" wire:click="showPastOrdersPage({{ $result['page'] - 1 }})" @disabled($result['page'] <= 1)>← 前</button>
+                        <button type="button" class="sfk-order-past-page"
+                            wire:click="showPastOrdersPage({{ $result['page'] - 1 }})" @disabled($result['page'] <= 1)>←
+                            前</button>
                         <span>ページ {{ $result['page'] }} / {{ $result['pages'] }}</span>
-                        <button type="button" class="sfk-order-past-page" wire:click="showPastOrdersPage({{ $result['page'] + 1 }})" @disabled($result['page'] >= $result['pages'])>次 →</button>
+                        <button type="button" class="sfk-order-past-page"
+                            wire:click="showPastOrdersPage({{ $result['page'] + 1 }})" @disabled($result['page'] >= $result['pages'])>次
+                            →</button>
                     </span>
                 @endif
             </div>
@@ -67,9 +71,12 @@
                             @foreach ($result['orders'] as $order)
                                 @php($url = OrderResource::getUrl('view', ['record' => $order]))
                                 <tr wire:key="past-order-{{ $order->id }}">
-                                    <td><a href="{{ $url }}" target="_blank" rel="noopener" title="レコードを開く"><x-filament::icon icon="heroicon-o-document-text" class="sfk-order-past-icon" /></a></td>
+                                    <td><a href="{{ $url }}" target="_blank" rel="noopener"
+                                            title="レコードを開く"><x-filament::icon icon="heroicon-o-document-text"
+                                                class="sfk-order-past-icon" /></a></td>
                                     <td>{{ $order->order_date?->format('Y年m月d日') }}</td>
-                                    <td><a href="{{ $url }}" target="_blank" rel="noopener">{{ $order->order_number }}</a></td>
+                                    <td><a href="{{ $url }}" target="_blank"
+                                            rel="noopener">{{ $order->order_number }}</a></td>
                                     <td>{{ $order->customer?->name }}</td>
                                     <td>{{ $order->product_name }}</td>
                                     <td class="is-number">{{ OrderFormat::number($order->quantity) }}</td>

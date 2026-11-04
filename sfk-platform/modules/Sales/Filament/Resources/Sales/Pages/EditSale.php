@@ -29,7 +29,7 @@ final class EditSale extends AppEditRecord
         return (string) $this->record->sales_number;
     }
 
-    protected function getHeaderActions(): array
+    protected function getFormActions(): array
     {
         return array_map(fn (Action $action): Action => $action->getName() === 'saveRecord'
             ? $action
@@ -37,7 +37,7 @@ final class EditSale extends AppEditRecord
                 ->modalHeading(fn (): string => $this->issuedDocumentsHeading())
                 ->modalSubmitActionLabel('保存する')
                 ->modalCancelActionLabel('キャンセル')
-            : $action, parent::getHeaderActions());
+            : $action, parent::getFormActions());
     }
 
     /** 「既に納品/請求レコードが作成されています。(納品書番号：…)…」 (legacy dialog of page 16). */

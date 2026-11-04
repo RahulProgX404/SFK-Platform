@@ -90,7 +90,7 @@ it('keeps employees on their joined spaces', function () {
         ->assertDontSee('製造スペース');
 });
 
-it('lets administrators edit the お知らせ, rendered for everyone', function () {
+it('lets administrators edit the お知らせ, shown to everyone on the dashboard selection (/portal)', function () {
     $this->actingAs($this->admin);
 
     Livewire::test(PortalPage::class)
@@ -100,7 +100,8 @@ it('lets administrators edit the お知らせ, rendered for everyone', function 
 
     expect(DashboardPortal::for('erp')->notice)->toContain('安全衛生チェック');
 
-    $this->actingAs($this->employee)->get('/erp')->assertSee('安全衛生チェックを毎月全員 1日 にお願いします。');
+    $this->actingAs($this->employee)->get('/portal')->assertOk()->assertSee('安全衛生チェックを毎月全員 1日 にお願いします。');
+    $this->get('/erp')->assertDontSee('安全衛生チェックを毎月全員 1日 にお願いします。');
 
     Livewire::test(PortalPage::class)->assertActionHidden('editNotice');
 });
@@ -108,7 +109,7 @@ it('lets administrators edit the お知らせ, rendered for everyone', function 
 it('does not render script from the お知らせ', function () {
     DashboardPortal::for('erp')->fill(['notice' => '<p>注意</p><script>alert(1)</script>'])->save();
 
-    $this->actingAs($this->employee)->get('/erp')
+    $this->actingAs($this->employee)->get('/portal')
         ->assertSee('注意')
         ->assertDontSee('<script>alert(1)</script>', escape: false);
 });
@@ -116,10 +117,10 @@ it('does not render script from the お知らせ', function () {
 it('shows the お知らせ in the text colours chosen in the editor', function () {
     DashboardPortal::for('erp')->fill(['notice' => '<p><span class="color" data-color="#e74c3c">赤い文字</span></p>'])->save();
 
-    $this->actingAs($this->employee)->get('/erp')
+    $this->actingAs($this->employee)->get('/portal')
         ->assertSee('赤い文字')
         ->assertSee('style="--color: #e74c3c', escape: false)
-        ->assertSee('.sfk-notice-content .color { color: var(--color); }', escape: false);
+        ->assertSee('.sp-notice-content .color { color: var(--color); }', escape: false);
 });
 
 it('links every space to its settings for administrators', function () {
@@ -255,22 +256,20 @@ it('keeps the place of the apps an administrator does not see when reordering', 
 });
 
 it('shows the edit buttons of お知らせ and アプリショートカット to administrators only (not even disabled)', function () {
-    $this->actingAs($this->employee)->get('/erp')
-        ->assertOk()
-        ->assertDontSee('お知らせを編集')
-        ->assertDontSee('アプリショートカットを編集');
+    DashboardPortal::for('erp')->fill(['notice' => '<p>お知らせ本文</p>'])->save();
 
-    $this->actingAs($this->admin)->get('/erp')
-        ->assertOk()
-        ->assertSee('お知らせを編集')
-        ->assertSee('アプリショートカットを編集');
+    $this->actingAs($this->employee)->get('/erp')->assertOk()->assertDontSee('アプリショートカットを編集');
+    $this->get('/portal')->assertOk()->assertSee('お知らせ本文')->assertDontSee('お知らせを編集');
+
+    $this->actingAs($this->admin)->get('/erp')->assertOk()->assertSee('アプリショートカットを編集');
+    $this->get('/portal')->assertOk()->assertSee('お知らせを編集')->assertSee('action=editNotice', false);
 });
 
 it('frames each アプリショートカット on its own, with space between them', function () {
     $this->actingAs($this->admin)->get('/erp')
         ->assertOk()
         ->assertSee('.sfk-shortcuts { display: flex; flex-wrap: wrap; gap: .75rem;', false)
-        ->assertSee('border: 1px solid #555; color: var(--kt-blue', false);
+        ->assertSee('border: 1px solid #e5e7eb; border-radius: 10px; color: var(--kt-blue', false);
 });
 
 it('lists 共通管理 first in ダッシュボード切替, each dashboard with its own icon, without a ダッシュボード entry', function () {

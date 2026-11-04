@@ -6,7 +6,6 @@ namespace Modules\Production\Filament\Resources\BagSchedules\Tables;
 
 use Closure;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Application\Filters\FilterField;
@@ -87,7 +86,6 @@ final class BagSchedulesTable
         return $table
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['machine', 'order.customer']))
             ->columns([
-                IconColumn::make('record')->label('')->state(true)->icon(Heroicon::OutlinedDocumentText)->color('primary')->width('2.5rem'),
                 ...array_map(fn (string $name): AppTextColumn => self::column($name), $names),
             ])
             // like the schedule print: by machine, then by time

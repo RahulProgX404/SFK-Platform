@@ -147,7 +147,7 @@ it('adds the tab 帳票出力 to アプリの設定 and the gear menu, for admin
         ->assertOk()
         ->assertSeeInOrder(['一覧', '設定', '帳票出力', '帳票テンプレート', 'テンプレートを追加する', '出力設定', '出力設定を追加する']);
     $this->get(DeliveryNoteResource::getUrl('index'))
-        ->assertSeeInOrder(['アプリの設定メニュー', 'その他の設定', '帳票出力']);
+        ->assertSeeInOrder(['その他の設定', '帳票出力']);
 
     $this->actingAs($employee);
     $this->get(DeliveryNoteSettings::getUrl(['tab' => 'documents']))->assertForbidden();
@@ -282,22 +282,19 @@ it('puts out a record from its button before 編集 as a PDF in a new tab', func
         ->and(preg_match_all('/\/Type \/Page\b/', $pdf))->toBe(2);
 });
 
-it('shows the 帳票 drop-down in the 上部スペース of the record and the list', function () {
+it('offers the 帳票 of the 上部スペース in エクスポート of the record and the list', function () {
     $output = documentOutput($this->documents, ['record_space', 'list_space']);
     $note = documentNote('株式会社得意先');
     $this->actingAs($this->admin);
 
     $this->get(DeliveryNoteResource::getUrl('view', ['record' => $note]))
         ->assertOk()
-        ->assertSee('sfk-docs-bar', false)
-        ->assertSee(route('core.documents.record', ['output' => $output, 'record' => $note->id]), false);
+        ->assertSeeInOrder(['sfk-export', 'エクスポート', e(route('core.documents.record', ['output' => $output, 'record' => $note->id]))], false);
     $this->get(DeliveryNoteResource::getUrl('index'))
         ->assertOk()
-        ->assertSee('sfk-docs-bar', false)
-        ->assertSee('printDocuments', false);
+        ->assertSeeInOrder(['sfk-export', 'エクスポート', 'documentList'.$output->id], false);
 
-    $component = Livewire::test(ListDeliveryNotes::class)
-        ->callAction(TestAction::make('printDocuments')->arguments(['output' => $output->id]));
+    $component = Livewire::test(ListDeliveryNotes::class)->callAction('documentList'.$output->id);
     $this->get(route('core.documents.print', ['token' => printToken($component)]))->assertOk()->assertHeader('Content-Type', 'application/pdf');
 });
 
@@ -550,16 +547,15 @@ it('groups 出力設定 with the same ボタン名 into one button with a menu o
 
     $note = documentNote('株式会社得意先');
     $page = Livewire::test(ViewDeliveryNote::class, ['record' => $note->getRouteKey()]);
-    $groups = array_values(array_filter($page->instance()->getCachedHeaderActions(), fn ($action): bool => $action instanceof ActionGroup && $action->getLabel() === '作業明細表'));
+    $export = array_values(array_filter($page->instance()->getCachedHeaderActions(), fn ($action): bool => MenuButtons::isExport($action)))[0];
+    $groups = array_values(array_filter($export->getActions(), fn ($action): bool => $action instanceof ActionGroup && $action->getLabel() === '作業明細表'));
     expect($groups)->toHaveCount(1)
-        ->and(array_map(fn (Action $action): string => (string) $action->getLabel(), array_values($groups[0]->getActions())))->toBe(['注文書', '営業控'])
-        ->and(MenuButtons::isMenuButton($groups[0]))->toBeTrue();
+        ->and(array_map(fn (Action $action): string => (string) $action->getLabel(), array_values($groups[0]->getActions())))->toBe(['注文書', '営業控']);
     $page->assertActionVisible('document'.$single->id)
         ->assertActionHasUrl('document'.$copy->id, route('core.documents.record', ['output' => $copy, 'record' => $note->id]));
 
     $this->get(DeliveryNoteResource::getUrl('view', ['record' => $note]))->assertOk()
-        ->assertSee('<optgroup label="作業明細表">', false)
-        ->assertSeeInOrder(['注文書', '営業控']);
+        ->assertSeeInOrder(['作業明細表', 'sfk-export-submenu', '注文書', '営業控'], false);
 
     // an entry of the list menu puts out the listed records
     $component = Livewire::test(ListDeliveryNotes::class)->callAction('documentList'.$copy->id);
@@ -590,11 +586,8 @@ it('lets the user choose the field of the file name when putting a 帳票 out (�
     expect($url)->toContain('name_field=customer_id')
         ->and($this->get($url)->assertOk()->headers->get('Content-Disposition'))->toContain("utf-8''".rawurlencode('納品書_株式会社得意先.pdf'));
 
-    // the 上部スペース asks too; a field that is not on the record page is ignored
-    $this->get(DeliveryNoteResource::getUrl('view', ['record' => $note]))->assertSee("mountAction('printDocument'", false);
-    $component = Livewire::test(ViewDeliveryNote::class, ['record' => $note->getRouteKey()])
-        ->callAction(TestAction::make('printDocument')->arguments(['output' => $output->id]), ['name_field' => 'number']);
-    expect($this->get(openedUrl($component))->headers->get('Content-Disposition'))->toContain("utf-8''".rawurlencode('納品書_'.$note->number.'.pdf'))
+    // a field that is not on the record page is ignored
+    expect($this->get(route('core.documents.record', ['output' => $output, 'record' => $note->id, 'name_field' => 'number']))->headers->get('Content-Disposition'))->toContain("utf-8''".rawurlencode('納品書_'.$note->number.'.pdf'))
         ->and($this->get(route('core.documents.record', ['output' => $output, 'record' => $note->id, 'name_field' => 'password']))->headers->get('Content-Disposition'))
         ->toContain("utf-8''".rawurlencode('納品書.pdf'));
 });

@@ -1,28 +1,19 @@
 {{--
-    ボタンの説明: the legacy menu text of the page (menuHelp(): button label => explanation) as a collapsible panel under
-    the toolbar; opened or closed is remembered per screen in the browser.
-    $help: array<string, string>, $key: storage key of the screen.
+    ボタンの説明: the legacy menu text of the page (menuHelp(): button label => explanation) in a popup panel next to the
+    app's buttons, opened and closed by the (i) switch ($store.sfkAppMenu.help).
+    $help: array<string, string>
 --}}
-<section
-    class="sfk-app-help"
-    x-data="{
-        open: true,
-        init() {
-            try { this.open = localStorage.getItem(@js($key)) !== 'closed' } catch (e) {}
-        },
-        toggle() {
-            this.open = ! this.open
-            try { localStorage.setItem(@js($key), this.open ? 'open' : 'closed') } catch (e) {}
-        },
-    }"
->
-    <button type="button" class="sfk-app-help-bar" x-on:click="toggle()" x-bind:aria-expanded="open ? 'true' : 'false'">
+<section class="sfk-app-help" x-data x-show="$store.sfkAppMenu.help" x-cloak x-transition.opacity role="dialog" aria-label="ボタンの説明">
+    <header class="sfk-app-help-head">
         <x-filament::icon icon="heroicon-o-information-circle" class="sfk-app-help-icon" />
         <span class="sfk-app-help-title">ボタンの説明</span>
-        <x-filament::icon icon="heroicon-m-chevron-down" class="sfk-app-help-chevron" x-bind:class="{ 'is-open': open }" />
-    </button>
+        <button type="button" class="sfk-app-help-close" x-on:click="$store.sfkAppMenu.help = false" title="閉じる">
+            <x-filament::icon icon="heroicon-m-x-mark" class="sfk-app-help-close-icon" />
+            <span class="fi-sr-only">閉じる</span>
+        </button>
+    </header>
 
-    <dl class="sfk-app-help-list" x-show="open" x-collapse>
+    <dl class="sfk-app-help-list">
         @foreach ($help as $label => $text)
             <div class="sfk-app-help-item">
                 <dt>{{ $label }}</dt>

@@ -8,11 +8,16 @@ use App\Modules\Filament\BasePanelProvider;
 use App\Modules\Module;
 use App\Modules\ModuleManager;
 use Filament\Contracts\Plugin;
+use Filament\Enums\DatabaseNotificationsPosition;
+use Filament\Enums\GlobalSearchPosition;
+use Filament\Enums\UserMenuPosition;
 use Filament\Panel;
+use Livewire\Livewire;
 use Modules\Core\Filament\Portal\PortalPage;
 
 /**
- * The main ERP panel (/erp, dashboard 白石封筒). Its home is the legacy-style ポータル (お知らせ, スペース, アプリ).
+ * The main ERP panel (/erp, dashboard 白石封筒). Its home is the ポータル (アプリショートカット, スペース, アプリ), the one
+ * screen with the top bar (search, bell and user menu there); the app screens have none (BasePanelProvider).
  * It contains no business screens itself: every enabled business module whose module.json says
  * `"panel": "erp"` contributes its Filament plugin here.
  */
@@ -30,14 +35,23 @@ final class ErpPanelProvider extends BasePanelProvider
             brand: (string) config('erp.panel.brand'),
         )
             ->default()
-            // Collapsing the menu hides it completely; the content then uses the full screen width.
-            ->sidebarCollapsibleOnDesktop(false)
-            ->sidebarFullyCollapsibleOnDesktop()
+            ->topbar(fn (): bool => self::onHome())
+            ->globalSearch(position: fn (): GlobalSearchPosition => self::onHome() ? GlobalSearchPosition::Topbar : GlobalSearchPosition::Sidebar)
+            ->userMenu(position: fn (): UserMenuPosition => self::onHome() ? UserMenuPosition::Topbar : UserMenuPosition::Sidebar)
+            ->databaseNotifications(position: fn (): DatabaseNotificationsPosition => self::onHome() ? DatabaseNotificationsPosition::Topbar : DatabaseNotificationsPosition::Sidebar)
             ->navigationGroups(NavigationGroup::labels())
             ->pages([
                 PortalPage::class,
             ])
             ->plugins($this->businessModulePlugins());
+    }
+
+    /** Whether the screen is the panel's home (/erp), also while Livewire updates it. */
+    private static function onHome(): bool
+    {
+        $path = Livewire::isLivewireRequest() ? (string) Livewire::originalPath() : request()->path();
+
+        return trim($path, '/') === trim((string) config('erp.panel.path', 'erp'), '/');
     }
 
     /** @return list<Plugin> */

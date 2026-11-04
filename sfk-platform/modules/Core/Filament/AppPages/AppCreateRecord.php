@@ -14,7 +14,8 @@ use Modules\Core\Application\History\RecordHistory;
 use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
 
 /**
- * New record of an app: app frame with キャンセル / 保存 at the top, no buttons below the form.
+ * New record of an app (design_ref/add-invoice.png): ← and the app name at the top; キャンセル / 保存 in the footer of the
+ * form, which stays at the bottom of the screen.
  *
  * レコードを再利用する (?duplicate=<id>, legacy duplicate record): the form starts with the copied record's values except
  * the key, 作成者 / 更新者, the timestamps and duplicateExcludedFields() (auto-numbered codes, attachments, legacy ids);
@@ -33,7 +34,7 @@ abstract class AppCreateRecord extends CreateRecord
         return 'create';
     }
 
-    protected function getHeaderActions(): array
+    protected function getFormActions(): array
     {
         return [
             $this->getCancelFormAction()->label('キャンセル')->color('gray'),
@@ -41,9 +42,9 @@ abstract class AppCreateRecord extends CreateRecord
         ];
     }
 
-    protected function getFormActions(): array
+    public function areFormActionsSticky(): bool
     {
-        return [];
+        return true;
     }
 
     protected function fillForm(): void

@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Modules\Purchasing\Providers;
 
 use App\Modules\ModuleServiceProvider;
-use Filament\Support\Facades\FilamentView;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\View\TablesRenderHook;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Application\Legacy\LegacyImporter;
 use Modules\Core\Application\Notifications\NotificationKind;
 use Modules\Core\Application\Notifications\NotificationKinds;
+use Modules\Core\Filament\Records\RecordTabs;
 use Modules\Core\Filament\Records\RelatedLists;
+use Modules\MasterData\Filament\Resources\Partners\Pages\ViewPartner;
 use Modules\Purchasing\Application\ConsumableOrders\ConsumableOrderWorkflow;
 use Modules\Purchasing\Application\ConsumableOrders\ConsumableReceipt;
 use Modules\Purchasing\Application\Legacy\LegacyConsumableOrderImport;
@@ -22,7 +22,7 @@ use Modules\Purchasing\Application\Legacy\LegacyPaymentImport;
 use Modules\Purchasing\Application\Legacy\LegacyPurchaseImport;
 use Modules\Purchasing\Application\Purchases\OverrunAlert;
 use Modules\Purchasing\Application\PurchasingObserver;
-use Modules\Purchasing\Filament\Resources\Payables\Pages\ListPayables;
+use Modules\Purchasing\Filament\PartnerTabs;
 use Modules\Purchasing\Filament\Resources\Purchases\PurchaseResource;
 use Modules\Purchasing\Filament\Resources\Purchases\PurchaseRows;
 use Modules\Purchasing\Models\ConsumableOrderLine;
@@ -48,6 +48,9 @@ final class PurchasingServiceProvider extends ModuleServiceProvider
 
     protected function bootModule(): void
     {
+        // the tabs and cards of a 取引先 on its 01. 取引先マスタ record (design_ref/customer-*.png)
+        PartnerTabs::register($this->app->make(RecordTabs::class), ViewPartner::TABS);
+
         // 仕入原価超過 → 通知先 (BR-PU-05); 消耗品発注 承認依頼 / 承認する → whom it goes to next (BR-PU-09)
         $kinds = $this->app->make(NotificationKinds::class);
         $kinds->register(new NotificationKind(
@@ -80,8 +83,5 @@ final class PurchasingServiceProvider extends ModuleServiceProvider
                 'stored_plate_amount', 'spot_color_amount'],
             PurchaseResource::class,
         ));
-
-        // 合計 under the search row of the 23. 買掛管理 list
-        FilamentView::registerRenderHook(TablesRenderHook::TOOLBAR_AFTER, fn (): string => ListPayables::totalsBar());
     }
 }

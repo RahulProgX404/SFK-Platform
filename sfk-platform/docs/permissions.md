@@ -91,18 +91,18 @@ name — of several, the first of this dashboard the user is a member of (`Busin
 `AppAbility::Export`. Override `appName()` for the registry name (default: navigation label). The app then appears
 on アプリ設定 as 開発中, and a super admin moves it through testing.
 
-Every app screen has the same design (like the legacy apps): the pages extend `Modules\Core\Filament\AppPages\`
-`AppListRecords` / `AppCreateRecord` / `AppEditRecord` / `AppViewRecord`, which replace Filament's page header with
-`core::filament.app-header`:
+Every app screen has the same design (`../design_ref/app-index.png`, `add-invoice.png`): the pages extend
+`Modules\Core\Filament\AppPages\` `AppListRecords` / `AppCreateRecord` / `AppEditRecord` / `AppViewRecord`, which
+replace Filament's page header with `core::filament.app-header`:
 
-- blue title bar with the app icon (アイコン文字) and name, breadcrumb (home › スペース › アプリ), grey band with the app
-  description (`BusinessApp.description`, else `AppResource::appDescription()`);
-- list: the app's views as a dropdown (`getListViews()`; columns read `$livewire->listView`), round ＋ (追加), gear
-  (administrators: the app's permissions, else アプリ設定), 「…」 with the header actions (e.g. ファイルに書き出す), and
-  「1 - 100（N件中）」 paging (100 per page) above and below striped light-blue rows;
-- create / edit: キャンセル and 保存 above the form (none below), light-blue ground; record tabs sit above the fields
-  (`RecordLayout::tabbed()` / `tabPanel()`) and switch only their own sections;
-- record page: the header actions (編集する, 削除する) in the toolbar.
+- the app name (after the home link on a list, after ← elsewhere) with (i) for the app description
+  (`BusinessApp.description`, else `AppResource::appDescription()`) in a popup;
+- list: エクスポート and 新規 at the top right, the summary cards, the app's views as tabs (columns read
+  `$livewire->listView`), search, 絞り込む, the switch of the legacy buttons, 並び替え, 列 and ⚙ (the app's option
+  actions, 一括削除, アプリの設定 for administrators); 表示件数 and the page numbers under the rows;
+- create / edit: キャンセル and 保存 in the footer of the form, kept at the bottom of the screen; record tabs sit above
+  the fields (`RecordLayout::tabbed()` / `tabPanel()`) and switch only their own sections;
+- record page: 編集, 再利用, 「…」 (印刷 / 削除), エクスポート, ⚙ and ‹ › at the top right.
 
 ## Not covered yet
 

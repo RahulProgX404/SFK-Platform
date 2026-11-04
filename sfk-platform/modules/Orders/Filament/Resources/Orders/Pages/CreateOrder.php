@@ -49,7 +49,6 @@ final class CreateOrder extends AppCreateRecord
             ->label($label)
             ->icon(Heroicon::OutlinedDocumentArrowUp)
             ->color('gray')
-            ->extraAttributes(['class' => 'sfk-toolbar-end'])
             ->modalHeading($label)
             ->modalWidth('md')
             ->modalSubmitActionLabel('読み込む')

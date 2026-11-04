@@ -6,14 +6,14 @@
             display: flex; flex-direction: column; gap: .625rem; padding: 1rem 1.125rem; border-radius: 0;
             background: #fff; border: 1px solid var(--kt-border, #e3e7e8); color: inherit; text-decoration: none;
         }
-        .sfk-settings-card:hover { background: var(--kt-blue-soft, #ebf5fb); border-color: var(--kt-blue, #3498db); }
-        .sfk-settings-card:focus-visible { outline: 2px solid var(--kt-blue, #3498db); outline-offset: 2px; }
+        .sfk-settings-card:hover { background: var(--kt-blue-soft, #e8eff6); border-color: var(--kt-blue, #05467E); }
+        .sfk-settings-card:focus-visible { outline: 2px solid var(--kt-blue, #05467E); outline-offset: 2px; }
         .sfk-settings-head { display: flex; align-items: center; gap: .75rem; }
         .sfk-settings-icon {
             display: grid; place-items: center; width: 3rem; height: 3rem; flex-shrink: 0;
-            background: var(--kt-blue, #3498db); color: #fff;
+            background: var(--kt-blue, #05467E); color: #fff;
         }
-        .sfk-settings-title { margin: 0; font-size: 1.125rem; font-weight: 700; color: var(--kt-blue, #3498db); }
+        .sfk-settings-title { margin: 0; font-size: 1.125rem; font-weight: 700; color: var(--kt-blue, #05467E); }
         .sfk-settings-card:hover .sfk-settings-title { text-decoration: underline; }
         .sfk-settings-metric { margin: 0; font-size: .875rem; color: var(--kt-muted, #888); }
     </style>

@@ -17,6 +17,7 @@ use Filament\Support\Enums\VerticalAlignment;
 use Filament\Support\Facades\FilamentIcon;
 use Filament\Support\Facades\FilamentView;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\View\TablesRenderHook;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
@@ -41,6 +42,7 @@ use Modules\Core\Console\RunNotificationChecksCommand;
 use Modules\Core\Console\SyncAppsCommand;
 use Modules\Core\Console\SyncSuperAdminCommand;
 use Modules\Core\Filament\AppPages\AppListRecords;
+use Modules\Core\Filament\Records\RecordTabs;
 use Modules\Core\Filament\Records\RelatedLists;
 use Modules\Core\Filament\Support\AppRecordDirectory;
 use Modules\Core\Http\Portal\DashboardDirectory;
@@ -63,6 +65,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
     {
         $this->app->singleton(DocumentNumberGenerator::class);
         $this->app->singleton(RelatedLists::class);
+        $this->app->singleton(RecordTabs::class);
 
         // 移行: the legacy logins are looked up once for all the apps of an import (legacy:import)
         $this->app->singleton(LegacyUsers::class);
@@ -107,6 +110,13 @@ final class CoreServiceProvider extends ModuleServiceProvider
         FilamentView::registerRenderHook(PanelsRenderHook::SIDEBAR_LOGO_AFTER, fn (): string => self::dashboardSwitcher('sidebar'));
         FilamentView::registerRenderHook(PanelsRenderHook::TOPBAR_LOGO_AFTER, fn (): string => self::dashboardSwitcher('topbar'));
         FilamentView::registerRenderHook(PanelsRenderHook::SIDEBAR_NAV_START, fn (): string => self::dashboardMenu());
+
+        // toolbar of the app lists (AppListRecords::toolbarPart(), empty elsewhere): the search column, 絞り込む and the
+        // legacy-button switch right of the search box; 並び替え before 列, ⚙ after it; the legacy buttons under it
+        FilamentView::registerRenderHook(TablesRenderHook::TOOLBAR_SEARCH_AFTER, fn (): string => AppListRecords::toolbarPart('start'));
+        FilamentView::registerRenderHook(TablesRenderHook::TOOLBAR_COLUMN_MANAGER_TRIGGER_BEFORE, fn (): string => AppListRecords::toolbarPart('sort'));
+        FilamentView::registerRenderHook(TablesRenderHook::TOOLBAR_COLUMN_MANAGER_TRIGGER_AFTER, fn (): string => AppListRecords::toolbarPart('settings'));
+        FilamentView::registerRenderHook(TablesRenderHook::TOOLBAR_AFTER, fn (): string => AppListRecords::toolbarPart('menu'));
 
         // Toasts: top middle of the screen, a solid icon per status — drawn white on the coloured icon tile of the
         // theme (core::filament.theme), the glyph showing the tile's colour through it; danger has the ✕ circle.

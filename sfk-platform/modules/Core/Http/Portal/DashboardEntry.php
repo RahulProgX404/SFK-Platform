@@ -11,5 +11,7 @@ final readonly class DashboardEntry
         public string $label,
         public string $icon,
         public string $url,
+        /** the line under the name on the portal card (config <panel>.portal.subtitle) */
+        public ?string $subtitle = null,
     ) {}
 }

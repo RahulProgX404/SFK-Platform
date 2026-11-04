@@ -1,37 +1,34 @@
-{{-- Frame of a ダッシュボード設定 screen (Modules\Core\Filament\DashboardSettings\Concerns\HasSettingsChrome). --}}
+{{--
+    Header of a ダッシュボード設定 screen (Modules\Core\Filament\DashboardSettings\Concerns\HasSettingsChrome), in the
+    look of the app screens: home › group › screen › record, the screen's name, its actions on the right.
+--}}
 @php
     use Filament\Support\Icons\Heroicon;
 
     $actions = $page->getCachedHeaderActions();
 @endphp
 
-<header class="sfk-app-header">
-    <div class="sfk-app-titlebar">
-        <span class="sfk-app-icon sfk-settings-icon" aria-hidden="true">
-            <x-filament::icon :icon="Heroicon::OutlinedCog6Tooth" class="sfk-settings-icon-svg" />
-        </span>
-        <h1 class="sfk-app-title">{{ $title }}</h1>
-    </div>
+<header class="sfk-app-header sfk-app-header-settings">
+    <div class="sfk-app-head">
+        <div class="sfk-app-head-title">
+            <a href="{{ $homeUrl }}" class="sfk-app-home" title="ホーム">
+                <x-filament::icon :icon="Heroicon::OutlinedHome" class="sfk-app-home-icon" />
+                <span class="fi-sr-only">ホーム</span>
+            </a>
+            <x-filament::icon :icon="Heroicon::ChevronRight" class="sfk-app-crumb-sep" />
+            <span class="sfk-app-subtitle">{{ $group }}</span>
+            <x-filament::icon :icon="Heroicon::ChevronRight" class="sfk-app-crumb-sep" />
+            <h1 class="sfk-app-title"><a href="{{ $sectionUrl }}">{{ filled($recordTitle) ? $sectionLabel : $title }}</a></h1>
+            @if (filled($recordTitle))
+                <x-filament::icon :icon="Heroicon::ChevronRight" class="sfk-app-crumb-sep" />
+                <span class="sfk-app-subtitle">{{ $recordTitle }}</span>
+            @endif
+        </div>
 
-    <nav class="sfk-app-crumbs" aria-label="パンくずリスト">
-        <a href="{{ $homeUrl }}" class="sfk-app-home" title="ポータル">
-            <x-filament::icon :icon="Heroicon::Home" class="sfk-app-home-icon" />
-        </a>
-        <span class="sfk-app-crumb-sep" aria-hidden="true">›</span>
-        <span>{{ $group }}</span>
-        <span class="sfk-app-crumb-sep" aria-hidden="true">›</span>
-        <a href="{{ $sectionUrl }}">{{ $sectionLabel }}</a>
-        @if (filled($recordTitle))
-            <span class="sfk-app-crumb-sep" aria-hidden="true">›</span>
-            <span>{{ $recordTitle }}</span>
-        @endif
-    </nav>
-
-    @if ($actions)
-        <div class="sfk-app-toolbar">
-            <div class="sfk-app-toolbar-start">
+        @if ($actions)
+            <div class="sfk-app-head-actions">
                 <x-filament::actions :actions="$actions" class="sfk-app-actions" />
             </div>
-        </div>
-    @endif
+        @endif
+    </div>
 </header>

@@ -14,7 +14,6 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Livewire\Livewire;
 use Modules\Core\Domain\Billing\ClosingDay;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\Support\MenuButtons;
@@ -58,14 +57,20 @@ final class ListSales extends AppListRecords
         return SalesTable::inlineFields();
     }
 
-    /** 集計サマリー under the search row (render hook of the table toolbar, SalesServiceProvider); not for calendar views. */
-    public static function summaryBar(): string
+    /** 集計サマリー: the cards above the 一覧 tabs (Core), for the list as filtered and searched. */
+    public function summaryCards(): array
     {
-        $page = Livewire::current();
+        $summary = $this->salesSummary();
+        $cards = [
+            self::summaryCard('対象件数', $summary['count'], 'count'),
+            self::summaryCard('売上数量', $summary['quantity'], 'number'),
+            self::summaryCard('売上残数量', $summary['remaining'], 'number', 'amber'),
+        ];
+        foreach ($summary['rows'] as [$label, $kind, $value]) {
+            $cards[] = self::summaryCard($label, $value, $kind);
+        }
 
-        return $page instanceof self && ! $page->currentView()->isCalendar()
-            ? view('sales::filament.sales-summary', ['page' => $page])->render()
-            : '';
+        return $cards;
     }
 
     /**

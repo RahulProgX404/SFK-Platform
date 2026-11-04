@@ -422,7 +422,7 @@ it('sums the receivables list and creates the missing months from 「…」 (Cus
 
     Livewire::test(ListReceivables::class)
         ->set('listView', salesView('receivable', '売掛一覧'))
-        ->assertSee(['合計', '対象件数: 2 件', '前月売掛残', '当月売掛残', '¥11,000'])
+        ->assertSee(['対象件数', '2件', '前月売掛残', '当月売掛残', '¥11,000'])
         ->callAction('refreshReceivables')
         ->assertNotified('売掛を更新しました（2件・1得意先）');
 

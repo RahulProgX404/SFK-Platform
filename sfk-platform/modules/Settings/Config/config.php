@@ -18,5 +18,6 @@ return [
     'portal' => [
         'label' => '共通管理',
         'icon' => 'settings',
+        'subtitle' => 'システム設定・管理',
     ],
 ];

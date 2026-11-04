@@ -7,7 +7,6 @@ namespace Modules\HumanResources\Filament\Resources\AlcoholChecks\Tables;
 use App\Models\User;
 use Closure;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Application\Filters\FilterField;
@@ -62,7 +61,6 @@ final class AlcoholChecksTable
         return $table
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['driver', 'employee', 'beforeChecker', 'afterChecker']))
             ->columns([
-                IconColumn::make('record')->label('')->state(true)->icon(Heroicon::OutlinedDocumentText)->color('primary')->width('2.5rem'),
                 ...array_map(fn (string $name): AppTextColumn => self::column($name), $names),
             ])
             ->defaultSort('id', 'desc')

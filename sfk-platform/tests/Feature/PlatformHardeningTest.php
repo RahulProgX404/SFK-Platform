@@ -55,16 +55,16 @@ it('serves the look of the panels as a stylesheet and a script the browser keeps
         ->assertSee(e(route('core.theme.css', ['v' => $bundle['version']])), false)
         ->assertSee(e(route('core.theme.js', ['v' => $bundle['version']])), false)
         // not inside the page any more
-        ->assertDontSee('--kt-blue: #3498db', false)
+        ->assertDontSee('--kt-blue: #05467E', false)
         // the avatar is drawn here, no name goes to an outside service
         ->assertDontSee('ui-avatars.com', false);
 
     $css = $this->get(route('core.theme.css', ['v' => $bundle['version']]))->assertOk();
     expect($css->headers->get('Content-Type'))->toStartWith('text/css')
         ->and($css->headers->get('Cache-Control'))->toContain('immutable')
-        ->and($css->getContent())->toContain('--kt-blue: #3498db')
-        // the menus of the app toolbar (e.g. 帳票 サブボタン名) open above the list's sticky search row (z-index 20)
-        ->and($css->getContent())->toMatch('/\.sfk-app-toolbar \.fi-dropdown-panel \{\s*z-index: 30;/')
+        ->and($css->getContent())->toContain('--kt-blue: #05467E')
+        // the menus of the app header (e.g. エクスポート) open above the list's sticky search row (z-index 20)
+        ->and($css->getContent())->toMatch('/\.sfk-app-header \.fi-dropdown-panel \{\s*z-index: 30;/')
         ->and($css->headers->has('Content-Security-Policy'))->toBeFalse();
 
     expect($this->get(route('core.theme.js', ['v' => $bundle['version']]))->assertOk()->getContent())

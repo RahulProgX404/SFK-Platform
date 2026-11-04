@@ -271,10 +271,10 @@ it('offers the legacy views, newest first, and sums the listed orders in 集計�
         ->assertSet('listView', orderView('自分が担当の受注一覧'))
         ->assertCanSeeTableRecords([$mine])
         ->assertCanNotSeeTableRecords([$done, $shipped])
-        ->assertSeeInOrder(['集計サマリー', '対象件数: 1 件', '売上金額', '¥100,000', '仕入原価計', '¥20,000', '実原価合計', '¥30,000', '利益率', '62.5%'])
+        ->assertSeeInOrder(['対象件数', '1件', '売上金額', '¥100,000', '仕入原価計', '¥20,000', '実原価合計', '¥30,000', '利益率', '62.5%'])
         ->set('listView', orderView('受注一覧'))
         ->assertCanSeeTableRecords([$shipped, $done, $mine], inOrder: true);
-    expect($list->html())->toContain('対象件数: 3 件');
+    expect($list->html())->toContain('3件');
 
     $list->set('listView', orderView('売上完了'))
         ->assertCanSeeTableRecords([$done])
@@ -301,7 +301,7 @@ it('edits a row in the list with the legacy save check (インライン編集)',
 
     Livewire::test(ListOrders::class)
         ->set('listView', orderView('受注一覧'))
-        ->callTableAction('inlineEdit', $order)
+        ->call('startInlineEdit', (string) $order->getKey())
         ->set('inlineData.quantity', '0')
         ->callTableAction('inlineSave', $order)
         ->assertHasErrors(['inlineData.quantity' => 'gt'])

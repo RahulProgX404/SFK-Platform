@@ -6,7 +6,6 @@ namespace Modules\Sales\Filament\Resources\DeliveryNotes\Tables;
 
 use App\Models\User;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
@@ -83,7 +82,6 @@ final class DeliveryNotesTable
         return $table
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['customer', 'assignees']))
             ->columns([
-                IconColumn::make('record')->label('')->state(true)->icon(Heroicon::OutlinedDocumentText)->color('primary')->width('2.5rem'),
                 ...array_map(fn (string $name): AppTextColumn => self::column($name), $names),
             ])
             ->defaultSort('id', 'desc')

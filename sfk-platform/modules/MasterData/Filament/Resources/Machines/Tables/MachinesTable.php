@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\MasterData\Filament\Resources\Machines\Tables;
 
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
 use Modules\Core\Application\Filters\FilterField;
 use Modules\Core\Application\Views\ListView;
@@ -59,12 +58,6 @@ final class MachinesTable
 
         return $table
             ->columns([
-                IconColumn::make('record')
-                    ->label('')
-                    ->state(true)
-                    ->icon(Heroicon::OutlinedDocumentText)
-                    ->color('primary')
-                    ->width('2.5rem'),
                 ...array_map(fn (string $name): AppTextColumn => self::column($name), $names),
             ])
             ->defaultSort('id', 'desc')

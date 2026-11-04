@@ -16,5 +16,6 @@ return [
     'portal' => [
         'label' => '白石封筒',
         'icon' => 'erp',
+        'subtitle' => '業務システム',
     ],
 ];

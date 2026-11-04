@@ -2,7 +2,7 @@
     legacy-style look for every Filament panel. Its <style> and <script> contents are served as the cached panel
     stylesheet / script (Modules\Core\Filament\Support\ThemeAssets, linked at the end of <head> by BasePanelProvider).
     Colours and sizes are the legacy vendor's published UI parts (MIT-licensed plugin stylesheet "51-modern-default"
-    and UI component library): #3498db submit buttons (hover #1d6fa5), #f7f9fa "normal" buttons with blue labels
+    and UI component library): #05467E submit buttons (hover #033456), #f7f9fa "normal" buttons with blue labels
     (hover #c8d6dd), #e74c3c alert buttons (hover #bf2718), #d4d7d7 disabled, #e3e7e8 hairlines, inset-shadow inputs
     with a blue focus border, red error bars, grey tabs with a white selected tab, blue sub-table headers, square
     corners and a Meiryo-first font stack.
@@ -20,14 +20,9 @@
         --text-xl: 1.4375rem;
         --text-2xl: 1.6875rem;
         --text-3xl: 2.125rem;
-        --radius-sm: 0px;
-        --radius-md: 0px;
-        --radius-lg: 0px;
-        --radius-xl: 0px;
-        --radius-2xl: 0px;
-        --kt-blue: #3498db;
-        --kt-blue-dark: #1d6fa5;
-        --kt-blue-soft: #e2f2fe;
+        --kt-blue: #05467E;
+        --kt-blue-dark: #033456;
+        --kt-blue-soft: #e6eef5;
         --kt-normal: #f7f9fa;
         --kt-normal-hover: #c8d6dd;
         --kt-red: #e74c3c;
@@ -54,19 +49,6 @@
         display: none !important;
     }
 
-    /* No rounded corners anywhere (also Filament's own parts); radio buttons stay round so they read as radio buttons,
-       and toasts are rounded (their own design, see the toasts below) */
-    *,
-    *::before,
-    *::after {
-        border-radius: 0 !important;
-    }
-
-    input[type="radio"],
-    .fi-radio-input {
-        border-radius: 9999px !important;
-    }
-
     /* Header bar: white with a hairline */
     .fi-topbar {
         box-shadow: 0 1px 0 var(--kt-border) !important;
@@ -81,10 +63,6 @@
     .fi-sidebar-group-label {
         color: var(--kt-muted);
         font-weight: 700;
-    }
-
-    .fi-sidebar-item-btn {
-        border-radius: 0;
     }
 
     .fi-sidebar-item.fi-active>.fi-sidebar-item-btn {
@@ -153,7 +131,7 @@
     /* Buttons: submit (filled blue), normal (light grey with blue label), alert (red), disabled (grey) */
     .fi-btn {
         font-weight: 400;
-        border-radius: 0;
+        border-radius: var(--sfk-radius);
     }
 
     .fi-btn.fi-color-primary[class*="fi-bg-color-"] {
@@ -222,7 +200,7 @@
 
     /* Inputs: hairline border with a soft inset shadow, blue border on focus, grey when disabled */
     .fi-input-wrp {
-        border-radius: 0;
+        border-radius: var(--sfk-radius);
         background-color: #ffffff;
         box-shadow: var(--kt-input-shadow), 0 0 0 1px var(--kt-border) !important;
     }
@@ -303,26 +281,6 @@
         color: #000000;
     }
 
-    /* Drop-down fields: light grey with a blue value */
-    .fi-input-wrp:has(> .fi-input-wrp-content-ctn > .fi-select-input):not(.fi-disabled),
-    .fi-input-wrp:has(> .fi-select-input):not(.fi-disabled) {
-        background-color: var(--kt-normal);
-        box-shadow: 1px 1px 1px #ffffff inset, 0 0 0 1px var(--kt-border) !important;
-    }
-
-    .fi-input-wrp:not(.fi-disabled) .fi-select-input {
-        color: var(--kt-blue);
-    }
-
-    .fi-checkbox-input,
-    .fi-radio-input {
-        border-radius: 0;
-    }
-
-    .fi-radio-input {
-        border-radius: 9999px;
-    }
-
     /* Field labels, required asterisk and the red error bar under a field */
     .fi-fo-field-label-content {
         color: var(--kt-label);
@@ -343,12 +301,12 @@
 
     /* Drop-down menus: white panel with a soft shadow, light-blue highlighted item */
     .fi-dropdown-panel {
-        border-radius: 0;
+        border-radius: var(--sfk-radius);
         box-shadow: 0 5px 10px rgba(0, 0, 0, .1) !important;
     }
 
     .fi-dropdown-list-item {
-        border-radius: 0;
+        border-radius: var(--sfk-radius);
         color: var(--kt-text);
     }
 
@@ -359,7 +317,7 @@
 
     /* Dialogs: white header with a large plain title, light-grey body, footer with the buttons */
     .fi-modal-window {
-        border-radius: 0;
+        border-radius: var(--sfk-radius);
     }
 
     .fi-modal-window:has(.fi-modal-content) .fi-modal-header {
@@ -491,7 +449,7 @@
     .fi-tabs {
         gap: 0;
         padding: 0;
-        border-radius: 0;
+        border-radius: var(--sfk-radius);
         background: transparent;
         box-shadow: none !important;
         border-bottom: 1px solid var(--kt-tab-border);
@@ -500,7 +458,7 @@
     .fi-tabs-item {
         min-height: 48px;
         padding: 0 24px;
-        border-radius: 0;
+        border-radius: var(--sfk-radius);
         background-color: var(--kt-disabled);
         color: var(--kt-text);
         border-top: 1px solid var(--kt-tab-border);
@@ -707,89 +665,6 @@
         flex-direction: column;
     }
 
-    .sfk-app-titlebar {
-        display: flex;
-        align-items: center;
-        gap: .625rem;
-        padding: .5rem .875rem;
-        background-color: var(--kt-blue);
-        color: #ffffff;
-    }
-
-    .sfk-app-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        width: 2rem;
-        height: 2rem;
-        background: #ffffff;
-        color: var(--kt-blue-dark);
-        font-size: .8125rem;
-        font-weight: 700;
-        line-height: 1;
-        overflow: hidden;
-        white-space: nowrap;
-    }
-
-    .sfk-app-title {
-        min-width: 0;
-        font-size: 1.3125rem;
-        font-weight: 700;
-        line-height: 1.4;
-    }
-
-    .sfk-app-title a {
-        color: #ffffff;
-    }
-
-    .sfk-app-title a:hover {
-        text-decoration: underline;
-    }
-
-    .sfk-app-crumbs {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: .375rem;
-        padding: .375rem .875rem;
-        background: #ffffff;
-        border-bottom: 1px solid var(--kt-border);
-        font-size: .9375rem;
-        color: var(--kt-muted);
-    }
-
-    .sfk-app-crumbs a {
-        color: var(--kt-blue-dark);
-    }
-
-    .sfk-app-crumbs a:hover {
-        text-decoration: underline;
-    }
-
-    .sfk-app-home {
-        display: inline-flex;
-    }
-
-    .sfk-app-home-icon {
-        width: 1.125rem;
-        height: 1.125rem;
-    }
-
-    .sfk-app-crumb-sep {
-        color: #bbbbbb;
-    }
-
-    .sfk-app-description {
-        padding: .625rem .875rem;
-        background: #f0f0f0;
-        border-bottom: 1px solid var(--kt-border);
-        font-size: .9375rem;
-        line-height: 1.6;
-        color: var(--kt-text);
-        white-space: pre-line;
-    }
-
     /*
      * The app's legacy buttons (core::filament.app-menu, MenuButtons): segmented groups of icon + label buttons in the
      * look of the toolbar tools (40px, --kt-normal, inset highlight), the buttons on the checked rows tinted once rows
@@ -820,7 +695,7 @@
         margin-inline-start: -1px;
     }
 
-    .sfk-app-toolbar .sfk-menu-btn.fi-btn {
+    .sfk-app-menu .sfk-menu-btn.fi-btn {
         position: relative;
         height: 2.5rem;
         gap: .375rem;
@@ -834,26 +709,26 @@
         white-space: nowrap;
     }
 
-    .sfk-app-toolbar .sfk-menu-btn.fi-btn .fi-icon {
+    .sfk-app-menu .sfk-menu-btn.fi-btn .fi-icon {
         width: 1.125rem;
         height: 1.125rem;
         color: var(--kt-blue);
     }
 
-    .sfk-app-toolbar .sfk-menu-btn.fi-btn:hover {
+    .sfk-app-menu .sfk-menu-btn.fi-btn:hover {
         z-index: 1;
         background: var(--kt-normal-hover);
         color: var(--kt-blue-dark);
     }
 
-    .sfk-app-toolbar .sfk-menu-btn.fi-btn:focus-visible {
+    .sfk-app-menu .sfk-menu-btn.fi-btn:focus-visible {
         z-index: 2;
         outline: 2px solid var(--kt-blue);
         outline-offset: 1px;
     }
 
     /* a button with a menu (MenuButtons::mark() of an ActionGroup, e.g. 帳票 with サブボタン名): ▾ after the label */
-    .sfk-app-toolbar .sfk-menu-btn.fi-btn[data-sfk-menu-group]::after {
+    .sfk-app-menu .sfk-menu-btn.fi-btn[data-sfk-menu-group]::after {
         content: '';
         border-top: 5px solid currentColor;
         border-right: 4px solid transparent;
@@ -899,21 +774,21 @@
 
     /* a tone per kind of button (MenuButtons::tone()), e.g. 納品書 green / 請求書 orange: a coloured left edge and icon
        (!important: the theme forces the gray button colours) */
-    .sfk-app-toolbar .sfk-menu-btn.fi-btn[data-sfk-tone] {
+    .sfk-app-menu .sfk-menu-btn.fi-btn[data-sfk-tone] {
         box-shadow: 3px 0 0 var(--sfk-tone) inset, 1px 1px 1px #ffffff inset !important;
         color: var(--sfk-tone-dark) !important;
     }
 
-    .sfk-app-toolbar .sfk-menu-btn.fi-btn[data-sfk-tone] .fi-icon {
+    .sfk-app-menu .sfk-menu-btn.fi-btn[data-sfk-tone] .fi-icon {
         color: var(--sfk-tone) !important;
     }
 
-    .sfk-app-toolbar .sfk-menu-btn.fi-btn[data-sfk-tone],
+    .sfk-app-menu .sfk-menu-btn.fi-btn[data-sfk-tone],
     .sfk-app-menu-rows.has-checked .sfk-menu-btn.fi-btn[data-sfk-tone] {
         background: var(--sfk-tone-soft) !important;
     }
 
-    .sfk-app-toolbar .sfk-menu-btn.fi-btn[data-sfk-tone]:hover {
+    .sfk-app-menu .sfk-menu-btn.fi-btn[data-sfk-tone]:hover {
         background: var(--kt-normal-hover) !important;
         color: var(--sfk-tone-dark) !important;
     }
@@ -931,8 +806,8 @@
     }
 
     /* a button with nothing to work on (MenuButtons / AppListRecords::needsRows()) */
-    .sfk-app-toolbar .sfk-app-menu .sfk-menu-btn.fi-btn:disabled,
-    .sfk-app-toolbar .sfk-app-menu .sfk-menu-btn.fi-btn:disabled:hover {
+    .sfk-app-menu .sfk-menu-btn.fi-btn:disabled,
+    .sfk-app-menu .sfk-menu-btn.fi-btn:disabled:hover {
         background: var(--kt-normal) !important;
         box-shadow: none !important;
         color: var(--kt-muted) !important;
@@ -940,7 +815,7 @@
         opacity: .55;
     }
 
-    .sfk-app-toolbar .sfk-app-menu .sfk-menu-btn.fi-btn:disabled .fi-icon {
+    .sfk-app-menu .sfk-menu-btn.fi-btn:disabled .fi-icon {
         color: var(--kt-muted) !important;
     }
 
@@ -1181,106 +1056,9 @@
         font-variant-numeric: tabular-nums;
     }
 
-    .sfk-app-toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
-        gap: .5rem;
-        padding: .625rem .875rem;
-    }
-
-    .sfk-app-toolbar-start,
-    .sfk-app-toolbar-end {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: .5rem;
-    }
-
-    /* the right group stays right also when there is nothing on the left (record page) */
-    .sfk-app-toolbar-end {
-        margin-left: auto;
-    }
-
-    .sfk-app-toolbar .fi-ac {
-        gap: .5rem;
-    }
-
-    /* an action given the class sfk-toolbar-end sits at the right end of the record-form toolbar */
-    .sfk-app-toolbar-start:has(.sfk-toolbar-end) {
-        flex: 1;
-    }
-
-    .sfk-app-toolbar-start:has(.sfk-toolbar-end)>.fi-ac {
-        flex: 1;
-    }
-
-    .sfk-app-toolbar .sfk-toolbar-end {
-        margin-inline-start: auto;
-    }
-
-    .sfk-app-view {
-        position: relative;
-        display: inline-flex;
-        align-items: center;
-    }
-
-    .sfk-app-view-select {
-        appearance: none;
-        min-width: 12rem;
-        height: 40px;
-        padding: 0 2.5rem 0 1.5rem;
-        background: var(--kt-normal);
-        border: 1px solid var(--kt-border);
-        box-shadow: 1px 1px 1px #ffffff inset;
-        font-size: 1rem;
-        color: var(--kt-blue);
-        cursor: pointer;
-    }
-
-    .sfk-app-view-select:hover {
-        background-color: var(--kt-normal-hover);
-    }
-
-    .sfk-app-view-select:focus-visible {
-        outline: none;
-        border-color: var(--kt-blue);
-    }
-
-    .sfk-app-view-chevron {
-        position: absolute;
-        right: .75rem;
-        width: 1rem;
-        height: 1rem;
-        color: var(--kt-blue);
-        pointer-events: none;
-    }
-
-    .sfk-app-add {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 2.5rem;
-        height: 2.5rem;
-        background: var(--kt-blue);
-        color: #ffffff;
-    }
-
-    .sfk-app-add:hover {
-        background: var(--kt-blue-dark);
-    }
-
-    .sfk-app-add:focus-visible,
-    .sfk-app-tool:focus-visible,
     .sfk-app-pager-btn:focus-visible {
         outline: 2px solid var(--kt-blue);
         outline-offset: 2px;
-    }
-
-    .sfk-app-add-icon {
-        width: 1.5rem;
-        height: 1.5rem;
     }
 
     .sfk-app-tool {
@@ -1305,37 +1083,12 @@
         height: 1.375rem;
     }
 
-    .sfk-app-toolbar .fi-icon-btn {
-        width: 2.5rem;
-        height: 2.5rem;
-        border: 1px solid var(--kt-border);
-        background: var(--kt-normal);
-        box-shadow: 1px 1px 1px #ffffff inset;
-        color: var(--kt-muted);
-    }
-
-    .sfk-app-toolbar .fi-icon-btn:hover {
-        background: var(--kt-normal-hover);
-        color: var(--kt-blue-dark);
-    }
-
     .sfk-app-pager {
         display: inline-flex;
         align-items: center;
         gap: .25rem;
         font-size: .9375rem;
         color: var(--kt-text);
-    }
-
-    .sfk-app-pager-bottom {
-        display: flex;
-        justify-content: flex-end;
-        padding: .5rem .875rem;
-    }
-
-    .sfk-app-pager-text {
-        padding: 0 .25rem;
-        white-space: nowrap;
     }
 
     .sfk-app-pager-btn {
@@ -1513,7 +1266,7 @@
         max-width: 100%;
         padding: 0 34px 0 10px;
         border: 1px solid var(--kt-border);
-        border-radius: 0;
+        border-radius: var(--sfk-radius);
         background-color: #ffffff;
         color: var(--kt-text);
         font-size: 1rem;
@@ -1549,7 +1302,7 @@
         height: 40px;
         padding: 0 8px;
         border: 1px solid var(--kt-border);
-        border-radius: 0;
+        border-radius: var(--sfk-radius);
         background: #ffffff;
         color: #000000;
         font-size: 1rem;
@@ -1574,7 +1327,7 @@
         height: 146px;
         padding: 2px 0;
         border: 1px solid var(--kt-border);
-        border-radius: 0;
+        border-radius: var(--sfk-radius);
         background: #ffffff;
         color: var(--kt-text);
         font-size: 1rem;
@@ -1662,12 +1415,15 @@
         height: 48px;
         padding: 0 16px;
         border: 1px solid var(--kt-border);
-        border-radius: 0;
+        border-radius: var(--sfk-radius);
         background: var(--kt-normal);
         box-shadow: 1px 1px 1px #ffffff inset;
         color: var(--kt-blue);
         font-size: 1.125rem;
     }
+
+
+
 
     .sfk-filter-btn:hover {
         background: var(--kt-normal-hover);
@@ -2854,15 +2610,8 @@
 
     @media print {
 
-        .sfk-print-toolbar,
-        .sfk-app-page-print .sfk-app-toolbar {
+        .sfk-print-toolbar {
             display: none !important;
-        }
-
-        .sfk-app-page-print .sfk-app-titlebar {
-            background: #ffffff !important;
-            color: var(--kt-text) !important;
-            border-bottom: 2px solid var(--kt-text);
         }
 
         .sfk-app-page-print .sfk-app-title a {
@@ -2977,15 +2726,6 @@
         text-decoration: underline;
     }
 
-    /* Create / edit toolbar: キャンセル (normal) and 保存 (submit) in the vendor's large button size */
-    :is(.sfk-app-page-create, .sfk-app-page-edit) .sfk-app-toolbar .fi-btn {
-        min-width: 163px;
-        max-width: 100%;
-        min-height: 48px;
-        padding-inline: 16px;
-        font-size: 1.125rem;
-    }
-
     /* App list: the paging is in the toolbar; light-blue striped rows with vertical rules */
     .sfk-app-page-list .fi-ta-ctn .fi-pagination {
         display: none;
@@ -3054,8 +2794,8 @@
         z-index: 20;
     }
 
-    /* …and the menus of the app toolbar above it (e.g. 帳票 with サブボタン名, 「…」): they open over the search row */
-    .sfk-app-toolbar .fi-dropdown-panel {
+    /* …and the menus of the app header above it (e.g. エクスポート): they open over the search row */
+    .sfk-app-header .fi-dropdown-panel {
         z-index: 30;
     }
 
@@ -3070,12 +2810,6 @@
     .sfk-search-column-item.is-selected {
         color: var(--kt-blue-dark);
         font-weight: 700;
-    }
-
-    /* the paging at the right end of the search row */
-    .sfk-app-page-list .fi-ta-header-toolbar>.sfk-app-pager {
-        order: 1;
-        margin-inline-start: auto;
     }
 
     /* no 「N件選択済み / 全選択 / 全選択解除」 bar above the list when rows are checked: the app buttons carry the
@@ -3126,16 +2860,8 @@
         box-shadow: 0 1px 0 var(--kt-border), 0 -1px 0 var(--kt-border) !important;
     }
 
-    .sfk-app-page-list .fi-ta-row.fi-striped>td {
-        background-color: #f2f8fc;
-    }
-
     .sfk-app-page-list .fi-ta-row:hover>td {
         background-color: var(--kt-blue-soft);
-    }
-
-    .sfk-app-page-list .fi-ta-table>tbody>tr>td {
-        border-inline-end: 1px solid var(--kt-border);
     }
 
     /* App record form / record page (and the settings forms): light-blue ground, white cards with room around the

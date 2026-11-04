@@ -9,7 +9,6 @@ use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\RichEditor;
-use Filament\Forms\Components\RichEditor\RichContentRenderer;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Pages\Dashboard;
@@ -19,6 +18,7 @@ use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Route;
+use Livewire\Attributes\Url;
 use Modules\Core\Access\AppAccess;
 use Modules\Core\Application\Apps\AppLifecycle;
 use Modules\Core\Filament\AppResource;
@@ -29,8 +29,10 @@ use Modules\Core\Models\DashboardPortal;
 use Modules\Core\Models\Space;
 
 /**
- * ポータル: the home page of a dashboard, laid out like the legacy portal — a greeting, the お知らせ with the
- * アプリショートカット (both shown to everyone of the dashboard and edited by administrators), and on the right the スペース and アプリ lists; the ⚙ of アプリ
+ * ポータル: the home page of a dashboard, laid out like the legacy portal — the アプリショートカット (shown to everyone of the
+ * dashboard and edited by administrators), and on the right the スペース and アプリ lists. The dashboard's お知らせ is
+ * shown on the dashboard selection (/portal, PortalController); its editor opens here (?action=editNotice, back to
+ * /portal with return=portal). The ⚙ of アプリ
  * (administrators) changes the order of the apps by drag and drop. Everything is scoped to the current dashboard and to
  * what the user may open (spaces they belong to, apps they may view).
  */
@@ -55,6 +57,10 @@ final class PortalPage extends Dashboard
 
     /** アプリ list filter: a space id, or null for すべてのアプリ. */
     public ?int $appSpace = null;
+
+    /** 'portal': お知らせを編集 was opened from /portal and goes back there when saved. */
+    #[Url(as: 'return')]
+    public ?string $returnTo = null;
 
     public function mount(): void
     {
@@ -90,7 +96,6 @@ final class PortalPage extends Dashboard
         $shortcuts = $this->shortcutApps($portal);
 
         return [
-            'notice' => filled($portal->notice) ? RichContentRenderer::make($portal->notice)->toHtml() : null,
             'shortcuts' => $shortcuts,
             // only the apps the user may open lead somewhere; the others are shown as tiles without a link
             'shortcutUrls' => $user === null ? [] : $shortcuts
@@ -149,6 +154,10 @@ final class PortalPage extends Dashboard
                 $portal->fill(['notice' => $data['notice'] ?? null])->save();
 
                 Notification::make()->success()->title('お知らせを保存しました')->send();
+
+                if ($this->returnTo === 'portal') {
+                    $this->redirect(route('core.portal'));
+                }
             });
     }
 

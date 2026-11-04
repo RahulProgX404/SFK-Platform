@@ -183,7 +183,7 @@ it('edits a row in the list and keeps the 変更履歴, comments and deletes wit
     $this->actingAs($this->admin);
 
     Livewire::test(ListConsumables::class)
-        ->callTableAction('inlineEdit', $consumable)
+        ->call('startInlineEdit', (string) $consumable->getKey())
         ->set('inlineData.name', '既存')
         ->callTableAction('inlineSave', $consumable)
         ->assertHasErrors(['inlineData.name' => 'unique'])

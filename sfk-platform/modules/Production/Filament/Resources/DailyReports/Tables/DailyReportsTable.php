@@ -7,7 +7,6 @@ namespace Modules\Production\Filament\Resources\DailyReports\Tables;
 use App\Models\User;
 use Closure;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
@@ -110,7 +109,6 @@ final class DailyReportsTable
                     ->addSelect(['cardboard_stock' => self::stockQuery('cardboard_id'), 'partition_stock' => self::stockQuery('partition_id')]);
             })
             ->columns([
-                IconColumn::make('record')->label('')->state(true)->icon(Heroicon::OutlinedDocumentText)->color('primary')->width('2.5rem'),
                 ...array_map(fn (string $name): AppTextColumn => self::column($name), $names),
             ])
             ->defaultSort('id', 'desc')

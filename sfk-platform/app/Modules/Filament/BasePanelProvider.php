@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Filament;
 
 use Filament\Actions\Action;
+use Filament\Enums\DatabaseNotificationsPosition;
+use Filament\Enums\GlobalSearchPosition;
+use Filament\Enums\UserMenuPosition;
 use Filament\FontProviders\LocalFontProvider;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -14,7 +17,6 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\View\TablesRenderHook;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -24,7 +26,6 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Modules\Core\Access\DashboardAccess;
-use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\DashboardSettings\DashboardSettingsPlugin;
 use Modules\Core\Filament\Profile\ProfilePage;
 use Modules\Core\Filament\Support\InitialAvatarProvider;
@@ -35,8 +36,8 @@ use Modules\Core\Http\Middleware\EnsurePasswordIsChanged;
  * Common configuration for every Filament panel in the platform (ERP panel and extension panels):
  * standard middleware stack, login page, shared users/guard, colours and branding.
  *
- * Look & feel follows the legacy system, which the staff already know: light theme only, the legacy vendor's
- * published UI-part colours and sizes, flat square boxes and a Meiryo-first font (core::filament.theme).
+ * Look & feel: light theme only, the brand blue, white surfaces with rounded corners and a Meiryo-first font
+ * (core::filament.theme with core::filament.design); no top bar.
  *
  * Panels differ only in id, path/domain, brand label and which components they load.
  * Access to each panel is checked in User::canAccessPanel() (user / 従業員カテゴリ dashboards and ユーザー種別,
@@ -44,8 +45,8 @@ use Modules\Core\Http\Middleware\EnsurePasswordIsChanged;
  */
 abstract class BasePanelProvider extends PanelProvider
 {
-    /** the legacy system's action blue; also used by the portal and the charts. */
-    public const BRAND_BLUE = '#3498db';
+    /** the primary colour (user's choice, 2026-11); also used by the portal and the charts. */
+    public const BRAND_BLUE = '#05467E';
 
     public const BRAND_RED = '#e74c3c';
 
@@ -79,13 +80,14 @@ abstract class BasePanelProvider extends PanelProvider
             // the look (core::filament.theme) and the Alpine components of the app lists (core::filament.app-filter-script),
             // as a stylesheet and a script the browser keeps
             ->renderHook(PanelsRenderHook::HEAD_END, fn (): string => ThemeAssets::headTags())
-            // paging of the app lists, right of the search box
-            ->renderHook(TablesRenderHook::TOOLBAR_END, fn (): string => AppListRecords::toolbarPager())
-            // the column the search looks in, an icon right of the search box of the app lists
-            ->renderHook(TablesRenderHook::TOOLBAR_SEARCH_AFTER, fn (): string => AppListRecords::toolbarSearchColumn())
-            ->sidebarCollapsibleOnDesktop()
-            // 通知 (bell in the top bar), sent through Modules\Core\Application\Notifications\Notifier (docs/notifications.md)
-            ->databaseNotifications()
+            // no top bar: the screens use the whole height; the sidebar hides completely and a floating button opens it
+            // (core::filament.design), the search, the bell and the user menu are in the sidebar
+            ->topbar(false)
+            ->sidebarFullyCollapsibleOnDesktop()
+            ->globalSearch(position: GlobalSearchPosition::Sidebar)
+            ->userMenu(position: UserMenuPosition::Sidebar)
+            // 通知 (bell), sent through Modules\Core\Application\Notifications\Notifier (docs/notifications.md)
+            ->databaseNotifications(position: DatabaseNotificationsPosition::Sidebar)
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

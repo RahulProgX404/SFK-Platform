@@ -12,7 +12,6 @@ use Filament\Notifications\Notification;
 use Filament\Support\Exceptions\Cancel;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
-use Livewire\Livewire;
 use Modules\Core\Domain\Billing\ClosingDay;
 use Modules\Core\Domain\Calendar\YearMonth;
 use Modules\Core\Filament\AppPages\AppListRecords;
@@ -61,14 +60,15 @@ abstract class ListReceivableMonths extends AppListRecords
         return ReceivablesTable::inlineFields();
     }
 
-    /** 合計 under the search row (render hook of the table toolbar, SalesServiceProvider); not for calendar views. */
-    public static function totalsBar(): string
+    /** 合計: the cards above the 一覧 tabs (Core), for the list as filtered and searched. */
+    public function summaryCards(): array
     {
-        $page = Livewire::current();
+        $totals = $this->receivableTotals();
 
-        return $page instanceof self && ! $page->currentView()->isCalendar()
-            ? view('sales::filament.receivable-totals', ['page' => $page])->render()
-            : '';
+        return [
+            self::summaryCard('対象件数', $totals['count'], 'count'),
+            ...array_map(fn (array $row): array => self::summaryCard($row[0], $row[1]), $totals['rows']),
+        ];
     }
 
     /** @return array{count: int, rows: list<array{0: string, 1: int}>} */
