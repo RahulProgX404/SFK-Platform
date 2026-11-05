@@ -260,6 +260,21 @@ it('lists invoices by the closing day of the customer and keeps the statement ar
     expect($invoice->carried_amount)->toBe(30000)->and($invoice->billed_total)->toBe(41000)->and($invoice->subtotal)->toBe(10000);
 });
 
+it('shows the cells of 請求内容詳細 under their own headers on the record page and the form', function () {
+    $invoice = screenInvoice($this->customer);
+    $salesNumber = (string) $invoice->lines()->value('sales_number');
+    $this->actingAs($this->admin);
+
+    expect($salesNumber)->not->toBe('');
+
+    // headers: … コードNo, 品名, 数量, 単位, 単価, 税率, 小計, 売上No …; the cells used to follow another order (売上No under コードNo)
+    Livewire::test(ViewInvoice::class, ['record' => $invoice->getRouteKey()])
+        ->assertSeeInOrder(['コードNo', '品名', '数量', '小計', '売上No', '長3封筒', '1,000', '¥10,000', $salesNumber]);
+
+    Livewire::test(EditInvoice::class, ['record' => $invoice->getRouteKey()])
+        ->assertSeeHtmlInOrder(['.product_name"', '.quantity"', '.amount"', '.sales_number"']);
+});
+
 it('settles an invoice with 入金明細 and lists what is still unpaid', function () {
     $paid = screenInvoice($this->customer);
     $unpaid = screenInvoice(screenCustomer('未入金商事'));

@@ -190,7 +190,7 @@
         gap: 4px;
         width: auto;
         padding-inline: 6px;
-        font-size: .875rem;
+        font-size: .8125rem;
     }
 
     /* a radio group without inline(): one option per line (the labels above flow side by side in its block) */
@@ -270,7 +270,7 @@
         --tippy-background-color: var(--sfk-ui-tooltip);
         max-width: 260px !important;
         color: #ffffff;
-        font-size: .875rem;
+        font-size: .8125rem;
         line-height: 1.5;
         box-shadow: none;
     }
@@ -309,7 +309,7 @@
 
     .fi-section.fi-collapsible>.fi-section-header .fi-section-header-heading {
         color: var(--kt-text);
-        font-size: 1rem;
+        font-size: .875rem;
     }
 
     .fi-section.fi-collapsible .fi-section-collapse-btn {
@@ -378,7 +378,7 @@
         background-color: var(--sfk-ui-chip) !important;
         box-shadow: 0 0 0 1px #c5e1f7 inset !important;
         color: var(--kt-text) !important;
-        font-size: .875rem;
+        font-size: .8125rem;
         font-weight: 400;
     }
 
@@ -413,7 +413,7 @@
         border-bottom: 0;
         border-inline-end: 1px solid rgba(255, 255, 255, .25);
         color: #ffffff !important;
-        font-size: .875rem;
+        font-size: .8125rem;
         font-weight: 400 !important;
     }
 
@@ -467,7 +467,7 @@
 
     .sfk-access>.fi-fo-repeater-items>.fi-fo-repeater-item>.fi-fo-repeater-item-header .fi-fo-repeater-item-header-label {
         color: var(--kt-label);
-        font-size: 1rem;
+        font-size: .875rem;
         font-weight: 700;
     }
 
@@ -487,7 +487,7 @@
         padding: 0 6px;
         background: var(--kt-blue);
         color: #ffffff;
-        font-size: .875rem;
+        font-size: .8125rem;
         font-variant-numeric: tabular-nums;
     }
 
@@ -510,7 +510,7 @@
     }
 
     .sfk-access :is(.sfk-access-entries, .sfk-access-conditions)>.fi-fo-repeater-items>.fi-fo-repeater-item>.fi-fo-repeater-item-header .fi-fo-repeater-item-header-label {
-        font-size: .9375rem;
+        font-size: .875rem;
     }
 
     .sfk-access :is(.sfk-access-entries, .sfk-access-conditions)>.fi-fo-repeater-items>.fi-fo-repeater-item>.fi-fo-repeater-item-content {
@@ -544,7 +544,7 @@
         border: 1px dashed var(--kt-blue);
         box-shadow: none;
         color: var(--kt-blue);
-        font-size: .9375rem;
+        font-size: .875rem;
     }
 
     .sfk-access>.fi-fo-repeater-add .fi-btn:hover {
@@ -556,7 +556,7 @@
         min-height: 36px;
         background: #ffffff;
         border-color: #b9c9d6;
-        font-size: .875rem;
+        font-size: .8125rem;
     }
 
     /* the rights of an entry in one wrapping row (Filament puts a group's parts in an inner grid) */
@@ -669,13 +669,13 @@
 
     .sfk-access-link-title {
         color: var(--kt-label);
-        font-size: 1rem;
+        font-size: .875rem;
         font-weight: 700;
     }
 
     .sfk-access-link-count {
         color: var(--kt-muted);
-        font-size: .875rem;
+        font-size: .8125rem;
         font-variant-numeric: tabular-nums;
     }
 

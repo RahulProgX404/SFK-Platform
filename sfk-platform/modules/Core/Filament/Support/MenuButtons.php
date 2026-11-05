@@ -84,7 +84,7 @@ final class MenuButtons
     }
 
     /**
-     * The ⚙ menu of an app list (right of 列): the app's option actions (e.g. ファイルに書き出す), 一括削除 and, for
+     * The ⚙ menu of an app list (right of 並び替え): the app's option actions (e.g. ファイルに書き出す), 一括削除 and, for
      * administrators, the shortcuts of アプリの設定.
      *
      * @param  list<Action|ActionGroup>  $actions

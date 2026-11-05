@@ -10,6 +10,7 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Modules\Core\Application\Apps\AppActionNotAllowed;
 use Modules\Core\Application\Apps\AppDiscovery;
@@ -40,6 +41,9 @@ final class AppsSettings extends Page
     protected static ?int $navigationSort = 1;
 
     protected string $view = 'settings::pages.apps-settings';
+
+    /** the six status columns use the whole width of the screen */
+    protected Width|string|null $maxContentWidth = Width::Full;
 
     public static function canAccess(): bool
     {

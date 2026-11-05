@@ -141,7 +141,7 @@ final class PortalPage extends Dashboard
                         ['bold', 'italic', 'underline', 'strike', RichEditorTools::TEXT_COLOR, 'highlight', 'link'],
                         ['h2', 'h3'],
                         ['alignStart', 'alignCenter', 'alignEnd'],
-                        ['bulletList', 'orderedList', 'blockquote'],
+                        ['bulletList', 'orderedList', 'blockquote', 'horizontalRule'],
                         RichEditorTools::TABLE_GROUP,
                         ['undo', 'redo'],
                     ])

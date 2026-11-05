@@ -112,10 +112,11 @@ final class CoreServiceProvider extends ModuleServiceProvider
         FilamentView::registerRenderHook(PanelsRenderHook::SIDEBAR_NAV_START, fn (): string => self::dashboardMenu());
 
         // toolbar of the app lists (AppListRecords::toolbarPart(), empty elsewhere): the search column, 絞り込む and the
-        // legacy-button switch right of the search box; 並び替え before 列, ⚙ after it; the legacy buttons under it
-        FilamentView::registerRenderHook(TablesRenderHook::TOOLBAR_SEARCH_AFTER, fn (): string => AppListRecords::toolbarPart('start'));
-        FilamentView::registerRenderHook(TablesRenderHook::TOOLBAR_COLUMN_MANAGER_TRIGGER_BEFORE, fn (): string => AppListRecords::toolbarPart('sort'));
-        FilamentView::registerRenderHook(TablesRenderHook::TOOLBAR_COLUMN_MANAGER_TRIGGER_AFTER, fn (): string => AppListRecords::toolbarPart('settings'));
+        // legacy-button switch right of the search box, then 並び替え and ⚙ (the lists have no 列 chooser, so not on its
+        // hooks: Filament leaves them out without one); the legacy buttons under it
+        FilamentView::registerRenderHook(TablesRenderHook::TOOLBAR_SEARCH_AFTER, fn (): string => AppListRecords::toolbarPart('start')
+            .AppListRecords::toolbarPart('sort')
+            .AppListRecords::toolbarPart('settings'));
         FilamentView::registerRenderHook(TablesRenderHook::TOOLBAR_AFTER, fn (): string => AppListRecords::toolbarPart('menu'));
 
         // Toasts: top middle of the screen, a solid icon per status — drawn white on the coloured icon tile of the

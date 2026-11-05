@@ -1,7 +1,7 @@
 {{--
     Header of an app screen (Modules\Core\Filament\AppPages\Concerns\HasAppChrome; design_ref/app-index.png and
     add-invoice.png): only the app name — on a list after the home link, on a record / form after ← (back to the list) —
-    with (i) opening the app's description in a popup.
+    with (i) opening the app's description in a popup. The breadcrumb home › app (› step) stays on every screen.
     list: エクスポート (帳票出力) and 新規 on the right; the summary cards (summaryCards()); the 一覧 as tabs; the toolbar
           of a view without a table (calendar / custom).
     view: 編集, 再利用, 「…」 (印刷・削除), エクスポート, ⚙ and ‹ › on the right; the app's legacy buttons under the name.
@@ -24,6 +24,8 @@
     $extraActions = array_values(array_filter($actions, fn ($action): bool => $own($action) && ! $isStandard($action) && $visible($action)));
     $printing = (bool) ($page->printMode ?? false);
     $menuHelp = $kind === 'view' && ! $printing ? $page->menuHelp() : [];
+    // the last crumb of a record screen
+    $step = ['create' => 'レコードの追加', 'edit' => 'レコードの編集', 'view' => 'レコードの詳細'][$kind] ?? null;
 @endphp
 
 <header @class(['sfk-app-header', 'sfk-app-header-'.$kind])>
@@ -34,27 +36,23 @@
 
     <div class="sfk-app-head">
         <div class="sfk-app-head-title" x-data="{ info: false }">
-            @if ($kind === 'list' || $kind === 'settings')
+            @unless ($printing)
                 <a href="{{ $chrome['home_url'] }}" class="sfk-app-home" title="ホーム">
                     <x-filament::icon :icon="Heroicon::OutlinedHome" class="sfk-app-home-icon" />
                     <span class="fi-sr-only">ホーム</span>
                 </a>
                 <x-filament::icon :icon="Heroicon::ChevronRight" class="sfk-app-crumb-sep" />
-            @elseif (! $printing)
-                <a href="{{ $chrome['index_url'] }}" class="sfk-app-back" title="一覧に戻る">
-                    <x-filament::icon :icon="Heroicon::ArrowLeft" class="sfk-app-back-icon" />
-                    <span class="fi-sr-only">一覧に戻る</span>
-                </a>
-            @endif
+            @endunless
 
             <h1 class="sfk-app-title">
                 <a href="{{ $chrome['index_url'] }}">{{ $chrome['name'] }}</a>
             </h1>
 
-            @if ($kind === 'settings')
+            @if ($kind === 'settings' || ($step !== null && ! $printing))
                 <x-filament::icon :icon="Heroicon::ChevronRight" class="sfk-app-crumb-sep" />
-                <span class="sfk-app-subtitle">アプリの設定</span>
-            @elseif (filled($chrome['description']) && ! $printing)
+                <span class="sfk-app-subtitle" aria-current="page">{{ $step ?? 'アプリの設定' }}</span>
+            @endif
+            @if ($kind !== 'settings' && filled($chrome['description']) && ! $printing)
                 <button type="button" class="sfk-app-info" x-on:click="info = ! info" x-bind:class="{ 'is-active': info }"
                     x-bind:aria-expanded="info ? 'true' : 'false'" title="アプリの説明">
                     <x-filament::icon :icon="Heroicon::OutlinedInformationCircle" class="sfk-app-info-icon" />

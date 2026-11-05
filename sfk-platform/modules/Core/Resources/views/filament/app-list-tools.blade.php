@@ -2,8 +2,8 @@
     Toolbar of an app list (design_ref/app-index.png; Modules\Core\Filament\AppPages\AppListRecords::toolbarPart()).
     $part: start — after the search box: the column searched, 絞り込む and the switch showing the app's legacy buttons
            (with ボタンの説明 once they are shown);
-           sort — 並び替え (before 列);
-           settings — ⚙ (after 列);
+           sort — 並び替え;
+           settings — ⚙ (right of 並び替え);
            menu — the row of the legacy buttons under the toolbar ($store.sfkAppMenu);
            bar — the toolbar of a カレンダー形式 / カスタマイズ形式 view (no table): start, ⚙ and the legacy buttons.
 --}}

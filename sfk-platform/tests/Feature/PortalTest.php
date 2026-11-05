@@ -268,8 +268,8 @@ it('shows the edit buttons of お知らせ and アプリショートカット to
 it('frames each アプリショートカット on its own, with space between them', function () {
     $this->actingAs($this->admin)->get('/erp')
         ->assertOk()
-        ->assertSee('.sfk-shortcuts { display: flex; flex-wrap: wrap; gap: .75rem;', false)
-        ->assertSee('border: 1px solid #e5e7eb; border-radius: 10px; color: var(--kt-blue', false);
+        ->assertSee('.sfk-shortcuts { display: flex; flex-wrap: wrap; gap: var(--sfk-space-3);', false)
+        ->assertSee('border-radius: var(--sfk-radius-lg); box-shadow: var(--sfk-ring);', false);
 });
 
 it('lists 共通管理 first in ダッシュボード切替, each dashboard with its own icon, without a ダッシュボード entry', function () {

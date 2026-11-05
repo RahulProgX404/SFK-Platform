@@ -36,7 +36,7 @@ use Modules\Core\Http\Middleware\EnsurePasswordIsChanged;
  * Common configuration for every Filament panel in the platform (ERP panel and extension panels):
  * standard middleware stack, login page, shared users/guard, colours and branding.
  *
- * Look & feel: light theme only, the brand blue, white surfaces with rounded corners and a Meiryo-first font
+ * Look & feel: light theme only, the brand blue, white surfaces with rounded corners and Noto Sans JP
  * (core::filament.theme with core::filament.design); no top bar.
  *
  * Panels differ only in id, path/domain, brand label and which components they load.
@@ -49,6 +49,9 @@ abstract class BasePanelProvider extends PanelProvider
     public const BRAND_BLUE = '#05467E';
 
     public const BRAND_RED = '#e74c3c';
+
+    /** the stylesheet of the self-hosted Noto Sans JP (also linked by the portal / login shell). */
+    public const FONT_STYLESHEET = '/fonts/noto-sans-jp/noto-sans-jp.css?v=1';
 
     /** the legacy system's success notification green. */
     public const BRAND_GREEN = '#91c36c';
@@ -73,8 +76,10 @@ abstract class BasePanelProvider extends PanelProvider
                 'gray' => Color::Gray,
             ])
             ->darkMode(false)
-            // System Japanese fonts (no web-font download); the full stack is set by the theme view.
-            ->font('Meiryo', provider: LocalFontProvider::class)
+            // Noto Sans JP, served by this system (public/fonts/noto-sans-jp: unicode-range slices, only the characters a
+            // page shows are loaded; the Content-Security-Policy allows no font host); the full stack with the system
+            // Japanese fonts as fallback is set by core::filament.design (--sfk-font).
+            ->font('Noto Sans JP', url: self::FONT_STYLESHEET, provider: LocalFontProvider::class)
             // avatars drawn here: the default sends every user's name to an outside service
             ->defaultAvatarProvider(InitialAvatarProvider::class)
             // the look (core::filament.theme) and the Alpine components of the app lists (core::filament.app-filter-script),

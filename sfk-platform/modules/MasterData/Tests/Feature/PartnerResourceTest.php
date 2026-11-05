@@ -401,8 +401,8 @@ it('puts 表示件数 and the paging under the list and shows table headers and 
         ->and(strpos($footer, '表示件数'))->toBeLessThan(strpos($footer, '1 - 1（1件中）'))
         ->and(themeCss())->toContain('--kt-label: #000000;')
         ->and(themeCss())->toContain('.fi-ta-header-cell {'."\n".'        color: var(--kt-label);')
-        ->and(compactCss(themeCss()))->toContain(compactCss('.kt-record .fi-in-entry-label { font-size: .875rem; font-weight: 400; color: var(--kt-label); }'))
-        ->and(compactCss(themeCss()))->toContain(compactCss('.fi-fo-field-label-content { font-size: .9375rem; color: var(--kt-label); }'));
+        ->and(compactCss(themeCss()))->toContain(compactCss('.kt-record .fi-in-entry-label { font-size: .8125rem; font-weight: 400; color: var(--kt-label); }'))
+        ->and(compactCss(themeCss()))->toContain(compactCss('.fi-fo-field-label-content { font-size: .875rem; color: var(--kt-label); }'));
 });
 
 it('shows no column of the list in bold, 取引先名 included', function () {

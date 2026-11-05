@@ -66,6 +66,12 @@ Japanese text in the generated PDFs uses the standard Japanese CID fonts by name
 |---|---|---|
 | halaxa/json-machine 1.2 (Filip Halaxa) | Apache-2.0 | Composer — reads the records of the legacy app exports one at a time (`legacy:import`) |
 
+## Font (2026-11-04, ui-refine)
+
+| Component | License | Where |
+|---|---|---|
+| Noto Sans JP (variable, weights 400–700; Google / Adobe, the Noto project) | SIL Open Font License 1.1 | `public/fonts/noto-sans-jp/` — the screen font, served by this system as unicode-range slices (`noto-sans-jp.css`, linked by `BasePanelProvider::FONT_STYLESHEET`); taken unmodified from Google Fonts. The OFL allows bundling and redistribution with software; the font may not be sold on its own and a modified version may not keep the name. |
+
 ## Dependency license review (2026-10-22)
 
 PHP (Composer, production — `composer licenses --no-dev`, 118 packages): all permissive.

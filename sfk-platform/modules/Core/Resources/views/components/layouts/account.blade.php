@@ -8,6 +8,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="color-scheme" content="light">
     <title>{{ $title }} | {{ config('core.system_name') }}</title>
+    <link rel="stylesheet" href="{{ \App\Modules\Filament\BasePanelProvider::FONT_STYLESHEET }}">
     <style>
         :root {
             --sfk-radius: 6px;
@@ -40,8 +41,10 @@
             min-height: 100vh;
             background: linear-gradient(180deg, #f7fbff 0%, #eef4fa 100%);
             color: var(--kt-text);
-            font-family: "メイリオ", Meiryo, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif;
-            font-size: 16px;
+            font-family: "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+            letter-spacing: .01em;
+            -webkit-font-smoothing: antialiased;
+            font-size: 14px;
             line-height: 1.6;
         }
         a { color: var(--kt-blue); text-decoration: none; }
@@ -50,39 +53,39 @@
         /* Global header (white bar with hairline, like the legacy system) */
         .kt-header {
             display: flex; align-items: center; justify-content: space-between; gap: 16px;
-            height: 64px; padding: 0 28px; background: var(--kt-surface);
+            height: 52px; padding: 0 24px; background: var(--kt-surface);
             box-shadow: 0 1px 0 var(--kt-border), 0 4px 14px rgba(16, 24, 40, .04);
         }
-        .kt-brand { display: flex; align-items: center; gap: 12px; color: var(--sfk-ink); font-weight: 700; font-size: 22px; }
+        .kt-brand { display: flex; align-items: center; gap: 12px; color: var(--sfk-ink); font-weight: 700; font-size: 17px; }
         .kt-brand:hover { text-decoration: none; }
         .kt-brand-mark {
-            display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px;
-            background: linear-gradient(135deg, #2b6aa0, var(--kt-blue-dark)); color: #fff; font-size: 14px; letter-spacing: .02em;
+            display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px;
+            background: linear-gradient(135deg, #2b6aa0, var(--kt-blue-dark)); color: #fff; font-size: 11px; letter-spacing: .02em;
         }
-        .kt-header-user { display: flex; align-items: center; gap: 16px; font-size: 15px; color: var(--kt-text); }
-        .kt-header-user svg { width: 20px; height: 20px; }
+        .kt-header-user { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--kt-text); }
+        .kt-header-user svg { width: 18px; height: 18px; }
         .kt-user-name { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
         .kt-user-name svg { color: #64748b; }
-        .kt-header-sep { width: 1px; height: 20px; background: var(--kt-border); }
+        .kt-header-sep { width: 1px; height: 16px; background: var(--kt-border); }
         .kt-header-user form { margin: 0; }
         .kt-link-button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: var(--kt-blue); cursor: pointer; }
         .kt-link-button:hover { text-decoration: underline; }
 
-        main { flex: 1; width: 100%; max-width: 1080px; margin: 0 auto; padding: 28px 20px 56px; }
-        .kt-footer { padding: 22px 20px; border-top: 1px solid #dde7f1; background: linear-gradient(180deg, rgba(255, 255, 255, 0), #e3eef9); text-align: center; font-size: 14px; color: var(--kt-muted); }
-        h1 { font-size: 23px; line-height: 1.4; margin: 0 0 20px; font-weight: 700; }
+        main { flex: 1; width: 100%; max-width: 1080px; margin: 0 auto; padding: 24px 20px 40px; }
+        .kt-footer { padding: 12px 20px; border-top: 1px solid #dde7f1; background: linear-gradient(180deg, rgba(255, 255, 255, 0), #e3eef9); text-align: center; font-size: 12px; color: var(--kt-muted); }
+        h1 { font-size: 18px; line-height: 1.4; margin: 0 0 16px; font-weight: 700; }
 
         /* Widget box (legacy portal widget / record box) */
         .kt-box { background: var(--kt-surface); border: 1px solid var(--kt-border); border-radius: var(--sfk-radius-lg); box-shadow: var(--sfk-shadow); overflow: hidden; }
         .kt-box-header {
             display: flex; align-items: center; gap: 8px; padding: 12px 16px;
             background: var(--kt-header); border-bottom: 1px solid var(--kt-border);
-            font-weight: 700; font-size: 16px;
+            font-weight: 600; font-size: 14px;
         }
         .kt-box-body { padding: 16px; }
 
         /* Messages: solid bars with white text (success green, danger red), warnings soft yellow */
-        .kt-alert { padding: 8px 18px; margin-bottom: 16px; font-size: 16px; line-height: 1.5; border: 1px solid transparent; border-radius: var(--sfk-radius); }
+        .kt-alert { padding: 8px 16px; margin-bottom: 16px; font-size: 14px; line-height: 1.5; border: 1px solid transparent; border-radius: var(--sfk-radius); }
         .kt-alert-success { background: var(--kt-green); color: #fff; }
         .kt-alert-warning { background: var(--kt-yellow-soft); color: var(--kt-yellow-text); border-color: #f7dc6f; }
         .kt-alert-danger { background: var(--kt-red); color: #fff; }
@@ -90,9 +93,9 @@
         /* Buttons (legacy vendor UI parts): submit = filled blue, normal = light grey with a blue label */
         .kt-button {
             display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-            min-width: 140px; max-width: 100%; height: 44px; padding: 0 18px; border-radius: var(--sfk-radius);
+            min-width: 140px; max-width: 100%; height: 38px; padding: 0 18px; border-radius: var(--sfk-radius);
             border: 1px solid transparent; background: var(--kt-blue); color: #fff; box-shadow: var(--sfk-shadow);
-            font: inherit; font-size: 16px; font-weight: 600; cursor: pointer;
+            font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
         }
         .kt-button:hover { background: var(--kt-blue-dark); text-decoration: none; }
         .kt-button:focus-visible { outline: 1px solid var(--kt-blue); outline-offset: 1px; }
@@ -102,14 +105,14 @@
 
         /* Text inputs: hairline border with a soft inset shadow, blue border on focus */
         .kt-input {
-            width: 100%; height: 42px; padding: 0 12px; border-radius: var(--sfk-radius);
-            border: 1px solid #dfe3e8; background: #fff; color: var(--sfk-ink); font: inherit; font-size: 16px;
+            width: 100%; height: 38px; padding: 0 12px; border-radius: var(--sfk-radius);
+            border: 1px solid #dfe3e8; background: #fff; color: var(--sfk-ink); font: inherit; font-size: 14px;
         }
         .kt-input:focus { outline: none; border-color: var(--kt-blue); box-shadow: 0 0 0 4px #e8eff6; }
         .kt-input[aria-invalid="true"] { border-color: var(--kt-red); }
         .kt-input:disabled { background: var(--kt-disabled); color: var(--kt-muted); box-shadow: none; }
         /* Error under a field: red bar with white text */
-        .kt-error { margin: 4px 0 0; padding: 0; color: var(--kt-red); font-size: 15px; line-height: 1.5; }
+        .kt-error { margin: 4px 0 0; padding: 0; color: var(--kt-red); font-size: 13px; line-height: 1.5; }
 
         @media (max-width: 640px) {
             .kt-header { padding: 0 16px; }

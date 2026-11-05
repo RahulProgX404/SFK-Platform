@@ -47,17 +47,25 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   (`BasePanelProvider::BRAND_BLUE`, #05467E) as primary — through the `--sfk-primary` / `--kt-blue` tokens, never a
   hard-coded colour; dark text, soft grey table headers. No top bar except on the ERP home (/erp, ErpPanelProvider) —
   elsewhere the sidebar (search, bell, user menu inside) collapses fully and a floating button opens it. While the
-  server works, three dots move over a transparent blur (no text). Style new parts with the `--sfk-*` tokens in
-  `core::filament.design`. Text: Filament's `text-sm` is 16px (the theme redefines `--text-xs` … `--text-3xl` × 16/14); give new
-  styles sizes from that scale — 16px (1rem) everyday text, 15px (.9375rem) labels / toolbar buttons, 14px (.875rem)
-  small notes, 13px (.8125rem) badges. Table headers and field labels (key names on record / edit / new pages) are black (`--kt-label`), never
-  grey. No table column is bold (no `->weight()` on table columns; the theme forces normal weight in table cells —
+  server works, three dots move over a transparent blur (no text). Style new parts only with the `--sfk-*` tokens at the
+  top of `core::filament.design` (ui-refine.md, 2026-11; sizes of `../index-ref.png`): type (`--sfk-fs-title` 18px,
+  `-heading` 16, `-body` 14, `-label` 14 for labels / table headers / buttons / tabs / navigation, `-small` 13, `-badge` 12,
+  `-figure` 18; nothing above 22px;
+  weights `--sfk-fw-*` 400/500/600/700, never heavier), colour roles (`--sfk-ink` / `-text` / `-muted` / `-subtle`,
+  `-line` / `-line-soft` / `-line-strong`, `-page` / `-surface` / `-head` / `-hover`, `-success` / `-warning` / `-danger`
+  with `-soft` grounds), spacing (`--sfk-space-1…10` on a 4px scale, `--sfk-gutter` 24px / 16px on phones) and one control
+  height (`--sfk-control` 36px for buttons, inputs, selects and toolbar tools); table header rows on `--sfk-table-head`,
+  the app lists' (index pages) on the dark `--sfk-list-head` with white labels. Font: Noto Sans JP, served by this system
+  (`public/fonts/noto-sans-jp`, OFL — no font host is allowed by the CSP), system Japanese fonts as fallback; amounts,
+  quantities, dates and codes use tabular numerals. Filament's `text-sm` is 14px (the theme redefines `--text-xs` …
+  `--text-3xl`, at most 20px). Table headers (except the dark ones, which are white) and field labels (key names on record / edit / new pages)
+  are black (`--kt-label`), never grey. No table column is bold (no `->weight()` on table columns; the theme forces normal weight in table cells —
   only the header row is bold).
-- App screens (Core `app-header`, nothing per app): only the app name — on a list after the home link, on a record / form
-  after ← — with (i) for the description popup. List: エクスポート (帳票出力; same ボタン名 = sub-menu) and 新規 at the
+- App screens (Core `app-header`, nothing per app): the breadcrumb home › app name on a list, home › app name ›
+  レコードの追加 / レコードの編集 / レコードの詳細 on the record screens, with (i) for the description popup. List: エクスポート (帳票出力; same ボタン名 = sub-menu) and 新規 at the
   top right, summary cards (`summaryCards()` with `SummaryCard::make()` — never a toolbar render hook of your own), the
-  一覧 as tabs, then search, 絞り込む, the switch of the legacy buttons (+ ボタンの説明 popup), 並び替え, 列 and ⚙ (the
-  app's `optionActions()`, 一括削除, アプリの設定); rows end with 「…」 (編集する → edit page, 削除する); 表示件数 and the page
+  一覧 as tabs, then search, 絞り込む, the switch of the legacy buttons (+ ボタンの説明 popup), 並び替え and ⚙ (the
+  app's `optionActions()`, 一括削除, アプリの設定) — no 列 chooser, the columns come from the 一覧; rows end with 「…」 (編集する → edit page, 削除する); 表示件数 and the page
   numbers under the table, which fills the screen; cell values stay on one line (full text on hover). Record page:
   編集, 再利用, 「…」 (印刷 / 削除), エクスポート, ⚙, ‹ › at the top right; the page's other buttons and the legacy buttons
   under the name. Create / edit: キャンセル (left) and 保存 (right) in the form's footer, which stays at the bottom of the

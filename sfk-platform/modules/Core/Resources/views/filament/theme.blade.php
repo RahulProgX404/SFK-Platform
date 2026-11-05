@@ -5,21 +5,21 @@
     and UI component library): #05467E submit buttons (hover #033456), #f7f9fa "normal" buttons with blue labels
     (hover #c8d6dd), #e74c3c alert buttons (hover #bf2718), #d4d7d7 disabled, #e3e7e8 hairlines, inset-shadow inputs
     with a blue focus border, red error bars, grey tabs with a white selected tab, blue sub-table headers, square
-    corners and a Meiryo-first font stack.
+    corners. The font (Noto Sans JP) and the current look are set by core::filament.design.
     Keep the colours in sync with BasePanelProvider::BRAND_* and the account layout (core::components.layouts.account).
 --}}
 <style>
     :root {
-        --font-family: "メイリオ", Meiryo, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif !important;
-        /* text sizes: Filament's text-sm (the everyday text) is 16px; the rest of the scale and every size of this
-           theme follow it (× 16/14, whole pixels). Line heights stay relative to the size. */
-        --text-xs: .875rem;
-        --text-sm: 1rem;
-        --text-base: 1.125rem;
-        --text-lg: 1.3125rem;
-        --text-xl: 1.4375rem;
-        --text-2xl: 1.6875rem;
-        --text-3xl: 2.125rem;
+        --font-family: "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", Meiryo, system-ui, sans-serif !important;
+        /* text sizes of index-ref.png (bug.md, 2026-11-04): Filament's text-sm (the everyday text) is 14px, titles
+           18px, nothing above 20px. Line heights stay relative to the size. */
+        --text-xs: .8125rem;
+        --text-sm: .875rem;
+        --text-base: 1rem;
+        --text-lg: 1.0625rem;
+        --text-xl: 1.125rem;
+        --text-2xl: 1.125rem;
+        --text-3xl: 1.25rem;
         --kt-blue: #05467E;
         --kt-blue-dark: #033456;
         --kt-blue-soft: #e6eef5;
@@ -274,7 +274,7 @@
 
     :is(.sfk-app-page-create, .sfk-app-page-edit) .fi-in-entry-label {
         color: var(--kt-label);
-        font-size: .9375rem;
+        font-size: .875rem;
     }
 
     .fi-input {
@@ -295,7 +295,7 @@
         padding: 4px 18px;
         background-color: var(--kt-red);
         color: #ffffff !important;
-        font-size: 1rem;
+        font-size: .875rem;
         line-height: 1.5;
     }
 
@@ -326,7 +326,7 @@
     }
 
     .fi-modal-heading {
-        font-size: 1.6875rem;
+        font-size: 1.125rem;
         font-weight: 400;
         color: var(--kt-text);
     }
@@ -345,7 +345,7 @@
         min-width: 163px;
         max-width: 100%;
         min-height: 48px;
-        font-size: 1.125rem;
+        font-size: .875rem;
     }
 
     /*
@@ -413,14 +413,14 @@
 
     .fi-no-notification:not(.fi-inline) .fi-no-notification-title {
         color: #1f2937;
-        font-size: 1.125rem;
+        font-size: 1rem;
         font-weight: 400;
         line-height: 1.5;
     }
 
     .fi-no-notification:not(.fi-inline) .fi-no-notification-body {
         color: #4b5563 !important;
-        font-size: 1rem;
+        font-size: .875rem;
     }
 
     .fi-no-notification:not(.fi-inline) .fi-no-notification-close-btn {
@@ -494,7 +494,7 @@
         padding: 4px 8px;
         background-color: var(--kt-blue);
         color: #ffffff;
-        font-size: .875rem;
+        font-size: .8125rem;
         font-weight: 400;
         border-inline: 1px solid var(--kt-blue);
     }
@@ -541,7 +541,7 @@
         padding: 4px 6px;
         background-color: var(--kt-blue);
         color: #ffffff;
-        font-size: .875rem;
+        font-size: .8125rem;
         font-weight: 400;
         text-align: start;
         white-space: nowrap;
@@ -588,14 +588,14 @@
     }
 
     .kt-subtable-label {
-        font-size: .9375rem;
+        font-size: .875rem;
         color: var(--kt-label);
         margin-bottom: 4px;
     }
 
     /* Headings */
     .fi-header-heading {
-        font-size: 1.5625rem;
+        font-size: 1.125rem;
         font-weight: 700;
         color: var(--kt-text);
     }
@@ -607,7 +607,7 @@
 
     /* legacy record forms and record pages (Modules\Core\Filament\Records\RecordLayout, class kt-record) */
     .kt-record .fi-in-entry-label {
-        font-size: .875rem;
+        font-size: .8125rem;
         font-weight: 400;
         color: var(--kt-label);
     }
@@ -616,12 +616,12 @@
         min-height: 1.75rem;
         padding: .125rem 0 .25rem;
         border-bottom: 1px solid var(--kt-border);
-        font-size: 1rem;
+        font-size: .875rem;
         color: var(--kt-text);
     }
 
     .kt-record .fi-fo-field-label {
-        font-size: .9375rem;
+        font-size: .875rem;
     }
 
 
@@ -704,7 +704,7 @@
         border: 1px solid var(--kt-border);
         box-shadow: 1px 1px 1px #ffffff inset;
         color: var(--kt-blue-dark);
-        font-size: .9375rem;
+        font-size: .875rem;
         font-weight: 400;
         white-space: nowrap;
     }
@@ -751,7 +751,7 @@
         background: var(--kt-muted);
         border: 2px solid #ffffff;
         color: #ffffff;
-        font-size: .8125rem;
+        font-size: .75rem;
         font-weight: 700;
         line-height: 1rem;
         text-align: center;
@@ -833,7 +833,7 @@
         border: 1px solid #f3d27a;
         border-left: 3px solid #e6a700;
         color: var(--kt-text);
-        font-size: .875rem;
+        font-size: .8125rem;
         text-align: start;
     }
 
@@ -885,7 +885,7 @@
         gap: .375rem;
         width: 100%;
         padding: .375rem .75rem;
-        font-size: .9375rem;
+        font-size: .875rem;
         color: var(--kt-blue-dark);
         text-align: left;
     }
@@ -927,7 +927,7 @@
         margin: 0;
         padding: .25rem .75rem .625rem;
         border-top: 1px solid var(--kt-border);
-        font-size: .9375rem;
+        font-size: .875rem;
         line-height: 1.6;
     }
 
@@ -968,7 +968,7 @@
         border: 1px solid var(--kt-border);
         border-left: 3px solid var(--kt-red);
         color: var(--kt-text);
-        font-size: .9375rem;
+        font-size: .875rem;
         line-height: 1.6;
     }
 
@@ -990,7 +990,7 @@
     .sfk-data-table {
         width: 100%;
         border-collapse: collapse;
-        font-size: .9375rem;
+        font-size: .875rem;
         white-space: nowrap;
     }
 
@@ -1041,7 +1041,7 @@
         margin: 0;
         padding: 0;
         list-style: none;
-        font-size: .9375rem;
+        font-size: .875rem;
     }
 
     .sfk-preview-counts li {
@@ -1087,7 +1087,7 @@
         display: inline-flex;
         align-items: center;
         gap: .25rem;
-        font-size: .9375rem;
+        font-size: .875rem;
         color: var(--kt-text);
     }
 
@@ -1163,7 +1163,7 @@
 
     .sfk-filter-title {
         margin: 0;
-        font-size: 1.6875rem;
+        font-size: 1.125rem;
         font-weight: 400;
         line-height: 1.3;
     }
@@ -1204,7 +1204,7 @@
     .sfk-filter-label {
         display: block;
         margin: 0 0 10px;
-        font-size: 1rem;
+        font-size: .875rem;
         font-weight: 400;
         color: var(--kt-text);
     }
@@ -1219,7 +1219,7 @@
         flex-wrap: wrap;
         gap: 6px 24px;
         margin-bottom: 10px;
-        font-size: 1rem;
+        font-size: .875rem;
     }
 
     .sfk-filter-match label {
@@ -1269,7 +1269,7 @@
         border-radius: var(--sfk-radius);
         background-color: #ffffff;
         color: var(--kt-text);
-        font-size: 1rem;
+        font-size: .875rem;
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%233498db' stroke-width='1.5'%3E%3Cpath d='M3 6l5 5 5-5'/%3E%3C/svg%3E");
         background-repeat: no-repeat;
         background-position: right 10px center;
@@ -1305,7 +1305,7 @@
         border-radius: var(--sfk-radius);
         background: #ffffff;
         color: #000000;
-        font-size: 1rem;
+        font-size: .875rem;
         box-shadow: var(--kt-input-shadow);
     }
 
@@ -1330,7 +1330,7 @@
         border-radius: var(--sfk-radius);
         background: #ffffff;
         color: var(--kt-text);
-        font-size: 1rem;
+        font-size: .875rem;
         box-shadow: var(--kt-input-shadow);
     }
 
@@ -1383,7 +1383,7 @@
         padding: 0;
         background: none;
         color: var(--kt-blue);
-        font-size: 1rem;
+        font-size: .875rem;
     }
 
     .sfk-filter-link:hover {
@@ -1419,7 +1419,7 @@
         background: var(--kt-normal);
         box-shadow: 1px 1px 1px #ffffff inset;
         color: var(--kt-blue);
-        font-size: 1.125rem;
+        font-size: .875rem;
     }
 
 
@@ -1487,7 +1487,7 @@
         padding: 4px 18px;
         background: var(--kt-red);
         color: #ffffff;
-        font-size: 1rem;
+        font-size: .875rem;
         line-height: 1.5;
     }
 
@@ -1546,7 +1546,7 @@
         padding: 2px 18px 2px 2px;
         border: 0;
         background: transparent;
-        font-size: 1rem;
+        font-size: .875rem;
         font-weight: 700;
         color: var(--kt-text);
         cursor: pointer;
@@ -1564,7 +1564,7 @@
 
     .sfk-calendar-grid th {
         padding: 8px 0;
-        font-size: .8125rem;
+        font-size: .75rem;
         font-weight: 700;
         color: var(--kt-text);
         text-align: center;
@@ -1582,7 +1582,7 @@
     .sfk-calendar-day {
         width: 34px;
         height: 33px;
-        font-size: .9375rem;
+        font-size: .875rem;
         color: var(--kt-text);
     }
 
@@ -1632,7 +1632,7 @@
         padding: 0 24px;
         background: transparent;
         color: var(--kt-text);
-        font-size: 1rem;
+        font-size: .875rem;
         border-top: 1px solid var(--kt-tab-border);
         border-left: 1px solid var(--kt-tab-border);
     }
@@ -1668,7 +1668,7 @@
 
     .sfk-views-title {
         margin: 0;
-        font-size: 1.3125rem;
+        font-size: 1.125rem;
         font-weight: 700;
     }
 
@@ -1697,7 +1697,7 @@
         margin-top: -1px;
         background: #ffffff;
         border: 1px solid var(--kt-border);
-        font-size: 1rem;
+        font-size: .875rem;
     }
 
     .sfk-views-row:hover {
@@ -1762,7 +1762,7 @@
         align-items: center;
         gap: 4px;
         color: var(--kt-blue);
-        font-size: .9375rem;
+        font-size: .875rem;
     }
 
     .sfk-views-action:hover {
@@ -1775,7 +1775,7 @@
     }
 
     .sfk-views-actions .fi-link {
-        font-size: .9375rem;
+        font-size: .875rem;
         font-weight: 400;
         color: var(--kt-red) !important;
     }
@@ -1811,7 +1811,7 @@
         border: 1px solid var(--kt-border);
         background: #ffffff;
         color: var(--kt-text);
-        font-size: 1rem;
+        font-size: .875rem;
         cursor: pointer;
     }
 
@@ -1901,7 +1901,7 @@
         border: 1px solid var(--kt-border);
         background: var(--kt-normal);
         color: var(--kt-text);
-        font-size: .9375rem;
+        font-size: .875rem;
         text-align: left;
         cursor: grab;
         overflow: hidden;
@@ -1937,7 +1937,7 @@
         border-right: 1px solid var(--kt-border);
         border-bottom: 1px solid var(--kt-border);
         color: var(--kt-label);
-        font-size: .9375rem;
+        font-size: .875rem;
         font-weight: 700;
         cursor: grab;
         white-space: nowrap;
@@ -1999,7 +1999,7 @@
         width: 100%;
         padding: 6px 16px;
         color: var(--kt-text);
-        font-size: .9375rem;
+        font-size: .875rem;
         font-weight: 400;
         text-align: left;
     }
@@ -2069,7 +2069,7 @@
         margin: 0 0 10px;
         padding-left: 10px;
         border-left: 4px solid var(--kt-blue);
-        font-size: 1.125rem;
+        font-size: 1rem;
         font-weight: 700;
     }
 
@@ -2082,7 +2082,7 @@
         border: 1px solid var(--kt-border);
         background: #ffffff;
         color: var(--kt-blue);
-        font-size: 1rem;
+        font-size: .875rem;
     }
 
     .sfk-settings-link:hover {
@@ -2109,7 +2109,7 @@
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        font-size: 1rem;
+        font-size: .875rem;
         cursor: pointer;
     }
 
@@ -2159,13 +2159,13 @@
     .sfk-user-avatar-sm {
         width: 18px;
         height: 18px;
-        font-size: 11px;
+        font-size: 10px;
     }
 
     .sfk-user-avatar-lg {
         width: 56px;
         height: 56px;
-        font-size: 25px;
+        font-size: 20px;
     }
 
     .sfk-user-card {
@@ -2183,20 +2183,20 @@
 
     .sfk-user-card-name {
         margin: 0 0 2px;
-        font-size: 1.125rem;
+        font-size: 1rem;
         font-weight: 700;
         color: var(--kt-text);
     }
 
     .sfk-user-card-meta {
         margin: 0;
-        font-size: .9375rem;
+        font-size: .875rem;
         color: var(--kt-muted);
     }
 
     .sfk-user-card-link {
         margin-top: 8px;
-        font-size: .9375rem;
+        font-size: .875rem;
         color: var(--kt-blue);
     }
 
@@ -2246,7 +2246,7 @@
 
     .sfk-history-title {
         margin: 0;
-        font-size: 1rem;
+        font-size: .875rem;
         font-weight: 700;
     }
 
@@ -2258,7 +2258,7 @@
         padding: 10px 12px;
         background: #e6f4ea;
         border-bottom: 1px solid #b7dfc2;
-        font-size: .9375rem;
+        font-size: .875rem;
         font-weight: 700;
     }
 
@@ -2266,13 +2266,13 @@
         min-width: 0;
         height: 32px;
         padding: 0 12px;
-        font-size: .9375rem;
+        font-size: .875rem;
     }
 
     .sfk-history-empty {
         margin: 0;
         padding: 16px 12px;
-        font-size: .9375rem;
+        font-size: .875rem;
         color: var(--kt-muted);
     }
 
@@ -2287,7 +2287,7 @@
     .sfk-history-item {
         padding: 10px 12px;
         border-bottom: 1px solid var(--kt-border);
-        font-size: .9375rem;
+        font-size: .875rem;
     }
 
     .sfk-history-item.is-shown {
@@ -2308,7 +2308,7 @@
 
     .sfk-history-date {
         color: var(--kt-muted);
-        font-size: .875rem;
+        font-size: .8125rem;
     }
 
     .sfk-history-who {
@@ -2336,7 +2336,7 @@
         padding: 1px 6px;
         background: #e6f4ea;
         color: #276b40;
-        font-size: .875rem;
+        font-size: .8125rem;
     }
 
     .sfk-history-actions {
@@ -2347,7 +2347,7 @@
     }
 
     .sfk-history-actions .fi-link {
-        font-size: .9375rem;
+        font-size: .875rem;
         font-weight: 400;
         color: var(--kt-blue) !important;
     }
@@ -2367,7 +2367,7 @@
         border: 1px solid var(--kt-border);
         background: #ffffff;
         box-shadow: var(--kt-input-shadow);
-        font-size: .9375rem;
+        font-size: .875rem;
         color: var(--kt-text);
     }
 
@@ -2395,7 +2395,7 @@
         display: inline-flex;
         align-items: center;
         gap: 4px;
-        font-size: .9375rem;
+        font-size: .875rem;
         white-space: nowrap;
         cursor: pointer;
     }
@@ -2409,7 +2409,7 @@
     .sfk-inline-error {
         margin: 0;
         color: var(--kt-red);
-        font-size: .875rem;
+        font-size: .8125rem;
     }
 
     /* Record panel collapsed: a narrow bar with the tabs' icons */
@@ -2452,7 +2452,7 @@
         padding: 0 4px;
         background: var(--kt-blue);
         color: #ffffff;
-        font-size: 11px;
+        font-size: 10px;
         line-height: 16px;
         text-align: center;
     }
@@ -2542,7 +2542,7 @@
     .sfk-comment-submit {
         min-width: 96px;
         height: 36px;
-        font-size: 1rem;
+        font-size: .875rem;
     }
 
     .sfk-comment-who {
@@ -2560,7 +2560,7 @@
         padding: 1px 6px;
         background: var(--kt-blue-soft);
         color: var(--kt-blue-dark);
-        font-size: .875rem;
+        font-size: .8125rem;
     }
 
     .sfk-comment-body {
@@ -2643,7 +2643,7 @@
 
     .sfk-calendar-view-month {
         margin: 0 4px;
-        font-size: 1.3125rem;
+        font-size: 1.125rem;
         font-weight: 700;
     }
 
@@ -2651,7 +2651,7 @@
         min-width: 0;
         height: 32px;
         padding: 0 14px;
-        font-size: .9375rem;
+        font-size: .875rem;
     }
 
     .sfk-calendar-view-grid {
@@ -2665,7 +2665,7 @@
         background: var(--kt-header);
         border: 1px solid var(--kt-border);
         color: var(--kt-label);
-        font-size: .875rem;
+        font-size: .8125rem;
         font-weight: 700;
     }
 
@@ -2696,7 +2696,7 @@
 
     .sfk-calendar-view-day {
         display: block;
-        font-size: .9375rem;
+        font-size: .875rem;
     }
 
     .sfk-calendar-view-grid td.is-today .sfk-calendar-view-day {
@@ -2708,7 +2708,7 @@
         margin: 2px 0 0;
         padding: 0;
         list-style: none;
-        font-size: .875rem;
+        font-size: .8125rem;
         line-height: 1.5;
     }
 
@@ -2800,7 +2800,7 @@
     }
 
     .sfk-search-column-item {
-        font-size: .9375rem;
+        font-size: .875rem;
     }
 
     .sfk-search-column-item:not(:has(.fi-icon)) {
@@ -2916,7 +2916,7 @@
     }
 
     :is(.sfk-app-page-create, .sfk-app-page-edit) .fi-fo-field-label-content {
-        font-size: .9375rem;
+        font-size: .875rem;
         color: var(--kt-label);
     }
 
@@ -2962,7 +2962,7 @@
         padding: 0 24px;
         background: var(--kt-disabled);
         color: var(--kt-text);
-        font-size: 1rem;
+        font-size: .875rem;
         border-top: 1px solid var(--kt-tab-border);
         border-left: 1px solid var(--kt-tab-border);
         box-shadow: 1px 0 3px var(--kt-tab-border) inset;
@@ -2997,7 +2997,7 @@
         padding-bottom: 10px;
         border-bottom: 1px solid #e3ebf2;
         color: var(--kt-label);
-        font-size: 1rem;
+        font-size: .875rem;
         font-weight: 700;
         letter-spacing: .02em;
     }
@@ -3021,7 +3021,7 @@
 
     /* file fields: the drop text 「ファイルをドラッグ&ドロップ又はファイル選択」 small, the field stays as it is */
     .filepond--drop-label label {
-        font-size: .75rem;
+        font-size: .6875rem;
     }
 
     /* Dashboard name (core::filament.dashboard-switcher, a link to the ポータル) replaces the panel brand */
@@ -3042,7 +3042,7 @@
         gap: .375rem;
         max-width: 100%;
         padding: .25rem .5rem;
-        font-size: 1.3125rem;
+        font-size: 1.125rem;
         font-weight: 700;
         color: var(--kt-text);
     }

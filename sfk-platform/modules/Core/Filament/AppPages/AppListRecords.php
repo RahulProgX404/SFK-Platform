@@ -367,10 +367,6 @@ abstract class AppListRecords extends ListRecords
             if (! $column->isSortable() && in_array($column->getName(), $fields, true)) {
                 $column->sortable();
             }
-            // 列: every column can be hidden from the list
-            if (! $column->isToggleable()) {
-                $column->toggleable();
-            }
         }
 
         // check boxes for 帳票出力 of the checked rows and for 選択したレコードを削除
@@ -386,7 +382,8 @@ abstract class AppListRecords extends ListRecords
             ->searchUsing(fn (Builder $query, string $search) => $this->applySearch($query, $search))
             ->searchPlaceholder(fn (): string => ($label = $this->searchColumnOptions()[$this->activeSearchColumn() ?? ''] ?? null) !== null ? $label.'で検索' : '検索')
             ->searchDebounce('300ms')
-            ->columnManagerTriggerAction(fn (Action $action): Action => $action->button()->label('列')->icon(Heroicon::OutlinedViewColumns)->color('gray'));
+            // no 列 chooser: the columns of a list are set by its 一覧 (アプリの設定 → 一覧)
+            ->columnManager(false);
     }
 
     /**
@@ -823,7 +820,7 @@ abstract class AppListRecords extends ListRecords
     /**
      * A part of the table toolbar (render hooks of every panel, BasePanelProvider; empty outside app lists,
      * core::filament.app-list-tools): 'start' — right of the search box: the search column, 絞り込む and the switch of
-     * the legacy buttons; 'sort' — 並び替え before 列; 'settings' — ⚙ after 列; 'menu' — the legacy buttons under the
+     * the legacy buttons; 'sort' — 並び替え before ⚙; 'settings' — ⚙; 'menu' — the legacy buttons under the
      * toolbar.
      */
     public static function toolbarPart(string $part): string

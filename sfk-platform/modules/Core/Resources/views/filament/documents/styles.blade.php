@@ -4,7 +4,7 @@
     .sfk-docs-meta {
         flex-shrink: 0;
         color: var(--kt-muted);
-        font-size: .875rem;
+        font-size: .8125rem;
     }
 
     .sfk-docs-output {
@@ -38,7 +38,7 @@
         border: 1px solid var(--kt-border);
         background: var(--kt-normal);
         color: var(--kt-text);
-        font-size: .8125rem;
+        font-size: .75rem;
     }
 
     .sfk-docs-tag.is-place {
@@ -90,7 +90,7 @@
 
     .sfk-designer-caption {
         color: var(--kt-label);
-        font-size: .9375rem;
+        font-size: .875rem;
     }
 
     .sfk-designer-tools {
@@ -118,7 +118,7 @@
         border: 1px solid var(--kt-tab-border);
         background: var(--kt-normal);
         color: var(--kt-text);
-        font-size: .9375rem;
+        font-size: .875rem;
     }
 
     .sfk-designer-page-tab.is-active {
@@ -132,7 +132,7 @@
         align-items: center;
         gap: 4px;
         color: var(--kt-blue);
-        font-size: .9375rem;
+        font-size: .875rem;
     }
 
     .sfk-designer-link:hover {
@@ -174,7 +174,7 @@
         justify-content: center;
         min-width: 120px;
         height: 40px;
-        font-size: 1rem;
+        font-size: .875rem;
     }
 
     .sfk-designer-body {
@@ -246,7 +246,7 @@
         padding-left: 8px;
         border-left: 3px solid var(--kt-blue);
         color: var(--kt-label);
-        font-size: .9375rem;
+        font-size: .875rem;
         font-weight: 700;
     }
 
@@ -270,7 +270,7 @@
         border: 1px solid var(--kt-border);
         background: #ffffff;
         color: var(--kt-text);
-        font-size: .9375rem;
+        font-size: .875rem;
         text-align: left;
         text-overflow: ellipsis;
         white-space: nowrap;

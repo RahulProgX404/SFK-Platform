@@ -169,7 +169,7 @@ final class DocumentParts
             Repeater::make('lines')->label($labels['lines'])->relationship('lines')->orderColumn('sort'),
             array_map(fn (string $key, int $width): array => [$labels[$key], $width], array_keys($columns), $columns),
             ['tax_rate' => TaxRate::Standard->value],
-        )->schema(array_values(array_intersect_key($inputs, $columns)));
+        )->schema(array_map(fn (string $key): Component => $inputs[$key], array_keys($columns))); // in the order of the headers
     }
 
     /** @param  array<string, string>  $labels */
@@ -196,7 +196,7 @@ final class DocumentParts
         return RecordTable::entry(
             RepeatableEntry::make('lines')->label($labels['lines'])->placeholder(''),
             array_map(fn (string $key, int $width): array => [$labels[$key], $width], array_keys($columns), $columns),
-        )->schema(array_values(array_map(fn (TextEntry $entry): TextEntry => $entry->placeholder(''), array_intersect_key($entries, $columns))));
+        )->schema(array_map(fn (string $key): TextEntry => $entries[$key]->placeholder(''), array_keys($columns))); // in the order of the headers
     }
 
     /** Totals of the rows being edited. */
