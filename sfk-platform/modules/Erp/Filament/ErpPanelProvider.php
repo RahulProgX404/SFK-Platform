@@ -12,12 +12,14 @@ use Filament\Enums\DatabaseNotificationsPosition;
 use Filament\Enums\GlobalSearchPosition;
 use Filament\Enums\UserMenuPosition;
 use Filament\Panel;
+use Filament\View\PanelsRenderHook;
 use Livewire\Livewire;
 use Modules\Core\Filament\Portal\PortalPage;
 
 /**
- * The main ERP panel (/erp, dashboard 白石封筒). Its home is the ポータル (アプリショートカット, スペース, アプリ), the one
- * screen with the top bar (search, bell and user menu there); the app screens have none (BasePanelProvider).
+ * The main ERP panel (/erp, dashboard 白石封筒). Its home is the dashboard (PortalPage), the one screen with the top bar:
+ * アプリ (all the apps over the whole screen, in place of a search box — the search stays in the sidebar), the bell and
+ * the user menu; the app screens have none (BasePanelProvider).
  * It contains no business screens itself: every enabled business module whose module.json says
  * `"panel": "erp"` contributes its Filament plugin here.
  */
@@ -36,7 +38,8 @@ final class ErpPanelProvider extends BasePanelProvider
         )
             ->default()
             ->topbar(fn (): bool => self::onHome())
-            ->globalSearch(position: fn (): GlobalSearchPosition => self::onHome() ? GlobalSearchPosition::Topbar : GlobalSearchPosition::Sidebar)
+            ->globalSearch(position: GlobalSearchPosition::Sidebar)
+            ->renderHook(PanelsRenderHook::GLOBAL_SEARCH_BEFORE, fn (): string => self::onHome() ? view('core::filament.app-launcher-button')->render() : '')
             ->userMenu(position: fn (): UserMenuPosition => self::onHome() ? UserMenuPosition::Topbar : UserMenuPosition::Sidebar)
             ->databaseNotifications(position: fn (): DatabaseNotificationsPosition => self::onHome() ? DatabaseNotificationsPosition::Topbar : DatabaseNotificationsPosition::Sidebar)
             ->navigationGroups(NavigationGroup::labels())

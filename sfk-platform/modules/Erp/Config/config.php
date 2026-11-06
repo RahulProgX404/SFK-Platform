@@ -12,6 +12,15 @@ return [
         'brand' => env('ERP_PANEL_BRAND', 'SFK システム'),
     ],
 
+    // The dashboard (/erp): 新規作成 of its header — app code => label, shown where the user may add records.
+    'dashboard' => [
+        'create' => [
+            'order-entry' => '受注入力',
+            'sales-entry' => '売上入力',
+            'daily-report' => '日報入力',
+        ],
+    ],
+
     // Card shown on the dashboard selection portal (/portal).
     'portal' => [
         'label' => '白石封筒',

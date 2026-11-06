@@ -2,12 +2,12 @@
     "name": "Analytics",
     "slug": "analytics",
     "type": "business",
-    "description": "Analytics: 22 過去の売上データ (past sales per salesperson and fiscal year, with charts), 25 販売先別売上計画 (sales plan vs actual per customer)",
+    "description": "Analytics: 22 過去の売上データ (past sales per salesperson and fiscal year, with charts), 25 販売先別売上計画 (sales plan vs actual per customer), 分析 (売上分析, 日報分析) and the cards of the dashboard",
     "version": "0.1.0",
     "provider": "Modules\\Analytics\\Providers\\AnalyticsServiceProvider",
     "filament_plugin": "Modules\\Analytics\\Filament\\AnalyticsPlugin",
     "panel": "erp",
-    "depends_on": ["core", "erp", "master-data", "sales"],
+    "depends_on": ["core", "erp", "master-data", "sales", "production", "hr", "purchasing"],
     "enabled": true,
     "order": 600
 }

@@ -56,6 +56,9 @@ use Modules\Core\Models\Space;
  * @property Carbon|null $last_login_at
  * @property Carbon|null $password_changed_at
  * @property int|null $list_page_size 表示件数 of the app lists (blank = 100)
+ * @property bool $show_financial_analysis 財務分析を表示 (set by administrators)
+ * @property string $financial_scope 財務分析の範囲: overall (全体) | personal (個人のみ) — with 財務分析を表示
+ * @property list<int>|null $app_order the user's own order of the apps in the アプリ panel (app ids)
  */
 #[Fillable([
     'name', 'email', 'password',
@@ -65,7 +68,7 @@ use Modules\Core\Models\Space;
     'position_id', 'dashboards', 'gender',
     'birthday', 'hired_on', 'left_on',
     'postal_code', 'address', 'phone', 'mobile_phone', 'contact_email',
-    'emergency_contact_name', 'emergency_contact_phone', 'notes',
+    'emergency_contact_name', 'emergency_contact_phone', 'notes', 'show_financial_analysis', 'financial_scope',
 ])]
 #[Hidden(['password', 'remember_token', 'work_rate', 'overtime_rate'])]
 class User extends Authenticatable implements FilamentUser, HasRecordComments
@@ -75,12 +78,18 @@ class User extends Authenticatable implements FilamentUser, HasRecordComments
 
     use RecordsComments;
 
+    /** 財務分析の範囲: 全体 / 個人のみ (users.financial_scope) */
+    public const FINANCE_OVERALL = 'overall';
+
+    public const FINANCE_PERSONAL = 'personal';
+
     /** @var array<string, mixed> */
     protected $attributes = [
         'user_type' => 'employee',
         'employment_status' => 'active',
         'must_change_password' => false,
         'managed_by_env' => false,
+        'financial_scope' => self::FINANCE_OVERALL,
     ];
 
     public function canAccessPanel(Panel $panel): bool
@@ -116,6 +125,24 @@ class User extends Authenticatable implements FilamentUser, HasRecordComments
     public function isSuperAdmin(): bool
     {
         return $this->user_type === UserType::SuperAdmin;
+    }
+
+    /**
+     * 財務分析を表示: the money of the dashboard (売上・入出金) and 分析 → 売上分析 — ticked by an administrator on the user's
+     * settings; super admins always.
+     */
+    public function seesFinancialAnalysis(): bool
+    {
+        return $this->isSuperAdmin() || (bool) $this->show_financial_analysis;
+    }
+
+    /**
+     * 財務分析の範囲 (bug.md 2026-11-06): 全体 shows everyone's money (and the user may switch the dashboard to their own),
+     * 個人のみ only the sales the user is the 担当者 of. Super admins always see all of it.
+     */
+    public function seesOverallFinance(): bool
+    {
+        return $this->seesFinancialAnalysis() && ($this->isSuperAdmin() || $this->financial_scope !== self::FINANCE_PERSONAL);
     }
 
     /** Whether this user may create, edit, reset and delete the given user (ユーザー種別 hierarchy). */
@@ -186,6 +213,8 @@ class User extends Authenticatable implements FilamentUser, HasRecordComments
             'left_on' => 'date',
             'must_change_password' => 'boolean',
             'managed_by_env' => 'boolean',
+            'show_financial_analysis' => 'boolean',
+            'app_order' => 'array',
             'password_changed_at' => 'datetime',
             'last_login_at' => 'datetime',
         ];

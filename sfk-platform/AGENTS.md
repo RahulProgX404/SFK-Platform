@@ -163,7 +163,25 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   even when it is hidden — disabled, but visible. Wrap it: `@if (($a = ($this->fooAction)([...]))->isVisible()) {{ $a }} @endif`.
 - プロフィール: employees see only 一般設定 (their own 氏名 / 住所・連絡先); 通知設定, 従業員マスタ情報, パスワード設定 and
   利用可能なダッシュボード are for administrators (user's decision, 2026-11). お知らせ is shown on /portal (edited on the
-  dashboard's ポータル, `?action=editNotice`).
+  dashboard's home, `?action=editNotice`).
+- The home of a dashboard (/erp, Core `PortalPage`; bug.md 2026-11-05, `../design_ref/Dashboard.png`) is the dashboard:
+  ダッシュボード with 全体 | 個人 (page filter `scope`), the period (date button → page filters `from` / `to`) and
+  新規作成 (`config('<panel>.dashboard.create')`, only apps the user may add to — one app = its page, none = disabled),
+  then the cards: the panel's Filament widgets
+  (business modules, e.g. Analytics `Filament/Widgets`), each saying its width in a 12-column grid. The money (rows 1–2,
+  分析 → 売上分析) needs 財務分析を表示 (`users.show_financial_analysis`, ticked by administrators in ユーザー管理;
+  `User::seesFinancialAnalysis()`, super admins always) and 財務分析の範囲 (`users.financial_scope`, bug.md 2026-11-06):
+  全体 sees everyone's money and may switch to 個人, 個人のみ only the sales they are the first 担当者 of
+  (`User::seesOverallFinance()`; money cards read `DashboardCard::salesData()`, 売上分析 its own row only). Users without
+  財務分析を表示 get 個人の概要 as the first row (their 勤務時間, 収入, 休暇日数, 有給休暇); the same card is on the user's
+  page (ユーザー管理, 02. 従業員マスタ) for the person and administrators — other modules add cards there through Core
+  `UserDetailWidgets`. Rows 3–4 are for everyone (row 3 without 財務分析を表示: クイックアクション, 休暇・勤怠予定,
+  作業者ランキング — the user's own row framed; クイックアクション is called 最近表示した項目 while it lists recent apps). The
+  top bar has アプリ in place of the search box (the search is in the sidebar): one panel over the whole screen with a
+  search box, スペース, よく使うアプリ (the five the user opens most, `AppUsageLog` written by every app screen; before
+  they opened any, those everyone opens most — always only apps they may open) and the apps. Administrators' drag
+  changes the default order (the registry); everyone else's drag only their own (`users.app_order`, 既定の並びに戻す);
+  without one they see the default. No アプリショートカット any more.
 - Never write the word for the old product anywhere; call it 旧システム in the UI and "legacy system" in English.
 - Cite the SYSTEM_BRAIN rule id in tests/docblocks when implementing a rule.
 

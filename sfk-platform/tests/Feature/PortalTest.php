@@ -1,13 +1,15 @@
 <?php
 
 /*
- * ポータル of 白石封筒 (legacy-style home): greeting, お知らせ and アプリショートカット (shown to everyone, administrators edit),
- * スペース (joined / all) and アプリ (only those the user may view, filterable by space).
+ * The home of 白石封筒: the dashboard (cards: modules/Analytics/Tests/Feature/DashboardTest.php), and アプリ — the panel over
+ * the whole screen with よく使うアプリ (the five the user opens most), スペース (joined / all) and the apps (only those the
+ * user may view, filterable by space) in the user's own order (drag; back to the default; administrators make theirs it).
  */
 
 use App\Models\User;
 use Filament\Facades\Filament;
 use Livewire\Livewire;
+use Modules\Core\Application\Apps\AppUsageLog;
 use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\AppStatus;
 use Modules\Core\Domain\Apps\PermissionSubject;
@@ -136,34 +138,49 @@ it('links every space to its settings for administrators', function () {
     Livewire::test(PortalPage::class)->assertDontSee('スペースの設定');
 });
 
-it('lets administrators choose アプリショートカット, shown to everyone of the dashboard, linked where the user may open the app', function () {
+it('shows よく使うアプリ in place of アプリショートカット: the five apps the user opens most, only those they may open', function () {
+    $log = app(AppUsageLog::class);
+    foreach (range(1, 3) as $visit) {
+        $log->touch($this->admin, 'sales-entry');
+    }
+    $log->touch($this->admin, 'daily-report-legacy');
+    foreach (range(1, 5) as $visit) {
+        $log->touch($this->admin, 'quotation'); // 開発中: not for administrators
+    }
+    $log->touch($this->employee, 'daily-report-legacy'); // not in their spaces any more
+
+    // 08 has no screen here and 09 is 開発中 (super admins only): left out
     $this->actingAs($this->admin);
-
     Livewire::test(PortalPage::class)
-        ->callAction('editShortcuts', data: ['shortcut_app_ids' => [$this->orders->id, $this->daily->id]])
-        ->assertHasNoActionErrors();
+        ->assertSeeInOrder(['よく使うアプリ', 'sfk-shortcut', '売上入力', 'sfk-app-title'], escape: false)
+        ->assertDontSee(['アプリショートカット', '09. 見積書管理']);
+    $super = User::factory()->superAdmin()->create();
+    $log->touch($super, 'sales-entry');
+    $log->touch($super, 'quotation');
+    $log->touch($super, 'quotation');
+    $this->actingAs($super);
+    Livewire::test(PortalPage::class)->assertSeeInOrder(['よく使うアプリ', '見積書管理', '売上入力', 'sfk-app-title'], escape: false);
 
-    expect(DashboardPortal::for('erp')->shortcut_app_ids)->toBe([$this->orders->id, $this->daily->id]);
-    DashboardPortal::for('erp')->fill(['shortcut_app_ids' => [$this->orders->id, $this->daily->id, $this->draft->id]])->save();
-
-    // not a member of 製造スペース: 08 is shown without a link; 09 is 開発中 (super admins only)
+    // nothing opened yet of the apps they may open (08 is not in their spaces): the apps everyone opens most, of those
+    // they may open — 06 (opened by the administrator), never 09
     $this->actingAs($this->employee);
     Livewire::test(PortalPage::class)
-        ->assertSee('アプリショートカット')
-        ->assertSeeInOrder(['sfk-shortcuts', '売上入力', '日報入力'])
-        ->assertSee('title="このアプリを開く権限がありません"', escape: false)
-        ->assertDontSee('見積書管理')
-        ->assertActionHidden('editShortcuts');
+        ->assertSeeInOrder(['よく使うアプリ', 'sfk-shortcut', '売上入力', 'sfk-app-title'], escape: false)
+        ->assertDontSee(['アプリショートカット', '見積書管理']);
+    expect($log->popular())->toBe(['quotation', 'sales-entry', 'daily-report-legacy'])
+        ->and($log->mostUsedOrPopular($this->employee, ['sales-entry']))->toBe(['sales-entry'])
+        ->and($log->mostUsedOrPopular($this->admin, ['sales-entry', 'daily-report-legacy']))->toBe(['sales-entry', 'daily-report-legacy']);
+    $log->touch($this->employee, 'sales-entry');
+    expect($log->mostUsedOrPopular($this->employee, ['sales-entry', 'quotation']))->toBe(['sales-entry']);
 
-    // a dashboard user in no space at all sees them too, and cannot change them
-    $this->actingAs(grantDashboards(User::factory()->create(), 'erp'));
-    Livewire::test(PortalPage::class)
-        ->assertSee('アプリショートカット')
-        ->assertSee('売上入力')
-        ->assertActionHidden('editShortcuts')
-        ->call('mountAction', 'editShortcuts')
-        ->assertActionNotMounted('editShortcuts');
-    expect(DashboardPortal::for('erp')->shortcut_app_ids)->toBe([$this->orders->id, $this->daily->id, $this->draft->id]);
+    // at most five, the most opened first (then the last opened)
+    foreach (range(1, 7) as $index) {
+        foreach (range(1, $index) as $visit) {
+            $log->touch($this->employee, 'app-'.$index);
+        }
+    }
+    expect($log->mostUsed($this->employee))->toBe(['app-7', 'app-6', 'app-5', 'app-4', 'app-3'])
+        ->and($log->mostUsed($this->employee, ['app-1', 'app-2']))->toBe(['app-2', 'app-1']);
 });
 
 it('offers the + buttons to the right people', function () {
@@ -255,21 +272,63 @@ it('keeps the place of the apps an administrator does not see when reordering', 
         ->and(BusinessApp::query()->orderBy('sort_order')->pluck('sort_order')->all())->toBe([1, 2, 3]);
 });
 
-it('shows the edit buttons of お知らせ and アプリショートカット to administrators only (not even disabled)', function () {
+it('shows the edit button of お知らせ to administrators only (not even disabled)', function () {
     DashboardPortal::for('erp')->fill(['notice' => '<p>お知らせ本文</p>'])->save();
 
-    $this->actingAs($this->employee)->get('/erp')->assertOk()->assertDontSee('アプリショートカットを編集');
-    $this->get('/portal')->assertOk()->assertSee('お知らせ本文')->assertDontSee('お知らせを編集');
-
-    $this->actingAs($this->admin)->get('/erp')->assertOk()->assertSee('アプリショートカットを編集');
-    $this->get('/portal')->assertOk()->assertSee('お知らせを編集')->assertSee('action=editNotice', false);
+    $this->actingAs($this->employee)->get('/portal')->assertOk()->assertSee('お知らせ本文')->assertDontSee('お知らせを編集');
+    $this->actingAs($this->admin)->get('/portal')->assertOk()->assertSee('お知らせを編集')->assertSee('action=editNotice', false);
 });
 
-it('frames each アプリショートカット on its own, with space between them', function () {
+it('lets users order the apps for themselves only, and administrators change the default order', function () {
+    // an employee: their own order (the apps they see only), the others keep the default
+    $other = grantDashboards(User::factory()->create(), 'erp');
+    $this->sales->users()->attach($other);
+    portal_app('order-entry', '04. 受注入力', $this->sales)->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true]);
+
+    $this->actingAs($this->employee);
+    Livewire::test(PortalPage::class)
+        ->assertSeeInOrder(['sfk-app-title', '06. 売上入力', '04. 受注入力'], escape: false)
+        ->assertDontSee('既定の並びに戻す')
+        ->call('saveMyAppOrder', [BusinessApp::query()->where('code', 'order-entry')->value('id'), $this->orders->id, $this->daily->id]);
+    Livewire::test(PortalPage::class)
+        ->assertSeeInOrder(['sfk-app-title', '04. 受注入力', '06. 売上入力'], escape: false)
+        ->assertSee(['既定の並びに戻す', 'title="ドラッグして並び替え"'], escape: false);
+    expect($this->employee->fresh()->app_order)->toBe([BusinessApp::query()->where('code', 'order-entry')->value('id'), $this->orders->id])
+        ->and(BusinessApp::query()->orderBy('sort_order')->orderBy('id')->pluck('code')->first())->toBe('sales-entry');
+    $this->actingAs($other);
+    Livewire::test(PortalPage::class)->assertSeeInOrder(['sfk-app-title', '06. 売上入力', '04. 受注入力'], escape: false);
+
+    // 既定の並びに戻す
+    $this->actingAs($this->employee);
+    Livewire::test(PortalPage::class)->call('resetMyAppOrder')->assertNotified('既定の並びに戻しました');
+    expect($this->employee->fresh()->app_order)->toBeNull();
+
+    // an administrator's drag changes the default (the registry) — for everyone without an order of their own
+    $this->employee->forceFill(['app_order' => [$this->orders->id]])->save();
+    $this->actingAs($this->admin);
+    Livewire::test(PortalPage::class)
+        ->assertSee('title="ドラッグして既定の並びを変更"', escape: false)
+        ->call('saveMyAppOrder', [$this->daily->id, $this->orders->id]);
+    expect($this->admin->fresh()->app_order)->toBeNull()
+        ->and(BusinessApp::query()->orderBy('sort_order')->orderBy('id')->pluck('code')->take(2)->all())->toBe(['daily-report-legacy', 'sales-entry']);
+    Livewire::test(PortalPage::class)
+        ->assertSeeInOrder(['sfk-app-title', '08. 日報入力', '06. 売上入力'], escape: false)
+        ->assertDontSee(['既定の並びに戻す', 'この並びを既定にする']);
+
+    // an old own order of an administrator is not used: they always see (and change) the default
+    $this->admin->forceFill(['app_order' => [$this->orders->id, $this->daily->id]])->save();
+    Livewire::test(PortalPage::class)->assertSeeInOrder(['sfk-app-title', '08. 日報入力', '06. 売上入力'], escape: false);
+
+    $this->actingAs($other);
+    Livewire::test(PortalPage::class)->assertSeeInOrder(['sfk-app-title', '06. 売上入力', '04. 受注入力'], escape: false);
+    $this->actingAs($this->employee);
+    Livewire::test(PortalPage::class)->assertSeeInOrder(['sfk-app-title', '06. 売上入力', '04. 受注入力'], escape: false);
+});
+
+it('frames each よく使うアプリ on its own, with space between them', function () {
     $this->actingAs($this->admin)->get('/erp')
         ->assertOk()
-        ->assertSee('.sfk-shortcuts { display: flex; flex-wrap: wrap; gap: var(--sfk-space-3);', false)
-        ->assertSee('border-radius: var(--sfk-radius-lg); box-shadow: var(--sfk-ring);', false);
+        ->assertSee(['.sfk-shortcuts {', '.sfk-shortcut {', 'box-shadow: var(--sfk-ring);'], false);
 });
 
 it('lists 共通管理 first in ダッシュボード切替, each dashboard with its own icon, without a ダッシュボード entry', function () {

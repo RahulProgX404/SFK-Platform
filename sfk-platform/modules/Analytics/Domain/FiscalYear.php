@@ -36,6 +36,29 @@ final class FiscalYear
         return (int) $day->format('n') >= self::MONTHS[0] ? $year : $year - 1;
     }
 
+    /** The business year (the year of its May) of a calendar month. */
+    public static function ofMonth(int $year, int $month): int
+    {
+        return $month >= self::MONTHS[0] ? $year : $year - 1;
+    }
+
+    /** The calendar year of a month of the business year. */
+    public static function calendarYear(int $fiscalYear, int $month): int
+    {
+        return $month >= self::MONTHS[0] ? $fiscalYear : $fiscalYear + 1;
+    }
+
+    /**
+     * The first day of the business year and the first day after it (Y-m-d): compare `>= first` and `< after`, so a date
+     * column stored with a time (SQLite) still counts on the last day.
+     *
+     * @return array{0: string, 1: string}
+     */
+    public static function days(int $fiscalYear): array
+    {
+        return [sprintf('%04d-05-01', $fiscalYear), sprintf('%04d-05-01', $fiscalYear + 1)];
+    }
+
     /** @return array<string, YearMonth> month column => calendar month of the business year containing the day */
     public static function months(DateTimeInterface $day): array
     {

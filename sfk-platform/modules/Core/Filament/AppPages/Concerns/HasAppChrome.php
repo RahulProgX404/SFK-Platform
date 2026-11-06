@@ -8,8 +8,11 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Support\Enums\Width;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Route;
+use Livewire\Livewire;
 use LogicException;
+use Modules\Core\Application\Apps\AppUsageLog;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\AppResource;
 use Modules\Core\Filament\DashboardSettings\Resources\AppSettings\AppSettingsResource;
@@ -24,6 +27,21 @@ trait HasAppChrome
 {
     /** list | create | edit | view: selects the toolbar. */
     abstract public function appPageKind(): string;
+
+    /**
+     * Notes that the user opened the app (and the record of a record / edit page) — once, when the screen is first drawn:
+     * よく使うアプリ and the recent records of the dashboard (AppUsageLog).
+     */
+    public function dehydrateHasAppChrome(): void
+    {
+        $user = auth()->user();
+        if (Livewire::isLivewireRequest() || ! $user instanceof User || ! in_array($this->appPageKind(), ['list', 'view', 'create', 'edit'], true)) {
+            return;
+        }
+
+        $record = property_exists($this, 'record') && $this->record instanceof Model ? $this->record : null;
+        app(AppUsageLog::class)->touch($user, $this->appResource()::appCode(), in_array($this->appPageKind(), ['view', 'edit'], true) ? $record : null);
+    }
 
     public function getHeader(): View
     {

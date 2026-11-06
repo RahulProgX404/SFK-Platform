@@ -50,6 +50,14 @@ final class UserInfolist
                             ->badge()
                             ->color('info')
                             ->placeholder('なし（従業員カテゴリで設定します）'),
+                        IconEntry::make('show_financial_analysis')
+                            ->label('財務分析を表示')
+                            ->state(fn (User $record): bool => $record->seesFinancialAnalysis())
+                            ->boolean(),
+                        TextEntry::make('financial_scope')
+                            ->label('財務分析の範囲')
+                            ->state(fn (User $record): string => $record->seesOverallFinance() ? '全体' : '個人のみ')
+                            ->visible(fn (User $record): bool => $record->seesFinancialAnalysis()),
                     ]),
                 Section::make('ログイン状況')
                     ->icon(Heroicon::OutlinedShieldCheck)

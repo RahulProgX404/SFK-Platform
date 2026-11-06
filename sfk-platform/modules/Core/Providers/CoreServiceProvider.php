@@ -45,6 +45,7 @@ use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\Records\RecordTabs;
 use Modules\Core\Filament\Records\RelatedLists;
 use Modules\Core\Filament\Support\AppRecordDirectory;
+use Modules\Core\Filament\Users\UserDetailWidgets;
 use Modules\Core\Http\Portal\DashboardDirectory;
 use Modules\Core\Http\Portal\DashboardEntry;
 use Modules\Core\Http\Responses\LoginPageLogoutResponse;
@@ -66,6 +67,8 @@ final class CoreServiceProvider extends ModuleServiceProvider
         $this->app->singleton(DocumentNumberGenerator::class);
         $this->app->singleton(RelatedLists::class);
         $this->app->singleton(RecordTabs::class);
+        // cards of other modules on the page of a user (e.g. 個人の概要)
+        $this->app->singleton(UserDetailWidgets::class);
 
         // 移行: the legacy logins are looked up once for all the apps of an import (legacy:import)
         $this->app->singleton(LegacyUsers::class);

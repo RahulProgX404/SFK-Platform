@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Settings\Filament\Resources\Users\Schemas;
 
+use App\Models\User;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -115,6 +118,20 @@ final class UserForm
                     ->label('利用可能なダッシュボード')
                     ->options(fn (): array => DashboardAccess::grantableOptions())
                     ->columns(2)
+                    ->columnSpanFull(),
+                // the money of the dashboard and 分析 → 売上分析 (super admins always see it)
+                Checkbox::make('show_financial_analysis')
+                    ->label('財務分析を表示')
+                    ->live()
+                    ->columnSpanFull(),
+                // with it: everyone's money (全体, may switch to their own on the dashboard) or only their own sales
+                Radio::make('financial_scope')
+                    ->label('財務分析の範囲')
+                    ->options([User::FINANCE_OVERALL => '全体', User::FINANCE_PERSONAL => '個人のみ'])
+                    ->default(User::FINANCE_OVERALL)
+                    ->required()
+                    ->inline()
+                    ->visible(fn (Get $get): bool => (bool) $get('show_financial_analysis'))
                     ->columnSpanFull(),
             ]);
     }
