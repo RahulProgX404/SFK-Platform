@@ -37,7 +37,8 @@ use Modules\Core\Models\Space;
  * - the header: ダッシュボード, 全体 | 個人 (page filter `scope`, users whose 財務分析の範囲 is 全体; whose money the cards
  *   show), the period (date button: presets or two dates — the page filters `from` / `to` every card
  *   follows, last 30 days at first) and 新規作成 (the apps of config('<panel>.dashboard.create') the user may add records
- *   to: a menu, the page itself when there is one, disabled when there is none);
+ *   to: a menu, the page itself when there is one, disabled when there is none; an app adding records in a panel
+ *   (AppResource::quickCreateComponent, e.g. 08. 日報入力) opens it over the dashboard);
  * - the cards: the widgets the business modules give the panel, in a 12-column grid (each says its width);
  * - アプリ (the button of the top bar, ErpPanelProvider): a panel over the whole screen with a search box, the スペース,
  *   よく使うアプリ (the five apps the user opens most, AppUsageLog) and the apps — in the user's own order, which they
@@ -157,22 +158,46 @@ final class PortalPage extends Dashboard
     }
 
     /**
-     * 新規作成: the apps of the dashboard's setting the user may add records to, label => new-record page.
+     * 新規作成: the apps of the dashboard's setting the user may add records to, label => their new-record page and, for
+     * an app adding records in a panel (quickCreateComponents()), its code — 新規作成 opens that panel here.
      *
-     * @return array<string, string>
+     * @return array<string, array{url: string, app: string|null}>
      */
     public function createItems(): array
     {
         $panel = Filament::getCurrentOrDefaultPanel();
+        $quick = $this->quickCreateComponents();
         $items = [];
         foreach ((array) config($panel->getId().'.dashboard.create', []) as $code => $label) {
             $url = AppResource::createUrlForApp((string) $code, $panel);
             if ($url !== null) {
-                $items[(string) $label] = $url;
+                $items[(string) $label] = ['url' => $url, 'app' => array_key_exists((string) $code, $quick) ? (string) $code : null];
             }
         }
 
         return $items;
+    }
+
+    /**
+     * The quick-create panels of the 新規作成 apps the user may add records to (AppResource::quickCreateComponent), app
+     * code => component; drawn on the dashboard, closed until 新規作成 opens one.
+     *
+     * @return array<string, class-string>
+     */
+    public function quickCreateComponents(): array
+    {
+        $panel = Filament::getCurrentOrDefaultPanel();
+        $components = [];
+        foreach (array_keys((array) config($panel->getId().'.dashboard.create', [])) as $code) {
+            $resource = AppResource::forCode((string) $code);
+            $component = $resource !== null && in_array($resource, $panel->getResources(), true) && ! $resource::hasPage('create') && $resource::canCreate()
+                ? $resource::quickCreateComponent() : null;
+            if ($component !== null) {
+                $components[(string) $code] = $component;
+            }
+        }
+
+        return $components;
     }
 
     /**

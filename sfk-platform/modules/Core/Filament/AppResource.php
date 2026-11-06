@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Filament;
 
 use App\Models\User;
+use Closure;
 use Filament\Facades\Filament;
 use Filament\Panel;
 use Filament\Resources\Resource;
@@ -76,11 +77,53 @@ abstract class AppResource extends Resource
     {
         foreach ($panel->getResources() as $resource) {
             if (is_subclass_of($resource, self::class) && $resource::appCode() === $appCode) {
-                return $resource::hasPage('create') && $resource::canCreate() ? $resource::getUrl('create', $parameters, panel: $panel->getId()) : null;
+                return $resource::newRecordUrl($parameters, $panel->getId());
             }
         }
 
         return null;
+    }
+
+    /**
+     * Livewire component (class) of an app that adds records in a panel over the screen instead of a create page (e.g.
+     * 08. 日報入力). Core then opens it from 新規, the dashboard's 新規作成 (event QUICK_CREATE_EVENT with the app code)
+     * and the list's ?new=1 (再利用: ?new=1&duplicate=<id>); the component is mounted with `app`, `open` and `duplicate`.
+     *
+     * @return class-string|null
+     */
+    public static function quickCreateComponent(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * The app as one screen (e.g. the 製袋予定表 of 12): its list shows only its first view — no 一覧 tabs, no 絞り込む, no
+     * toolbar — and ⚙ (administrators) sits in the header in place of 新規 with アプリの権限 only, on every screen of the app.
+     */
+    public static function isSingleScreen(): bool
+    {
+        return false;
+    }
+
+    /** Browser event opening an app's quick-create panel, detail { app: <app code> }. */
+    public const QUICK_CREATE_EVENT = 'sfk-quick-create';
+
+    /**
+     * Where a new record of this app is added: its create page, else its list opening the quick-create panel
+     * (?new=1); null when it has neither or the user may not add records.
+     *
+     * @param  array<string, mixed>  $parameters  query of the page (e.g. duplicate)
+     */
+    public static function newRecordUrl(array $parameters = [], ?string $panel = null): ?string
+    {
+        if (! static::canCreate()) {
+            return null;
+        }
+        if (static::hasPage('create')) {
+            return static::getUrl('create', $parameters, panel: $panel);
+        }
+
+        return static::quickCreateComponent() !== null ? static::getUrl('index', ['new' => 1, ...$parameters], panel: $panel) : null;
     }
 
     /**
@@ -154,6 +197,21 @@ abstract class AppResource extends Resource
     public static function canDelete(Model $record): bool
     {
         return static::appCan(AppAbility::Delete) && static::recordAllows($record, RecordAccess::DELETE);
+    }
+
+    /**
+     * The record of a URL (/{record}): a key that is no whole number is no record of an app with numeric ids — e.g.
+     * /create of an app without a create page (12. 製袋予定管理, 08. 日報入力) — so 404, not a database error (PostgreSQL
+     * rejects 'create' for a bigint).
+     */
+    public static function resolveRecordRouteBinding(int|string $key, ?Closure $modifyQuery = null): ?Model
+    {
+        $model = app(static::getModel());
+        if ($model->getKeyType() === 'int' && static::getRecordRouteKeyName() === null && ! ctype_digit((string) $key)) {
+            return null;
+        }
+
+        return parent::resolveRecordRouteBinding($key, $modifyQuery);
     }
 
     /** The records of the app the user may see: the レコードのアクセス権 narrow the query (RecordAccess::scope()). */

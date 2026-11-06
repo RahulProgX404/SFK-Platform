@@ -1142,6 +1142,11 @@
         @endforeach
     </div>
 
+    {{-- 新規作成 of an app adding records in a panel over the screen (PortalPage::quickCreateComponents) --}}
+    @foreach ($this->quickCreateComponents() as $quickApp => $quickComponent)
+        @livewire($quickComponent, ['app' => $quickApp], key('sfk-quick-create-'.$quickApp))
+    @endforeach
+
     {{-- アプリ: opened by the button of the top bar (core::filament.app-launcher-button) --}}
     <div class="sfk-apps" role="dialog" aria-modal="true" aria-labelledby="sfk-apps-title" x-data="{ open: false, q: '' }"
         x-show="open" x-cloak x-on:sfk-open-apps.window="open = true; setTimeout(() => $refs.q.focus(), 50)"

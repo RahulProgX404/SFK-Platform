@@ -43,7 +43,7 @@ final class DailyReportsTable
 
     /** 日報一覧 */
     public const LIST_COLUMNS = ['worked_on', 'user_id', 'order_id', 'product_name', 'machine_id', 'cardboard_id', 'cardboard_used', 'glue', 'glue_cost',
-        'started_at', 'ended_at', 'changeover_minutes', 'overtime_started_at', 'overtime_ended_at', 'changeover_count', 'produced', 'crew', 'per_person',
+        'started_at', 'ended_at', 'changeover_minutes', 'work_type', 'changeover_count', 'produced', 'crew', 'per_person',
         'quality_checks', 'gloves', 'damaged_before', 'damaged_after', 'difficulty', 'notes'];
 
     /** The legacy （すべて） order. */
@@ -53,8 +53,8 @@ final class DailyReportsTable
         'gloves', 'damaged_before', 'damaged_after', 'current_status', 'new_status', 'difficulty', 'notes', 'work_hours', 'machine_code', 'processing_rate',
         'changeover_rate', 'handwork_rate', 'machine_rate', 'printing_rate', 'plate_change_rate', 'ink_mixing_rate', 'machine_fee', 'sheet_fee', 'changeover_fee',
         'internal_cost', 'cardboard_cost', 'update_status', 'break_time', 'partition_stock', 'partition_used', 'partition_cost', 'partition_stock_after',
-        'cardboard_id', 'partition_id', 'manufacturing_sales', 'sheet_and_changeover_fee', 'overtime_started_at', 'overtime_ended_at', 'overtime_break', 'day_type',
-        'overtime_hours', 'overtime_labor_cost', 'overtime_rate'];
+        'cardboard_id', 'partition_id', 'manufacturing_sales', 'sheet_and_changeover_fee', 'day_type', 'work_type', 'overtime_hours', 'overtime_labor_cost',
+        'overtime_rate'];
 
     /** Rates and money figures: administrators only. */
     private const COST_COLUMNS = ['work_rate', 'labor_cost', 'processing_rate', 'changeover_rate', 'handwork_rate', 'machine_rate', 'printing_rate',
@@ -64,7 +64,8 @@ final class DailyReportsTable
     /** Calculated columns => their SQL (sorting). */
     private const EXPRESSIONS = [
         'labor_cost' => 'daily_reports.work_rate * daily_reports.work_hours',
-        'machine_fee' => 'daily_reports.machine_rate * daily_reports.work_hours',
+        // the machine runs the 残業時間 of a 残業 task (TaskCosting::hours)
+        'machine_fee' => "daily_reports.machine_rate * (case when daily_reports.work_type = '残業' then daily_reports.overtime_hours else daily_reports.work_hours end)",
         'sheet_fee' => 'daily_reports.produced * daily_reports.processing_rate',
         'changeover_fee' => 'daily_reports.changeover_rate * daily_reports.changeover_count',
         'sheet_and_changeover_fee' => 'coalesce(daily_reports.produced * daily_reports.processing_rate, 0) + coalesce(daily_reports.changeover_rate * daily_reports.changeover_count, 0)',
@@ -146,6 +147,7 @@ final class DailyReportsTable
             FilterField::number('produced', $label('produced')),
             FilterField::number('crew', $label('crew')),
             FilterField::choice('day_type', $label('day_type'), ProductionChoices::options(ProductionChoices::DAY_TYPES)),
+            FilterField::choice('work_type', $label('work_type'), ProductionChoices::options(ProductionChoices::WORK_TYPES)),
             FilterField::number('damaged_before', $label('damaged_before')),
             FilterField::number('damaged_after', $label('damaged_after')),
             FilterField::choice('new_status', $label('new_status'), OrderChoices::options(OrderChoices::STATUSES)),
@@ -178,9 +180,7 @@ final class DailyReportsTable
             InlineField::number('produced', 4)->required(),
             InlineField::number('crew', 4)->required()->minValue(1),
             InlineField::select('day_type', ProductionChoices::options(ProductionChoices::DAY_TYPES))->required(),
-            InlineField::time('overtime_started_at'),
-            InlineField::time('overtime_ended_at'),
-            InlineField::time('overtime_break'),
+            InlineField::select('work_type', ProductionChoices::options(ProductionChoices::WORK_TYPES))->required(),
             InlineField::checkboxes('quality_checks', ProductionChoices::options(ProductionChoices::QUALITY_CHECKS))->required(),
             InlineField::checkbox('gloves', ProductionChoices::GLOVES),
             InlineField::number('damaged_before', 4)->required(),
@@ -250,7 +250,7 @@ final class DailyReportsTable
             'per_person' => $number(fn (DailyReport $record): ?int => TaskCosting::perPerson($record->produced, $record->crew))
                 ->sortable(query: $expression(self::EXPRESSIONS['per_person'])),
             'work_hours', 'overtime_hours' => $column->alignEnd()->formatStateUsing(fn (mixed $state): string => AppFormat::number($state)),
-            'started_at', 'ended_at', 'break_time', 'overtime_started_at', 'overtime_ended_at', 'overtime_break' => $column->state($time),
+            'started_at', 'ended_at', 'break_time' => $column->state($time),
             'quality_checks' => $column->state(fn (DailyReport $record): ?string => implode('、', (array) $record->quality_checks) ?: null),
             'gloves' => $column->state(fn (DailyReport $record): ?string => $record->gloves ? ProductionChoices::GLOVES : null),
             'update_status' => $column->state(fn (DailyReport $record): ?string => $record->update_status ? ProductionChoices::UPDATE_STATUS : null),
@@ -258,7 +258,7 @@ final class DailyReportsTable
                 ->sortable(query: $expression(self::EXPRESSIONS[$name])),
             'overtime_labor_cost' => $price(fn (DailyReport $record): string => TaskCosting::product($record->overtime_hours, AppFormat::text($record->overtime_rate)))
                 ->sortable(query: $expression(self::EXPRESSIONS[$name])),
-            'machine_fee' => $price(fn (DailyReport $record): string => TaskCosting::product($record->machine_rate, $record->work_hours))
+            'machine_fee' => $price(fn (DailyReport $record): string => TaskCosting::product($record->machine_rate, DailyReportLayout::machineHours($record)))
                 ->sortable(query: $expression(self::EXPRESSIONS[$name])),
             'sheet_fee' => $price($sheetFee)->sortable(query: $expression(self::EXPRESSIONS[$name])),
             'changeover_fee' => $price($changeoverFee)->sortable(query: $expression(self::EXPRESSIONS[$name])),

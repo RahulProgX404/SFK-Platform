@@ -3,7 +3,8 @@
     add-invoice.png): only the app name — on a list after the home link, on a record / form after ← (back to the list) —
     with (i) opening the app's description in a popup. The breadcrumb home › app (› step) stays on every screen.
     list: エクスポート (帳票出力) and 新規 on the right; the summary cards (summaryCards()); the 一覧 as tabs; the toolbar
-          of a view without a table (calendar / custom).
+          of a view without a table (calendar / custom). An app of one screen (AppResource::isSingleScreen): ⚙ in place
+          of 新規, no tabs, no 絞り込む, no toolbar.
     view: 編集, 再利用, 「…」 (印刷・削除), エクスポート, ⚙ and ‹ › on the right; the app's legacy buttons under the name.
     create / edit: nothing more (キャンセル / 保存 are in the footer of the form).
     settings: the tabs of アプリの設定.
@@ -74,8 +75,12 @@
                 @if ($export)
                     @include('core::filament.app-export', ['export' => $export])
                 @endif
-                @if ($chrome['create_url'])
-                    <a href="{{ $chrome['create_url'] }}" class="sfk-app-new" title="レコードを追加する">
+                @if ($chrome['single_screen'])
+                    {{-- an app of one screen: ⚙ (アプリの権限) in place of 新規 --}}
+                    @include('core::filament.app-settings-menu', ['chrome' => $chrome])
+                @elseif ($chrome['create_url'])
+                    <a href="{{ $chrome['create_url'] }}" class="sfk-app-new" title="レコードを追加する"
+                        @if ($chrome['create_app']) x-on:click.prevent="$dispatch(@js(\Modules\Core\Filament\AppResource::QUICK_CREATE_EVENT), { app: @js($chrome['create_app']) })" @endif>
                         <x-filament::icon :icon="Heroicon::PlusCircle" class="sfk-app-new-icon" />
                         <span>新規</span>
                     </a>
@@ -142,7 +147,7 @@
             @include('core::filament.app-summary', ['cards' => $cards])
         @endif
 
-        @if (count($views = $page->allListViews()) > 1)
+        @if (! $chrome['single_screen'] && count($views = $page->allListViews()) > 1)
             <nav class="sfk-app-tabs" aria-label="一覧">
                 @foreach ($views as $key => $label)
                     <button type="button" wire:click="$set('listView', @js((string) $key))"
@@ -152,11 +157,11 @@
             </nav>
         @endif
 
-        @if ($page->filterFields() !== [])
+        @if (! $chrome['single_screen'] && $page->filterFields() !== [])
             @include('core::filament.app-filter', ['page' => $page])
         @endif
 
-        @unless ($page->currentView()->isTable())
+        @unless ($chrome['single_screen'] || $page->currentView()->isTable())
             @include('core::filament.app-list-tools', ['page' => $page, 'part' => 'bar'])
         @endunless
     @elseif ($kind === 'settings')

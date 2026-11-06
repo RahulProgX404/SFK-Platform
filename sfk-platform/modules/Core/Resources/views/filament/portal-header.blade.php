@@ -3,10 +3,12 @@
     全体 | 個人 (whose money the cards show; users whose 財務分析の範囲 is 全体), the period (a date button: presets or
     two dates) and 新規作成 (a menu of the apps the user may add records to — the page itself when there is one,
     disabled when there is none).
-    $from, $to: Y-m-d; $scope: overall | personal; $switchesScope: bool; $createItems: label => url
+    $from, $to: Y-m-d; $scope: overall | personal; $switchesScope: bool; $createItems: label => [url, app] (app: the quick-create panel it opens on the dashboard, AppResource::QUICK_CREATE_EVENT)
 --}}
 @php
     use Illuminate\Support\Carbon;
+    use Illuminate\Support\Js;
+    use Modules\Core\Filament\AppResource;
 
     $label = Carbon::parse($from)->format('Y/m/d').' 〜 '.Carbon::parse($to)->format('Y/m/d');
     $presets = ['today' => '今日', '7d' => '過去7日間', '30d' => '過去30日間', 'month' => '今月', 'lastMonth' => '先月', 'year' => '今年'];
@@ -54,7 +56,9 @@
         </x-filament::dropdown>
 
         @if (count($createItems) === 1)
-            <a href="{{ reset($createItems) }}" class="sfk-dash-create">
+            @php($item = reset($createItems))
+            <a href="{{ $item['url'] }}" class="sfk-dash-create"
+                @if ($item['app']) x-on:click.prevent="$dispatch({{ Js::from(AppResource::QUICK_CREATE_EVENT) }}, { app: {{ Js::from($item['app']) }} })" @endif>
                 <x-filament::icon icon="heroicon-m-plus-circle" class="sfk-dash-create-icon" />
                 <span>新規作成</span>
             </a>
@@ -73,8 +77,13 @@
                     </button>
                 </x-slot>
                 <x-filament::dropdown.list>
-                    @foreach ($createItems as $itemLabel => $url)
-                        <x-filament::dropdown.list.item tag="a" :href="$url" icon="heroicon-o-document-plus">{{ $itemLabel }}</x-filament::dropdown.list.item>
+                    @foreach ($createItems as $itemLabel => $item)
+                        @if ($item['app'])
+                            <x-filament::dropdown.list.item tag="a" :href="$item['url']" icon="heroicon-o-document-plus"
+                                x-on:click.prevent="close(); $dispatch({{ Js::from(AppResource::QUICK_CREATE_EVENT) }}, { app: {{ Js::from($item['app']) }} })">{{ $itemLabel }}</x-filament::dropdown.list.item>
+                        @else
+                            <x-filament::dropdown.list.item tag="a" :href="$item['url']" icon="heroicon-o-document-plus">{{ $itemLabel }}</x-filament::dropdown.list.item>
+                        @endif
                     @endforeach
                 </x-filament::dropdown.list>
             </x-filament::dropdown>

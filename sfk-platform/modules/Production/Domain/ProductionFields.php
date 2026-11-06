@@ -44,6 +44,7 @@ final class ProductionFields
         'crew' => '作業人数',
         'per_person' => '人数割',
         'day_type' => '日種別',
+        'work_type' => '勤務種別',
         'overtime_started_at' => '残業開始時間(24H)',
         'overtime_ended_at' => '残業終了時間(24H)',
         'overtime_break' => '休憩時間(残業)',
@@ -89,6 +90,9 @@ final class ProductionFields
     ];
 
     public const SCHEDULE = [
+        'scheduled_on' => '日付',
+        'person_initial' => '担当者',
+        'highlight_color' => 'ハイライト',
         'starts_at' => '開始日時',
         'ends_at' => '終了日時',
         'machine_id' => '機械名',

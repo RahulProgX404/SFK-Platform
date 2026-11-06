@@ -2,6 +2,7 @@
     /** @var \App\Models\User $user */
     /** @var list<\Modules\Core\Http\Portal\DashboardEntry> $dashboards */
     /** @var list<array{dashboard: string, html: string|null, edit_url: string|null}> $notices */
+    /** @var string|null $keyboardUrl Space / Enter opens this dashboard (白石封筒) */
     $icons = [
         'erp' => '<path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />',
         'settings' => '<path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />',
@@ -315,4 +316,28 @@
             setInterval(tick, 15000)
         })()
     </script>
+
+    @if ($keyboardUrl !== null)
+        {{-- Space / Enter opens 白石封筒 (the main dashboard) — not while a link, button or field has the focus (they keep
+             their own Enter / Space), nor with a modifier key, a held-down key or while typing Japanese (IME).
+             Every statement ends with ";": PHP drops the line break after the URL printed by @js. --}}
+        <script>
+            (() => {
+                const url = @js($keyboardUrl);
+                const own = 'a[href], button, input, textarea, select, summary, label, [contenteditable]:not([contenteditable="false"]), [role="button"], [role="link"], [role="menuitem"], [role="textbox"]';
+                let opening = false;
+                window.addEventListener('pageshow', () => { opening = false; });
+                document.addEventListener('keydown', (event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return;
+                    if (opening || event.defaultPrevented || event.repeat || event.isComposing || event.keyCode === 229) return;
+                    if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+                    const target = event.target instanceof Element ? event.target : null;
+                    if (target && target !== document.body && target.closest(own)) return;
+                    event.preventDefault();
+                    opening = true;
+                    window.location.assign(url);
+                });
+            })();
+        </script>
+    @endif
 </x-core::layouts.account>

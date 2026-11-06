@@ -104,6 +104,18 @@ abstract class AppListRecords extends ListRecords
     #[Url(as: 'month')]
     public string $calendarMonth = '';
 
+    /** ?new=1: the app's quick-create panel opens with the list (AppResource::newRecordUrl) */
+    #[Url(as: 'new')]
+    public ?string $newRecord = null;
+
+    /** ?duplicate=<id> with ?new=1: レコードを再利用する in the quick-create panel */
+    #[Url(as: 'duplicate')]
+    public ?string $duplicateRecord = null;
+
+    /** ?created=<id>: the record just added in the quick-create panel, marked in the list */
+    #[Url(as: 'created')]
+    public ?string $createdRecord = null;
+
     /** @var array<string, mixed>|null 適用 conditions (RecordFilter::toArray()); null = those of the view */
     #[Session]
     public ?array $appFilter = null;
@@ -299,6 +311,11 @@ abstract class AppListRecords extends ListRecords
 
     public function currentView(): ListView
     {
+        // an app of one screen shows its first view only (AppResource::isSingleScreen)
+        if ($this->appResource()::isSingleScreen()) {
+            return $this->listViews()[0];
+        }
+
         foreach ($this->listViews() as $view) {
             if ($view->key === $this->listView) {
                 return $view;
@@ -383,7 +400,25 @@ abstract class AppListRecords extends ListRecords
             ->searchPlaceholder(fn (): string => ($label = $this->searchColumnOptions()[$this->activeSearchColumn() ?? ''] ?? null) !== null ? $label.'で検索' : '検索')
             ->searchDebounce('300ms')
             // no 列 chooser: the columns of a list are set by its 一覧 (アプリの設定 → 一覧)
-            ->columnManager(false);
+            ->columnManager(false)
+            ->recordClasses(fn (Model $record): ?string => $this->createdRecord !== null && (string) $record->getKey() === $this->createdRecord ? 'sfk-row-created' : null);
+    }
+
+    /**
+     * The app's quick-create panel under the list (AppResource::quickCreateComponent), opened by 新規 and ?new=1; null when
+     * the app has a create page or the user may not add records.
+     *
+     * @return array{component: class-string, params: array{app: string, open: bool, duplicate: string|null}}|null
+     */
+    public function quickCreate(): ?array
+    {
+        $resource = $this->appResource();
+        $component = $resource::quickCreateComponent();
+        if ($component === null || $resource::hasPage('create') || ! $resource::canCreate()) {
+            return null;
+        }
+
+        return ['component' => $component, 'params' => ['app' => $resource::appCode(), 'open' => filled($this->newRecord), 'duplicate' => $this->duplicateRecord]];
     }
 
     /**
@@ -849,7 +884,7 @@ abstract class AppListRecords extends ListRecords
 
     public function getFooter(): View
     {
-        return view('core::filament.app-pager', ['page' => $this]);
+        return view('core::filament.app-list-footer', ['page' => $this]);
     }
 
     public function calendarMonthStart(): CarbonImmutable

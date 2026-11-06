@@ -14,7 +14,8 @@ use Modules\Production\Domain\ProductionChoices;
 use Modules\Production\Models\BagSchedule;
 
 /**
- * Takes over 12. 製袋予定管理 (legacy app 17, SYSTEM_BRAIN APP_12, BP-04): 製袋予定ID kept, 開始 / 終了日時, 機械 (by its
+ * Takes over 12. 製袋予定管理 (legacy app 17, SYSTEM_BRAIN APP_12, BP-04): 製袋予定ID kept, 開始 / 終了日時 (the day of
+ * 開始日時 is the schedule's 日付 on the 製袋予定表), 機械 (by its
  * 機械レコード番号, 03 taken over before), 使用状況, 部数, 備考 and the job by its 注番 (04 taken over before).
  *
  * The legacy app kept 品名(フリー) on schedules entered 「受注から注番を取得」 without a job; the new one keeps only the
@@ -65,8 +66,10 @@ final class LegacyBagScheduleImport implements LegacyImporter
                 }
 
                 $updatedBy = $this->users->id($record->modifier());
+                $startsAt = $record->dateTime('開始日時');
                 [$id, $created] = $this->rows->save('bag_schedules', $record->id(), [
-                    'starts_at' => $record->dateTime('開始日時'),
+                    'scheduled_on' => $startsAt !== null ? substr($startsAt, 0, 10) : null,
+                    'starts_at' => $startsAt,
                     'ends_at' => $record->dateTime('終了日時'),
                     'machine_id' => $machineId,
                     'usage_status' => $log->choice($record->text('使用状況'), array_keys(ProductionChoices::USAGE_STATUSES), $label, '使用状況'),

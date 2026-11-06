@@ -54,7 +54,8 @@
         --sfk-page: #f5f7fa;
         --sfk-head: #f8f9fb;
         /* the header row of the tables: a little darker than the other grey grounds (bug.md, 2026-11-04) */
-        --sfk-table-head: #eef1f5;
+        --sfk-table-head: #868686;
+        --sfk-table-body: #eef1f5;
         /* the header row of the app lists (index pages): dark with white text, like the tables of a record
            (user, 2026-11-05) */
         --sfk-list-head: var(--sfk-table-head-dark);
@@ -2300,7 +2301,7 @@
     .sfk-record-tab-table th button {
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        /* justify-content: space-between; */
         gap: 8px;
         width: 100%;
         padding: 12px 16px;
@@ -2311,7 +2312,7 @@
     .sfk-record-tab-sort {
         width: 14px;
         height: 14px;
-        color: var(--sfk-subtle);
+
     }
 
     .sfk-record-tab-table td {
@@ -2618,6 +2619,11 @@
     .fi-ta-row.fi-selected>td,
     .fi-ta-row:has(.fi-ta-record-checkbox:checked)>td {
         background-color: var(--sfk-primary-soft);
+    }
+
+    /* the record just added in an app's quick-create panel (?created=) */
+    .fi-ta-row.sfk-row-created>td {
+        background-color: var(--sfk-success-soft);
     }
 
     /* sort marks: quiet until the column is sorted or the header is pointed at */

@@ -9,6 +9,7 @@ enum NavigationGroup: string
 {
     case Users = 'ユーザー管理';
     case Apps = 'アプリ管理';
+    case Company = '会社設定';
 
     /** @return list<string> */
     public static function labels(): array

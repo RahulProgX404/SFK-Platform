@@ -22,31 +22,25 @@ use Modules\MasterData\Models\Machine;
 use Modules\MasterData\Models\Partner;
 use Modules\Orders\Models\Order;
 use Modules\Production\Domain\ProductionChoices;
-use Modules\Production\Domain\Schedules\GanttChart;
+use Modules\Production\Domain\Schedules\ScheduleBoard;
 use Modules\Production\Filament\Resources\BagSchedules\BagScheduleLayout;
 use Modules\Production\Filament\Resources\BagSchedules\BagScheduleResource;
 use Modules\Production\Models\BagSchedule;
 
 /**
- * Record list of 12. 製袋予定管理 with the legacy views (SYSTEM_BRAIN APP_12 views.md): 日次 / 週次 / 月次 / 年次ガントチャート
- * (カスタマイズ形式, ListBagSchedules) and 帳票出力用(テスト) (使用状況 not 完了, by 機械コード — the list printed as the
- * schedule); （すべて） shows columns() in order, the list is by 機械コード and 開始日時. インライン編集 changes 使用状況, 部数
- * and 備考.
+ * Record list of 12. 製袋予定管理: the view 製袋予定表 (カスタマイズ形式, the board of production-schedule.js) and the
+ * legacy 帳票出力用(テスト) (使用状況 not 完了, by 機械コード — the list printed as the schedule, SYSTEM_BRAIN APP_12
+ * views.md); （すべて） shows columns() in order, the list is by 日付 and 機械コード. インライン編集 changes 担当者, 部数 and
+ * 備考.
  */
 final class BagSchedulesTable
 {
+    public const VIEW_BOARD = 'board';
+
     public const VIEW_PRINT = 'print';
 
-    public const PRINT_COLUMNS = ['machine_id', 'usage_status', 'order_number_p', 'customer', 'product_name_p', 'copies', 'brought_on', 'brought_by', 'delivered_on',
-        'flap_glue', 'order_notes'];
-
-    /** Gantt view names by scale. */
-    public const GANTT_VIEWS = [
-        GanttChart::DAY => '日次ガントチャート',
-        GanttChart::WEEK => '週次ガントチャート',
-        GanttChart::MONTH => '月次ガントチャート',
-        GanttChart::YEAR => '年次ガントチャート',
-    ];
+    public const PRINT_COLUMNS = ['scheduled_on', 'machine_id', 'usage_status', 'order_number_p', 'customer', 'product_name_p', 'copies', 'person_initial', 'brought_on',
+        'brought_by', 'delivered_on', 'flap_glue', 'order_notes'];
 
     /**
      * Every column (name => label), in the order of the legacy （すべて）.
@@ -56,7 +50,8 @@ final class BagSchedulesTable
     public static function columns(): array
     {
         $columns = [];
-        foreach (['id', 'starts_at', 'ends_at', 'usage_status', 'machine_id', 'order_id', 'product_name', 'copies', 'notes', 'free_product_name', 'machine_code',
+        foreach (['id', 'scheduled_on', 'machine_id', 'person_initial', 'order_id', 'product_name', 'copies', 'notes', 'highlight_color', 'starts_at', 'ends_at',
+            'usage_status', 'free_product_name', 'machine_code',
             'free_order_number', 'entry_mode', 'brought_on', 'delivered_on', 'order_notes', 'customer', 'quantity', 'brought_by', 'die_cut', 'window', 'flap_glue',
             'order_number_p', 'product_name_p', 'created_at'] as $name) {
             $columns[$name] = BagScheduleLayout::label($name);
@@ -68,10 +63,7 @@ final class BagSchedulesTable
     /** @return list<ListView> */
     public static function defaultViews(): array
     {
-        $views = [];
-        foreach (self::GANTT_VIEWS as $scale => $name) {
-            $views[] = ListView::custom('gantt-'.$scale, $name, 'gantt-'.$scale);
-        }
+        $views = [ListView::custom(self::VIEW_BOARD, '製袋予定表', self::VIEW_BOARD)];
         $views[] = ListView::table(self::VIEW_PRINT, '帳票出力用(テスト)', self::PRINT_COLUMNS, [],
             [['field' => 'usage_status', 'operator' => FilterOperator::NotIn->value, 'values' => ['完了']]]);
 
@@ -88,8 +80,8 @@ final class BagSchedulesTable
             ->columns([
                 ...array_map(fn (string $name): AppTextColumn => self::column($name), $names),
             ])
-            // like the schedule print: by machine, then by time
-            ->defaultSort(fn (Builder $query): Builder => $query->orderBy(self::machineColumn('code'))->orderBy('bag_schedules.starts_at'))
+            // like the schedule print: by day, then by machine
+            ->defaultSort(fn (Builder $query): Builder => $query->orderBy('bag_schedules.scheduled_on')->orderBy(self::machineColumn('code'))->orderBy('bag_schedules.id'))
             ->recordActions(AppRecordActions::make(BagScheduleResource::class))
             ->emptyStateIcon(Heroicon::OutlinedChartBar)
             ->emptyStateHeading('製袋予定がありません');
@@ -105,17 +97,21 @@ final class BagSchedulesTable
         $label = fn (string $name): string => BagScheduleLayout::label($name);
 
         return [
-            FilterField::dateTime('starts_at', $label('starts_at')),
-            FilterField::dateTime('ends_at', $label('ends_at')),
+            FilterField::date('scheduled_on', $label('scheduled_on')),
             FilterField::choice('machine_id', $label('machine_id'), fn (): array => Machine::query()->orderByDesc('id')->pluck('name', 'id')
                 ->mapWithKeys(fn (string $name, int|string $id): array => [(string) $id => $name])->all()),
-            FilterField::choice('usage_status', $label('usage_status'), ProductionChoices::options(array_keys(ProductionChoices::USAGE_STATUSES))),
-            FilterField::choice('entry_mode', $label('entry_mode'), ProductionChoices::options([ProductionChoices::ENTRY_FROM_ORDER, ProductionChoices::ENTRY_FREE])),
+            FilterField::text('person_initial', $label('person_initial')),
             FilterField::text('order_id', $label('order_id'))->query(self::filterOrderNumber(...)),
-            FilterField::text('free_order_number', $label('free_order_number')),
-            FilterField::text('free_product_name', $label('free_product_name')),
+            FilterField::text('product_name', $label('product_name')),
             FilterField::number('copies', $label('copies')),
             FilterField::text('notes', $label('notes')),
+            FilterField::choice('highlight_color', $label('highlight_color'), ScheduleBoard::HIGHLIGHTS),
+            FilterField::dateTime('starts_at', $label('starts_at')),
+            FilterField::dateTime('ends_at', $label('ends_at')),
+            FilterField::choice('usage_status', $label('usage_status'), ProductionChoices::options(array_keys(ProductionChoices::USAGE_STATUSES))),
+            FilterField::choice('entry_mode', $label('entry_mode'), ProductionChoices::options([ProductionChoices::ENTRY_FROM_ORDER, ProductionChoices::ENTRY_FREE])),
+            FilterField::text('free_order_number', $label('free_order_number')),
+            FilterField::text('free_product_name', $label('free_product_name')),
             FilterField::number('id', $label('id')),
             FilterField::user('created_by', $label('creator')),
             FilterField::dateTime('created_at', $label('created_at')),
@@ -128,9 +124,8 @@ final class BagSchedulesTable
     public static function inlineFields(): array
     {
         return [
-            InlineField::select('usage_status', ProductionChoices::options(array_keys(ProductionChoices::USAGE_STATUSES))),
+            InlineField::text('person_initial')->maxLength(40),
             InlineField::number('copies', 4)->minValue(0)->maxValue(999999999999),
-            InlineField::text('notes')->maxLength(255),
         ];
     }
 
@@ -144,7 +139,9 @@ final class BagSchedulesTable
         );
 
         return match (true) {
-            in_array($name, ['free_order_number', 'free_product_name', 'notes'], true) => $column->searchable(),
+            in_array($name, ['free_order_number', 'free_product_name', 'notes', 'person_initial'], true) => $column->searchable(),
+            $name === 'scheduled_on' => $column->date('Y-m-d'),
+            $name === 'highlight_color' => $column->formatStateUsing(fn (?string $state): string => ScheduleBoard::HIGHLIGHTS[(string) $state] ?? ''),
             $name === 'starts_at', $name === 'ends_at', $name === 'created_at' => $column->dateTime('Y-m-d H:i'),
             $name === 'copies' => $column->alignEnd()->formatStateUsing(fn (mixed $state): string => AppFormat::number($state)),
             $name === 'machine_id' => $column->state(fn (BagSchedule $record): ?string => $record->machine?->name)->sortable(query: $machine('name')),
@@ -153,7 +150,7 @@ final class BagSchedulesTable
                 ->state(fn (BagSchedule $record): ?string => $record->order?->order_number)
                 ->searchable(query: SearchQuery::through('order', 'order_number'))
                 ->sortable(query: $order('order_number')),
-            $name === 'product_name' => $column->state(fn (BagSchedule $record): ?string => $record->order?->product_name)->sortable(query: $order('product_name')),
+            $name === 'product_name' => $column->state(fn (BagSchedule $record): ?string => $record->productName())->searchable(),
             $name === 'order_number_p' => $column->state(fn (BagSchedule $record): ?string => $record->orderNumber())
                 ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy(
                     Order::query()->selectRaw('coalesce(max(orders.order_number), bag_schedules.free_order_number)')->whereColumn('orders.id', 'bag_schedules.order_id'),

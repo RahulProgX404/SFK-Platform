@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace Modules\Production\Filament\Resources\BagSchedules;
 
 use App\Models\User;
-use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\Radio;
+use Closure;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
@@ -21,15 +23,18 @@ use Modules\Core\Filament\Support\UserPopup;
 use Modules\MasterData\Models\Machine;
 use Modules\Orders\Filament\Resources\Orders\OrderResource;
 use Modules\Orders\Models\Order;
-use Modules\Production\Domain\ProductionChoices;
+use Modules\Production\Application\Schedules\ProductionSchedule;
+use Modules\Production\Application\Schedules\SalesLookup;
 use Modules\Production\Domain\ProductionFields;
+use Modules\Production\Domain\Schedules\ScheduleBoard;
 use Modules\Production\Models\BagSchedule;
 
 /**
- * Form and record page of 12. 製袋予定管理 (fields of SYSTEM_BRAIN APP_12 fields.md), on a 12-column grid of the 1,500 px
- * canvas: 予定 (開始 / 終了日時, 機械名, 使用状況) and 内容 (入力方法, 部数, either 注番 — a job, its 品名 shown — or 注番(フリー) /
- * 品名(フリー) — the inputs of the other 入力方法 cannot be typed — and 備考). 開発者用フィールド shows the job's values the
- * schedule print uses.
+ * Form and record page of 12. 製袋予定管理 in the fields of the 製袋予定表 (production-schedule.js), on a 12-column grid of
+ * the 1,500 px canvas: 予定 (日付, 機械名 — a line of the board —, ハイライト) and 内容 (注番, 担当者, 部数, 品名, 備考 — one per
+ * line, up to 10). With a 注番, 担当者 / 品名 / 部数 come from 06. 売上入力 (shown when it is chosen, taken again when saved:
+ * Pages\Concerns\TakesSalesValues); without one 品名 and 部数 are required. 開発者用フィールド (super admins) shows the
+ * legacy 開始 / 終了日時, 使用状況, 入力方法 and free 注番 / 品名 and the job's values the schedule print uses.
  */
 final class BagScheduleLayout
 {
@@ -39,17 +44,17 @@ final class BagScheduleLayout
 
     private const MAIN = [
         '予定',
-        [['starts_at', 375], ['ends_at', 375], ['machine_id', 500], ['usage_status', 250]],
+        [['scheduled_on', 250], ['machine_id', 500], ['highlight_color', 250]],
         '内容',
-        [['entry_mode', 500], ['copies', 250]],
-        [['order_id', 375], ['product_name', 1125]],
-        [['free_order_number', 375], ['free_product_name', 1125]],
+        [['order_id', 375], ['person_initial', 375], ['copies', 250]],
+        [['product_name', 1500]],
         [['notes', 1500]],
     ];
 
     private const FOOTER = [[['id', 120], ['creator', 136], ['created_at', 196], ['updater', 136], ['updated_at', 196]]];
 
     private const DEVELOPER = [
+        [['starts_at', 193], ['ends_at', 193], ['usage_status', 193], ['entry_mode', 193], ['free_order_number', 193], ['free_product_name', 386]],
         [['machine_code', 193], ['order_number_p', 193], ['product_name_p', 193], ['customer', 193], ['quantity', 193]],
         [['brought_on', 117], ['brought_by', 193], ['delivered_on', 117], ['order_notes', 193], ['die_cut', 193], ['window', 193], ['flap_glue', 193], ['legacy_id', 193]],
     ];
@@ -89,24 +94,14 @@ final class BagScheduleLayout
     {
         $label = self::label($name);
         $order = fn (Get $get): ?Order => is_numeric($get('order_id')) ? Order::query()->with('customer')->find((int) $get('order_id')) : null;
-        $free = fn (Get $get): bool => $get('entry_mode') === ProductionChoices::ENTRY_FREE;
+        $ofOrder = fn (Get $get): bool => is_numeric($get('order_id'));
         $text = fn (callable $state): TextEntry => TextEntry::make($name)->label($label)->placeholder('')->state($state);
 
         return match (true) {
-            $name === 'starts_at' => DateTimePicker::make($name)->label($label)->seconds(false),
-            $name === 'ends_at' => DateTimePicker::make($name)->label($label)->seconds(false)->afterOrEqual('starts_at'),
-            $name === 'machine_id' => Select::make($name)
-                ->label($label)
-                ->relationship('machine', 'name', fn (Builder $query): Builder => $query->orderByDesc('id'))
-                ->searchable()
-                ->preload()
-                ->placeholder('-----')
-                ->live(),
-            $name === 'usage_status' => Select::make($name)->label($label)->placeholder('-----')
-                ->options(ProductionChoices::options(array_keys(ProductionChoices::USAGE_STATUSES)))->native(false),
-            $name === 'entry_mode' => Radio::make($name)->label($label)->inline()->required()->live()
-                ->options(ProductionChoices::options([ProductionChoices::ENTRY_FROM_ORDER, ProductionChoices::ENTRY_FREE]))
-                ->default(ProductionChoices::ENTRY_FROM_ORDER),
+            $name === 'scheduled_on' => DatePicker::make($name)->label($label)->required()->default(fn (): string => now()->toDateString()),
+            $name === 'machine_id' => Select::make($name)->label($label)->placeholder('-----')->required()->native(false)
+                ->options(fn (): array => self::lineOptions()),
+            $name === 'highlight_color' => Select::make($name)->label($label)->placeholder('なし')->native(false)->options(ScheduleBoard::HIGHLIGHTS),
             $name === 'order_id' => Select::make($name)
                 ->label($label)
                 ->relationship('order', 'order_number', fn (Builder $query): Builder => $query->orderByDesc('id'))
@@ -115,15 +110,31 @@ final class BagScheduleLayout
                 ->optionsLimit(100)
                 ->placeholder('-----')
                 ->live()
-                ->disabled($free),
-            $name === 'product_name' => $text(fn (Get $get): ?string => $order($get)?->product_name),
-            $name === 'free_order_number' => TextInput::make($name)->label($label)->maxLength(64)->disabled(fn (Get $get): bool => ! $free($get)),
-            $name === 'free_product_name' => TextInput::make($name)->label($label)->maxLength(255)->disabled(fn (Get $get): bool => ! $free($get)),
-            $name === 'copies' => TextInput::make($name)->label($label)->numeric()->step('any')->rule('decimal:0,4')->minValue(0)->maxValue(999999999999),
-            $name === 'notes' => TextInput::make($name)->label($label)->maxLength(255),
+                ->afterStateUpdated(function (mixed $state, Set $set): void {
+                    $sale = is_numeric($state) ? self::saleOf((int) $state) : null;
+                    if ($sale !== null) {
+                        $set('person_initial', $sale['person']);
+                        $set('product_name', $sale['product']);
+                        $set('copies', $sale['quantity']);
+                    }
+                }),
+            $name === 'person_initial' => TextInput::make($name)->label($label)->maxLength(40)->disabled($ofOrder),
+            $name === 'product_name' => TextInput::make($name)->label($label)->maxLength(120)->disabled($ofOrder)
+                ->required(fn (Get $get): bool => ! $ofOrder($get)),
+            $name === 'copies' => TextInput::make($name)->label($label)->numeric()->step('any')->rule('decimal:0,4')->minValue(0)->maxValue(999999999999)
+                ->disabled($ofOrder)->required(fn (Get $get): bool => ! $ofOrder($get)),
+            $name === 'notes' => Textarea::make($name)->label($label)->rows(3)
+                ->rule(fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
+                    $notes = array_filter(array_map(trim(...), preg_split('/\r\n|\r|\n/', (string) $value) ?: []), fn (string $note): bool => $note !== '');
+                    if (count($notes) > ScheduleBoard::MAX_NOTES) {
+                        $fail('備考は'.ScheduleBoard::MAX_NOTES.'件までです');
+                    } elseif (array_filter($notes, fn (string $note): bool => mb_strlen($note) > 40) !== []) {
+                        $fail('備考は1件40文字以内で入力してください');
+                    }
+                }),
             $name === 'machine_code' => $text(fn (Get $get): ?string => is_numeric($get('machine_id')) ? Machine::query()->whereKey((int) $get('machine_id'))->value('code') : null),
-            $name === 'order_number_p' => $text(fn (Get $get): ?string => $free($get) ? $get('free_order_number') : $order($get)?->order_number),
-            $name === 'product_name_p' => $text(fn (Get $get): ?string => $free($get) ? $get('free_product_name') : $order($get)?->product_name),
+            $name === 'order_number_p' => $text(fn (Get $get): ?string => $order($get)?->order_number),
+            $name === 'product_name_p' => $text(fn (Get $get): ?string => $get('product_name')),
             $name === 'customer' => $text(fn (Get $get): ?string => $order($get)?->customer?->name),
             isset(self::ORDER_VALUES[$name]) => $text(fn (Get $get): ?string => self::orderValue($order($get), $name)),
             $name === 'legacy_id' => TextInput::make($name)->label($label)->numeric()->integer()->minValue(1)->unique(ignoreRecord: true),
@@ -131,18 +142,40 @@ final class BagScheduleLayout
         };
     }
 
+    /** @return array<int, string> 機械名: the lines of the board (machine id => label) */
+    public static function lineOptions(): array
+    {
+        $options = [];
+        foreach (app(ProductionSchedule::class)->lines() as $line) {
+            $options[$line['machine']] = trim($line['label'].'　'.($line['subtitle'] ?? ''));
+        }
+
+        return $options;
+    }
+
+    /** @return array{order: Order, person: string, product: string, quantity: string|null}|null the 06. 売上入力 values of a job */
+    public static function saleOf(int $orderId): ?array
+    {
+        $number = Order::query()->whereKey($orderId)->value('order_number');
+
+        return is_string($number) ? app(SalesLookup::class)->find($number) : null;
+    }
+
     private static function entry(string $name): Component
     {
         $entry = TextEntry::make($name)->label(self::label($name))->placeholder('—');
 
         return match (true) {
+            $name === 'scheduled_on' => $entry->date('Y-m-d'),
             $name === 'starts_at', $name === 'ends_at' => $entry->dateTime('Y-m-d H:i'),
             $name === 'machine_id' => $entry->state(fn (BagSchedule $record): ?string => $record->machine?->name),
+            $name === 'highlight_color' => $entry->formatStateUsing(fn (?string $state): string => ScheduleBoard::HIGHLIGHTS[(string) $state] ?? ''),
+            $name === 'notes' => $entry->state(fn (BagSchedule $record): ?string => $record->noteList() !== [] ? implode('、', $record->noteList()) : null),
             $name === 'order_id' => $entry
-                ->state(fn (BagSchedule $record): ?string => $record->order?->order_number)
+                ->state(fn (BagSchedule $record): ?string => $record->orderNumber())
                 ->url(fn (BagSchedule $record): ?string => $record->order !== null && OrderResource::canView($record->order)
                     ? OrderResource::getUrl('view', ['record' => $record->order]) : null),
-            $name === 'product_name' => $entry->state(fn (BagSchedule $record): ?string => $record->order?->product_name),
+            $name === 'product_name' => $entry->state(fn (BagSchedule $record): ?string => $record->productName()),
             $name === 'copies' => $entry->formatStateUsing(fn (mixed $state): string => AppFormat::number($state)),
             $name === 'machine_code' => $entry->state(fn (BagSchedule $record): ?string => $record->machine?->code),
             $name === 'order_number_p' => $entry->state(fn (BagSchedule $record): ?string => $record->orderNumber()),

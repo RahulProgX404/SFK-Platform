@@ -14,6 +14,7 @@ use Filament\Enums\UserMenuPosition;
 use Filament\Panel;
 use Filament\View\PanelsRenderHook;
 use Livewire\Livewire;
+use Modules\Core\Filament\Calendar\CompanyCalendarPage;
 use Modules\Core\Filament\Portal\PortalPage;
 
 /**
@@ -22,6 +23,7 @@ use Modules\Core\Filament\Portal\PortalPage;
  * the user menu; the app screens have none (BasePanelProvider).
  * It contains no business screens itself: every enabled business module whose module.json says
  * `"panel": "erp"` contributes its Filament plugin here.
+ * Core adds 会社カレンダー (CompanyCalendarPage): read-only for everyone, the first item of the sidebar.
  */
 final class ErpPanelProvider extends BasePanelProvider
 {
@@ -45,6 +47,7 @@ final class ErpPanelProvider extends BasePanelProvider
             ->navigationGroups(NavigationGroup::labels())
             ->pages([
                 PortalPage::class,
+                CompanyCalendarPage::class,
             ])
             ->plugins($this->businessModulePlugins());
     }

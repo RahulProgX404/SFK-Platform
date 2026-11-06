@@ -369,9 +369,9 @@ abstract class AppViewRecord extends ViewRecord
                 ->icon(Heroicon::OutlinedDocumentDuplicate)
                 ->iconButton()
                 ->color('gray')
-                ->url(fn (): string => $resource::getUrl('create', ['duplicate' => $this->record->getKey()]))
-                ->visible(fn (): bool => $this->historyVersion === null && $resource::hasPage('create') && $resource::canCreate()
-                    && $this->appSetting('record_duplicate_enabled')),
+                // the create page, or the list opening the app's quick-create panel with the copy
+                ->url(fn (): string => (string) $resource::newRecordUrl(['duplicate' => $this->record->getKey()]))
+                ->visible(fn (): bool => $this->historyVersion === null && $resource::newRecordUrl() !== null && $this->appSetting('record_duplicate_enabled')),
             ActionGroup::make([
                 Action::make('print')
                     ->label('印刷する')

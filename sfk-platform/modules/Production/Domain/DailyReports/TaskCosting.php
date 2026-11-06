@@ -12,10 +12,15 @@ use Modules\Core\Domain\Money\Yen;
  *
  *   作業時間     = ROUND((終了時間 − 開始時間 − 休憩時間) / 3600, 2)                               (BR-PR-01)
  *   残業時間     = ROUND((残業終了時間 − 残業開始時間 − 休憩時間(残業)) / 3600, 2)
- *   時給計算     = 作業単価 × 作業時間;  残業時給計算 = 残業時間 × 残業単価;  機械使用料 = 機械単価(H) × 作業時間
+ *   時給計算     = 作業単価 × 作業時間;  残業時給計算 = 残業時間 × 残業単価;  機械使用料 = 機械単価(H) × 機械時間
  *   枚数単価     = 出来上 × 加工単価(枚);  型替え単価 = 型替単価(回) × 回数
  *   社内原価     = ROUND(時給計算 + 残業時給計算 + 機械使用料 + 糊代 + ダンボール原価 + ダンボール原価(仕切))  (BR-PR-02)
- *   製造売上     = ROUND(作業時間 × 機械単価(H) + 作業単価 × 出来上)                               (BR-PR-03, the 08 formula)
+ *   製造売上     = ROUND(機械時間 × 機械単価(H) + 作業単価 × 出来上)                               (BR-PR-03, the 08 formula)
+ *
+ * 勤務種別 (2026-11, hours()): a 通常 task works 作業時間 (開始 → 終了 − 休憩) and the machine runs as long; its 残業時間
+ * is the separate overtime span the earlier records were entered with (none on new ones). A 残業 task is overtime from
+ * 開始 to 終了: 残業時間 = that span at the 残業単価, 作業時間 = 0, and the machine runs the 残業時間. 作業時間 + 残業時間
+ * stays the time worked, as the dashboards add it up.
  *   人数割       = ROUNDDOWN(出来上 / 作業人数)                                                   (BR-PR-04)
  *
  * ROUND rounds .5 away from zero like the legacy function (社内原価 was unrounded in the legacy app). Times are 'H:i'
@@ -39,24 +44,40 @@ final class TaskCosting
         return self::round(bcdiv((string) $seconds, '3600', 6), 2);
     }
 
+    /**
+     * 作業時間, 残業時間 and the machine's hours of a task by its 勤務種別 (null while 開始 / 終了 are missing; a 通常 task
+     * without an overtime span has no 残業時間).
+     *
+     * @return array{work: ?string, overtime: ?string, machine: ?string}
+     */
+    public static function hours(bool $overtimeTask, ?string $start, ?string $end, ?string $break, ?string $overtimeStart = null, ?string $overtimeEnd = null, ?string $overtimeBreak = null): array
+    {
+        $span = self::workHours($start, $end, $break);
+        if ($overtimeTask) {
+            return ['work' => $span === null ? null : '0.00', 'overtime' => $span, 'machine' => $span];
+        }
+
+        return ['work' => $span, 'overtime' => self::workHours($overtimeStart, $overtimeEnd, $overtimeBreak), 'machine' => $span];
+    }
+
     /** 時給計算 / 機械使用料 / 枚数単価 / 型替え単価: rate × measure, exact. */
     public static function product(?string $rate, ?string $measure): string
     {
         return bcmul(self::decimal($rate), self::decimal($measure), self::SCALE);
     }
 
-    /** 社内原価 (whole yen). */
-    public static function internalCost(?string $workRate, ?string $machineRate, ?string $hours, ?string $overtimeRate, ?string $overtimeHours, ?string $glueCost, ?string $cardboardCost, ?string $partitionCost): int
+    /** 社内原価 (whole yen); the machine runs $machineHours (hours()['machine']). */
+    public static function internalCost(?string $workRate, ?string $machineRate, ?string $hours, ?string $machineHours, ?string $overtimeRate, ?string $overtimeHours, ?string $glueCost, ?string $cardboardCost, ?string $partitionCost): int
     {
         $sum = '0';
-        foreach ([self::product($workRate, $hours), self::product($overtimeHours, $overtimeRate), self::product($machineRate, $hours), $glueCost, $cardboardCost, $partitionCost] as $cost) {
+        foreach ([self::product($workRate, $hours), self::product($overtimeHours, $overtimeRate), self::product($machineRate, $machineHours), $glueCost, $cardboardCost, $partitionCost] as $cost) {
             $sum = bcadd($sum, self::decimal($cost), self::SCALE);
         }
 
         return Yen::round($sum, RoundingMode::HalfUp);
     }
 
-    /** 製造売上 (whole yen). */
+    /** 製造売上 (whole yen); $hours are the machine's hours (hours()['machine']). */
     public static function manufacturingSales(?string $workRate, ?string $machineRate, ?string $hours, ?string $produced): int
     {
         return Yen::round(bcadd(self::product($hours, $machineRate), self::product($workRate, $produced), self::SCALE), RoundingMode::HalfUp);

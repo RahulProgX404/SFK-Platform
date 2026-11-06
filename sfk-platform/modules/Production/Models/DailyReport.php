@@ -17,10 +17,11 @@ use Modules\MasterData\Models\Consumable;
 use Modules\MasterData\Models\Machine;
 use Modules\Orders\Models\Order;
 use Modules\Production\Domain\DailyReports\TaskCosting;
+use Modules\Production\Domain\ProductionChoices;
 
 /**
  * A daily report of 08. 日報入力 (SYSTEM_BRAIN APP_08): one record per task — 作業日, 作業者, 注番, 機械名, the boxes used,
- * 糊, times with the overtime, 出来上 and the checks. The worker's 作業単価 / 残業単価, the machine's rates and the box
+ * 糊, times, 日種別 / 勤務種別, 出来上 and the checks. The worker's 作業単価 / 残業単価, the machine's rates and the box
  * prices are copied when they are chosen (legacy lookups, snapshots); 作業時間, 残業時間, 社内原価 and 製造売上 are
  * recalculated on every save (TaskCosting, BR-PR-01..03) — the jobs add them up (JobProduction).
  *
@@ -46,6 +47,7 @@ use Modules\Production\Domain\DailyReports\TaskCosting;
  * @property string|null $produced
  * @property string|null $crew
  * @property string $day_type
+ * @property string $work_type
  * @property string|null $overtime_started_at
  * @property string|null $overtime_ended_at
  * @property string|null $overtime_break
@@ -93,8 +95,8 @@ final class DailyReport extends Model implements HasRecordComments, HasRecordHis
     protected $guarded = ['id', 'work_rate', 'overtime_rate', 'work_hours', 'overtime_hours', 'internal_cost', 'manufacturing_sales', 'created_by', 'updated_by',
         'created_at', 'updated_at'];
 
-    /** 日種別 starts as 平日. */
-    protected $attributes = ['day_type' => '平日'];
+    /** 日種別 starts as 平日, 勤務種別 as 通常. */
+    protected $attributes = ['day_type' => '平日', 'work_type' => '通常'];
 
     protected function casts(): array
     {
@@ -139,6 +141,11 @@ final class DailyReport extends Model implements HasRecordComments, HasRecordHis
                 $report->partition_cost = $report->partition_id === null ? null : Consumable::query()->whereKey($report->partition_id)->value('unit_price');
             }
 
+            // a 残業 task is overtime from 開始 to 終了: no separate overtime span (that of the earlier 通常 records)
+            if ($report->isOvertimeTask()) {
+                $report->forceFill(['overtime_started_at' => null, 'overtime_ended_at' => null, 'overtime_break' => null]);
+            }
+
             $report->fillFigures();
         });
     }
@@ -155,20 +162,26 @@ final class DailyReport extends Model implements HasRecordComments, HasRecordHis
             'work_hours', 'overtime_hours', 'internal_cost', 'manufacturing_sales', 'cardboard_stock', 'partition_stock'];
     }
 
-    /** 作業時間 / 残業時間 / 社内原価 / 製造売上 (BR-PR-01..03). */
+    /** 勤務種別 残業 */
+    public function isOvertimeTask(): bool
+    {
+        return $this->work_type === ProductionChoices::WORK_OVERTIME;
+    }
+
+    /** 作業時間 / 残業時間 / 社内原価 / 製造売上 by the 勤務種別 (BR-PR-01..03, TaskCosting::hours). */
     public function fillFigures(): void
     {
         $workRate = $this->work_rate === null ? null : (string) $this->work_rate;
         $overtimeRate = $this->overtime_rate === null ? null : (string) $this->overtime_rate;
-        $hours = TaskCosting::workHours($this->started_at, $this->ended_at, $this->break_time);
-        $overtime = TaskCosting::workHours($this->overtime_started_at, $this->overtime_ended_at, $this->overtime_break);
+        $hours = TaskCosting::hours($this->isOvertimeTask(), $this->started_at, $this->ended_at, $this->break_time, $this->overtime_started_at,
+            $this->overtime_ended_at, $this->overtime_break);
 
         $this->forceFill([
-            'work_hours' => $hours,
-            'overtime_hours' => $overtime,
-            'internal_cost' => TaskCosting::internalCost($workRate, $this->machine_rate, $hours, $overtimeRate, $overtime, $this->glue_cost, $this->cardboard_cost,
-                $this->partition_cost),
-            'manufacturing_sales' => TaskCosting::manufacturingSales($workRate, $this->machine_rate, $hours, $this->produced),
+            'work_hours' => $hours['work'],
+            'overtime_hours' => $hours['overtime'],
+            'internal_cost' => TaskCosting::internalCost($workRate, $this->machine_rate, $hours['work'], $hours['machine'], $overtimeRate, $hours['overtime'],
+                $this->glue_cost, $this->cardboard_cost, $this->partition_cost),
+            'manufacturing_sales' => TaskCosting::manufacturingSales($workRate, $this->machine_rate, $hours['machine'], $this->produced),
         ]);
     }
 

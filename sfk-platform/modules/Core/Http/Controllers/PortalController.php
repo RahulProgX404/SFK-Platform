@@ -18,7 +18,7 @@ use Modules\Core\Models\DashboardPortal;
 /**
  * Entry point after sign-in: the welcome card, the dashboards the user may open and, below them, the お知らせ of those
  * dashboards (edited by administrators on the dashboard: ✎ opens its editor). A user with exactly one dashboard and
- * no お知らせ to read goes straight to the dashboard.
+ * no お知らせ to read goes straight to the dashboard. Space / Enter opens the main dashboard (白石封筒).
  */
 final class PortalController
 {
@@ -43,7 +43,25 @@ final class PortalController
             'dashboards' => $entries,
             'notices' => $notices,
             'unread' => $user->unreadNotifications()->count(),
+            'keyboardUrl' => $this->keyboardUrl($entries),
         ]);
+    }
+
+    /**
+     * Space / Enter on the portal opens the main dashboard (白石封筒, the default panel) — when the user may open it.
+     *
+     * @param  list<DashboardEntry>  $entries
+     */
+    private function keyboardUrl(array $entries): ?string
+    {
+        $main = Filament::getDefaultPanel()->getId();
+        foreach ($entries as $entry) {
+            if ($entry->id === $main) {
+                return $entry->url;
+            }
+        }
+
+        return null;
     }
 
     /**

@@ -38,22 +38,23 @@ use Modules\Production\Models\DailyReport;
 
 /**
  * Form and record page of 08. 日報入力 (fields of SYSTEM_BRAIN APP_08 fields.md), one record per task, grouped by task on
- * a 12-column grid of the 1,500 px canvas: 作業情報 (作業日, 作業者 — employees 在籍中, newest first — 機械名, 日種別), 注番情報,
- * 作業時間・出来高 (with 型変 and the overtime), 使用資材 (ダンボール, 仕切, 糊), 品質・ステータス, その他 and 原価. The job's 品名 / 受注数 / 製造済数 / 製造残数 / 現在のステータス and the boxes' 在庫数 are shown from
- * the masters; the figures follow TaskCosting (BR-PR-01..04). The money figures (時給計算 … 社内原価, 残業時給計算) and
+ * a 12-column grid of the 1,500 px canvas: 作業情報 (作業日, 作業者 — employees 在籍中, newest first — 機械名, 日種別, 勤務種別),
+ * 注番情報, 作業時間・出来高 (with 型変), 使用資材 (ダンボール, 仕切, 糊), 品質・ステータス, その他 and 原価. The job's 品名 / 受注数 / 製造済数 / 製造残数 / 現在のステータス and the boxes' 在庫数 are shown from
+ * the masters; the figures follow TaskCosting (BR-PR-01..04; a 残業 task is overtime from 開始 to 終了 — the 残業開始 / 残業終了 /
+ * 休憩時間(残業) of the earlier records are kept, not asked). The money figures (時給計算 … 社内原価, 残業時給計算) and
  * 開発者用フィールド are shown to administrators only, like the cost data of the other production screens.
  */
 final class DailyReportLayout
 {
     private const MAIN = [
         '作業情報',
-        [['worked_on', 250], ['user_id', 500], ['machine_id', 500], ['day_type', 250]],
+        [['worked_on', 250], ['user_id', 375], ['machine_id', 375], ['day_type', 250], ['work_type', 250]],
         '注番情報',
         [['order_id', 375], ['product_name', 1125]],
         [['order_quantity', 500], ['manufactured_quantity', 500], ['manufacturing_remaining', 500]],
         '作業時間・出来高',
         [['started_at', 250], ['ended_at', 250], ['break_time', 250], ['produced', 250], ['crew', 250], ['per_person', 250]],
-        [['changeover_minutes', 250], ['changeover_count', 250], ['overtime_started_at', 375], ['overtime_ended_at', 375], ['overtime_break', 250]],
+        [['changeover_minutes', 250], ['changeover_count', 250]],
         '使用資材',
         [['cardboard_id', 750], ['cardboard_stock', 375], ['cardboard_used', 375]],
         [['partition_id', 750], ['partition_stock', 375], ['partition_used', 375]],
@@ -129,9 +130,13 @@ final class DailyReportLayout
         $overtimeRate = $copy('overtime_rate', 'user_id', fn (Get $get): mixed => $worker($get)?->overtime_rate);
         $cardboardCost = $copy('cardboard_cost', 'cardboard_id', fn (Get $get): ?string => self::unitPrice($get('cardboard_id')));
         $partitionCost = $copy('partition_cost', 'partition_id', fn (Get $get): ?string => self::unitPrice($get('partition_id')));
-        $hours = fn (Get $get): ?string => TaskCosting::workHours(self::time($get('started_at')), self::time($get('ended_at')), self::time($get('break_time')));
-        $overtime = fn (Get $get): ?string => TaskCosting::workHours(self::time($get('overtime_started_at')), self::time($get('overtime_ended_at')),
-            self::time($get('overtime_break')));
+        // 作業時間 / 残業時間 / the machine's hours by the 勤務種別; an earlier record's own overtime span while it stays 通常
+        $split = fn (Get $get, ?Model $record): array => TaskCosting::hours($get('work_type') === ProductionChoices::WORK_OVERTIME, self::time($get('started_at')),
+            self::time($get('ended_at')), self::time($get('break_time')), ...($record instanceof DailyReport
+                ? [self::time($record->overtime_started_at), self::time($record->overtime_ended_at), self::time($record->overtime_break)] : []));
+        $hours = fn (Get $get, ?Model $record): ?string => $split($get, $record)['work'];
+        $overtime = fn (Get $get, ?Model $record): ?string => $split($get, $record)['overtime'];
+        $machineHours = fn (Get $get, ?Model $record): ?string => $split($get, $record)['machine'];
         $stock = fn (string $key): Closure => fn (Get $get): ?string => BoxUsage::stockOf(is_numeric($get($key)) ? (int) $get($key) : null);
         $sheetFee = fn (Get $get, ?Model $record): string => TaskCosting::product(self::decimal($get('produced')), $rate('processing_rate')($get, $record));
         $changeoverFee = fn (Get $get, ?Model $record): string => TaskCosting::product($rate('changeover_rate')($get, $record), self::decimal($get('changeover_count')));
@@ -150,28 +155,31 @@ final class DailyReportLayout
                 ->required()
                 ->live(),
             'order_id' => Select::make($name)->label($label)->placeholder('-----')
-                ->relationship('order', 'order_number', fn (Builder $query): Builder => $query->orderByDesc('id'))->searchable()->preload()->live(),
+                ->relationship('order', 'order_number', fn (Builder $query): Builder => $query->orderByDesc('id'))->searchable()->preload()->live()->required(),
             'product_name' => $shown(fn (Get $get): ?string => $order($get)?->product_name),
             'order_quantity' => $shown(fn (Get $get): string => AppFormat::number($order($get)?->quantity)),
             'manufactured_quantity' => $shown(fn (Get $get): string => AppFormat::number($order($get)?->getAttribute('manufactured_quantity'))),
             'manufacturing_remaining' => $shown(fn (Get $get): string => AppFormat::number($order($get)?->getAttribute('manufacturing_remaining'))),
             'machine_id' => Select::make($name)->label($label)->placeholder('-----')
-                ->relationship('machine', 'name', fn (Builder $query): Builder => $query->orderByDesc('id'))->searchable()->preload()->live()->required(),
+                ->relationship('machine', 'name', fn (Builder $query, Get $get): Builder => self::orderMachines($query, $get('order_id')))
+                ->searchable()->preload()->live()->required(),
             'cardboard_id' => Select::make($name)->label($label)->placeholder('-----')->relationship('cardboard', 'name', $boxes)->searchable()->preload()->live(),
             'partition_id' => Select::make($name)->label($label)->placeholder('-----')->relationship('partition', 'name', $boxes)->searchable()->preload()->live(),
             'cardboard_stock' => $shown(fn (Get $get): string => AppFormat::number($stock('cardboard_id')($get))),
             'partition_stock' => $shown(fn (Get $get): string => AppFormat::number($stock('partition_id')($get))),
             'cardboard_used', 'partition_used', 'glue_cost', 'changeover_minutes', 'changeover_count' => $number(),
             'glue' => Select::make($name)->label($label)->placeholder('-----')->options(ProductionChoices::options(ProductionChoices::GLUES))->native(false),
-            'started_at', 'ended_at' => $time(ProductionChoices::DEFAULT_TIME)->required(),
+            'started_at' => $time(ProductionChoices::DEFAULT_START)->required(),
+            'ended_at' => $time(ProductionChoices::DEFAULT_END)->required(),
             'break_time' => $time(ProductionChoices::DEFAULT_BREAK),
-            'overtime_started_at', 'overtime_ended_at', 'overtime_break' => $time(ProductionChoices::DEFAULT_TIME),
             'produced', 'damaged_before' => $number()->required(),
             'damaged_after' => $number()->minValue(0)->required(),
             'crew' => $number()->minValue(1)->required(),
             'per_person' => $shown(fn (Get $get): string => AppFormat::number(TaskCosting::perPerson(self::decimal($get('produced')), self::decimal($get('crew'))))),
             'day_type' => Radio::make($name)->label($label)->inline()->options(ProductionChoices::options(ProductionChoices::DAY_TYPES))
                 ->default(ProductionChoices::DAY_TYPES[0])->required(),
+            'work_type' => Radio::make($name)->label($label)->inline()->options(ProductionChoices::options(ProductionChoices::WORK_TYPES))
+                ->default(ProductionChoices::WORK_TYPES[0])->required()->live(),
             'quality_checks' => CheckboxList::make($name)->label($label)->options(ProductionChoices::options(ProductionChoices::QUALITY_CHECKS))->columns(3)->required(),
             'gloves' => self::flag($name, ProductionChoices::GLOVES),
             'current_status' => $shown(fn (Get $get): ?string => $order($get)?->status),
@@ -179,16 +187,16 @@ final class DailyReportLayout
             'new_status' => Select::make($name)->label($label)->placeholder('-----')->options(OrderChoices::options(OrderChoices::STATUSES))->native(false),
             'difficulty' => Select::make($name)->label($label)->placeholder('-----')->options(ProductionChoices::options(ProductionChoices::DIFFICULTIES))->native(false),
             'notes' => Textarea::make($name)->label($label)->rows(3)->maxLength(4000),
-            'work_hours' => $shown(fn (Get $get): string => self::hoursText($hours($get))),
-            'overtime_hours' => $shown(fn (Get $get): string => self::hoursText($overtime($get))),
-            'labor_cost' => $shown(fn (Get $get, ?Model $record): string => AppFormat::price(TaskCosting::product($workRate($get, $record), $hours($get)))),
-            'overtime_labor_cost' => $shown(fn (Get $get, ?Model $record): string => AppFormat::price(TaskCosting::product($overtime($get), $overtimeRate($get, $record)))),
-            'machine_fee' => $shown(fn (Get $get, ?Model $record): string => AppFormat::price(TaskCosting::product($rate('machine_rate')($get, $record), $hours($get)))),
+            'work_hours' => $shown(fn (Get $get, ?Model $record): string => self::hoursText($hours($get, $record))),
+            'overtime_hours' => $shown(fn (Get $get, ?Model $record): string => self::hoursText($overtime($get, $record))),
+            'labor_cost' => $shown(fn (Get $get, ?Model $record): string => AppFormat::price(TaskCosting::product($workRate($get, $record), $hours($get, $record)))),
+            'overtime_labor_cost' => $shown(fn (Get $get, ?Model $record): string => AppFormat::price(TaskCosting::product($overtime($get, $record), $overtimeRate($get, $record)))),
+            'machine_fee' => $shown(fn (Get $get, ?Model $record): string => AppFormat::price(TaskCosting::product($rate('machine_rate')($get, $record), $machineHours($get, $record)))),
             'sheet_fee' => $shown(fn (Get $get, ?Model $record): string => AppFormat::price($sheetFee($get, $record))),
             'changeover_fee' => $shown(fn (Get $get, ?Model $record): string => AppFormat::price($changeoverFee($get, $record))),
             'internal_cost' => $shown(fn (Get $get, ?Model $record): string => AppFormat::yen(TaskCosting::internalCost(
-                $workRate($get, $record), $rate('machine_rate')($get, $record), $hours($get), $overtimeRate($get, $record), $overtime($get),
-                self::decimal($get('glue_cost')), $cardboardCost($get, $record), $partitionCost($get, $record),
+                $workRate($get, $record), $rate('machine_rate')($get, $record), $hours($get, $record), $machineHours($get, $record), $overtimeRate($get, $record),
+                $overtime($get, $record), self::decimal($get('glue_cost')), $cardboardCost($get, $record), $partitionCost($get, $record),
             ))),
             'worker_code', 'employee_code', 'sales_staff_code', 'department_code' => $shown(fn (Get $get): ?string => self::text($worker($get)?->getAttribute($name))),
             'work_rate' => $shown(fn (Get $get, ?Model $record): string => AppFormat::price($workRate($get, $record))),
@@ -202,7 +210,7 @@ final class DailyReportLayout
             'cardboard_stock_after' => $shown(fn (Get $get): string => AppFormat::number(self::stockAfter($stock('cardboard_id')($get), $get('cardboard_used')))),
             'partition_stock_after' => $shown(fn (Get $get): string => AppFormat::number(self::stockAfter($stock('partition_id')($get), $get('partition_used')))),
             'manufacturing_sales' => $shown(fn (Get $get, ?Model $record): string => AppFormat::yen(TaskCosting::manufacturingSales(
-                $workRate($get, $record), $rate('machine_rate')($get, $record), $hours($get), self::decimal($get('produced')),
+                $workRate($get, $record), $rate('machine_rate')($get, $record), $machineHours($get, $record), self::decimal($get('produced')),
             ))),
             'sheet_and_changeover_fee' => $shown(fn (Get $get, ?Model $record): string => AppFormat::price(bcadd($sheetFee($get, $record), $changeoverFee($get, $record), 4))),
             default => null,
@@ -245,7 +253,7 @@ final class DailyReportLayout
                 fn (DailyReport $record): mixed => $record->getAttribute($name),
             ),
             'per_person' => $number(fn (DailyReport $record): ?int => TaskCosting::perPerson($record->produced, $record->crew)),
-            'started_at', 'ended_at', 'break_time', 'overtime_started_at', 'overtime_ended_at', 'overtime_break' => $state(
+            'started_at', 'ended_at', 'break_time' => $state(
                 fn (DailyReport $record): ?string => self::time($record->getAttribute($name)),
             ),
             'quality_checks' => $state(fn (DailyReport $record): ?string => implode('、', (array) $record->quality_checks) ?: null),
@@ -254,7 +262,7 @@ final class DailyReportLayout
             'work_hours', 'overtime_hours' => $state(fn (DailyReport $record): string => self::hoursText($record->getAttribute($name))),
             'labor_cost' => $price(fn (DailyReport $record): string => TaskCosting::product(self::decimal($record->work_rate), $record->work_hours)),
             'overtime_labor_cost' => $price(fn (DailyReport $record): string => TaskCosting::product($record->overtime_hours, self::decimal($record->overtime_rate))),
-            'machine_fee' => $price(fn (DailyReport $record): string => TaskCosting::product($record->machine_rate, $record->work_hours)),
+            'machine_fee' => $price(fn (DailyReport $record): string => TaskCosting::product($record->machine_rate, self::machineHours($record))),
             'sheet_fee' => $price($sheetFee),
             'changeover_fee' => $price($changeoverFee),
             'sheet_and_changeover_fee' => $price(fn (DailyReport $record): string => bcadd($sheetFee($record), $changeoverFee($record), 4)),
@@ -287,6 +295,61 @@ final class DailyReportLayout
         return $components;
     }
 
+    /**
+     * The machines a job (注番) is likely to run on next: those of its earlier tasks, the latest first, then the order's
+     * 機械 (製袋予定). A 注番 passes several machines (断裁, 抜き, 窓, 製袋, 糊 — one machine on only 24% of the legacy
+     * jobs), so 機械名 is never chosen from it; these only lead the choices. Every report of the job counts, also those
+     * of other workers the user may not open: only the order of the machine master's names comes from them.
+     *
+     * @return list<int>
+     */
+    public static function machinesOfOrder(?int $orderId): array
+    {
+        if ($orderId === null) {
+            return [];
+        }
+
+        $reports = new DailyReport;
+        $used = DailyReport::query()
+            ->where($reports->qualifyColumn('order_id'), $orderId)
+            ->whereNotNull($reports->qualifyColumn('machine_id'))
+            ->groupBy($reports->qualifyColumn('machine_id'))
+            ->orderByRaw('MAX('.$reports->getQualifiedKeyName().') DESC')
+            ->pluck($reports->qualifyColumn('machine_id'))
+            ->map(fn (mixed $id): int => (int) $id);
+        $ordered = Order::query()->whereKey($orderId)->value('machine_id');
+
+        return $used->push(is_numeric($ordered) ? (int) $ordered : null)->filter()->unique()->values()->all();
+    }
+
+    /**
+     * 機械名 choices of a job, id => name, in the order of the form's drop-down (orderMachines).
+     *
+     * @return array<int, string>
+     */
+    public static function machineOptions(?int $orderId): array
+    {
+        return self::orderMachines(Machine::query(), $orderId)->pluck('name', 'id')->mapWithKeys(fn (mixed $name, int|string $id): array => [(int) $id => (string) $name])->all();
+    }
+
+    /**
+     * 機械名 choices: the job's machines (machinesOfOrder) first, then the rest, newest first as in the legacy picker.
+     *
+     * @param  Builder<Machine>  $query
+     * @return Builder<Machine>
+     */
+    private static function orderMachines(Builder $query, mixed $orderId): Builder
+    {
+        $first = self::machinesOfOrder(is_numeric($orderId) ? (int) $orderId : null);
+        if ($first !== []) {
+            // the ids are integers read from the database, written into the CASE so its result stays numeric
+            $cases = implode(' ', array_map(fn (int $id, int $rank): string => "WHEN {$id} THEN {$rank}", $first, array_keys($first)));
+            $query->orderByRaw('CASE '.$query->getModel()->getQualifiedKeyName()." {$cases} ELSE ".count($first).' END');
+        }
+
+        return $query->orderByDesc($query->getModel()->getQualifiedKeyName());
+    }
+
     /** A legacy single check box (手袋 「着用」, ステータスの更新 「する」), stored as a boolean. */
     private static function flag(string $name, string $option): CheckboxList
     {
@@ -297,6 +360,12 @@ final class DailyReportLayout
             ->formatStateUsing(fn (mixed $state): array => collect(is_array($state) ? $state : [$state])
                 ->contains(fn (mixed $value): bool => $value === $option || $value === true || $value === 1 || $value === '1') ? [$option] : [])
             ->dehydrateStateUsing(fn (mixed $state): bool => in_array($option, (array) $state, true));
+    }
+
+    /** The machine's hours of a saved task: its 残業時間 when it is a 残業 task, else its 作業時間 (TaskCosting::hours). */
+    public static function machineHours(DailyReport $record): ?string
+    {
+        return $record->isOvertimeTask() ? $record->overtime_hours : $record->work_hours;
     }
 
     /** 在庫数更新値 = 在庫数 − 使用数 (null while the stock is not kept). */

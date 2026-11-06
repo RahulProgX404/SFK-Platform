@@ -59,7 +59,7 @@ trait HasAppChrome
         return [...parent::getPageClasses(), 'sfk-app-page', 'sfk-app-page-'.$this->appPageKind()];
     }
 
-    /** @return array{name: string, icon: string, space: string|null, description: string|null, index_url: string, create_url: string|null, home_url: string, settings_url: string|null, settings_menu: list<array{label: string, url: string}>, settings_tabs: array<string, array{0: string, 1: string}>} */
+    /** @return array{name: string, icon: string, space: string|null, description: string|null, index_url: string, create_url: string|null, create_app: string|null, home_url: string, settings_url: string|null, settings_menu: list<array{label: string, url: string}>, settings_tabs: array<string, array{0: string, 1: string}>, single_screen: bool} */
     public function appChrome(): array
     {
         $resource = $this->appResource();
@@ -73,11 +73,15 @@ trait HasAppChrome
             'space' => $app->exists ? $app->spaceOn(Filament::getCurrentOrDefaultPanel()->getId(), $user instanceof User ? $user : null)?->name : null,
             'description' => filled($app->description) ? $app->description : $resource::appDescription(),
             'index_url' => $resource::getUrl('index'),
-            'create_url' => $resource::hasPage('create') && $resource::canCreate() ? $resource::getUrl('create') : null,
+            'create_url' => $resource::newRecordUrl(),
+            // an app adding records in a panel over the screen: 新規 opens it (AppResource::quickCreateComponent)
+            'create_app' => $resource::quickCreateComponent() !== null ? $resource::appCode() : null,
             'home_url' => Filament::getCurrentPanel()?->getUrl() ?? url('/'),
             'settings_url' => $this->appSettingsUrl($app),
             'settings_menu' => $this->appSettingsMenu($app),
             'settings_tabs' => $this->appSettingsTabs(),
+            // one screen: no 一覧 tabs / 絞り込む, ⚙ in the header (AppResource::isSingleScreen)
+            'single_screen' => $resource::isSingleScreen(),
         ];
     }
 
@@ -92,6 +96,13 @@ trait HasAppChrome
         $resource = $this->appResource();
         if (! $this->isAppAdministrator() || ! $app->exists) {
             return [];
+        }
+
+        // an app of one screen: アプリの権限 only
+        if ($resource::isSingleScreen()) {
+            $permissions = $this->appPermissionsUrl($app);
+
+            return $permissions !== null ? [['label' => 'アプリの権限', 'url' => $permissions]] : [];
         }
 
         $menu = [];
@@ -158,7 +169,7 @@ trait HasAppChrome
     {
         $resource = $this->appResource();
 
-        if ($resource::hasPage('views') && $this->isAppAdministrator() && $app->exists) {
+        if (! $resource::isSingleScreen() && $resource::hasPage('views') && $this->isAppAdministrator() && $app->exists) {
             return $resource::getUrl('views');
         }
 

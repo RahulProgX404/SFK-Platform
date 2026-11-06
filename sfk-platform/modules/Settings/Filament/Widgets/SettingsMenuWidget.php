@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace Modules\Settings\Filament\Widgets;
 
+use Carbon\CarbonImmutable;
 use Filament\Widgets\Widget;
+use Modules\Core\Application\Calendar\CompanyCalendar;
 use Modules\Core\Domain\Apps\AppStatus;
+use Modules\Core\Domain\Calendar\CalendarDayType;
 use Modules\Core\Models\BusinessApp;
 use Modules\Core\Models\EmployeeCategory;
 use Modules\Core\Models\Position;
 use Modules\Settings\Application\UserStatistics;
 use Modules\Settings\Filament\Pages\AppsSettings;
+use Modules\Settings\Filament\Pages\CompanyCalendarSettings;
 use Modules\Settings\Filament\Resources\EmployeeCategories\EmployeeCategoryResource;
 use Modules\Settings\Filament\Resources\Positions\PositionResource;
 use Modules\Settings\Filament\Resources\Users\UserResource;
@@ -33,6 +37,8 @@ final class SettingsMenuWidget extends Widget
     protected function getViewData(): array
     {
         $statistics = app(UserStatistics::class);
+        $today = CarbonImmutable::today();
+        $closed = count(array_filter(app(CompanyCalendar::class)->dayTypes($today->startOfYear(), $today->endOfYear()), fn (CalendarDayType $type): bool => $type->isClosed()));
 
         return [
             'sections' => [
@@ -60,6 +66,12 @@ final class SettingsMenuWidget extends Widget
                     'url' => AppsSettings::getUrl(),
                     'metric' => number_format(BusinessApp::query()->count()).' アプリ / 公開中 '
                         .number_format(BusinessApp::query()->where('status', AppStatus::Published->value)->count()),
+                ],
+                [
+                    'title' => '会社カレンダー',
+                    'icon' => 'heroicon-o-calendar-days',
+                    'url' => CompanyCalendarSettings::getUrl(),
+                    'metric' => "{$today->year}年 休日 {$closed} 日",
                 ],
             ],
         ];

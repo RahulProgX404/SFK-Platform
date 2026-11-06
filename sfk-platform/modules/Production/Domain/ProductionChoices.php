@@ -25,14 +25,23 @@ final class ProductionChoices
     /** 難易度 of 08. */
     public const DIFFICULTIES = ['S 　非常に難しい', 'A　難しい', 'B　普通', 'C　やや簡単', 'D　簡単'];
 
-    /** 休憩時間 default of 08 (BR-PR-01). */
-    public const DEFAULT_BREAK = '01:00';
+    /** 開始時間 / 終了時間 / 休憩時間 of a new task of 08 (quick entry, 2026-11). */
+    public const DEFAULT_START = '09:00';
 
-    /** Default of the other times of 08 (開始 / 終了, the overtime). */
-    public const DEFAULT_TIME = '00:00';
+    public const DEFAULT_END = '17:00';
+
+    public const DEFAULT_BREAK = '00:00';
+
+    /** 作業人数 of a new task of 08. */
+    public const DEFAULT_CREW = '1';
 
     /** 日種別 of 08 (required). */
     public const DAY_TYPES = ['平日', '休日'];
+
+    /** 勤務種別 of 08 (required, 通常 first): a 残業 task is overtime from 開始 to 終了 (TaskCosting::hours). */
+    public const WORK_TYPES = ['通常', '残業'];
+
+    public const WORK_OVERTIME = '残業';
 
     /** 使用状況 of 12, in the order of the legacy schedule; the colours of its Gantt chart (legacy app description). */
     public const USAGE_STATUSES = ['使用前' => '#ff9900', '使用中' => '#ff0000', '完了' => '#999999'];

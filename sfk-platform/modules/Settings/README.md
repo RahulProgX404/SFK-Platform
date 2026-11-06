@@ -10,6 +10,7 @@ system-wide settings. Japanese UI.
 | 従業員カテゴリ     | `/settings/employee-categories` | Options of the 従業員カテゴリ dropdown and the 利用可能なダッシュボード of each category (add / rename / reorder / deactivate)                   |
 | 役職               | `/settings/positions`           | Options of the 役職 dropdown (add / rename / reorder / deactivate)                                                                               |
 | アプリ設定         | `/settings/apps`                | App registry as a drag-and-drop board over the six statuses (apps come from the code; super admins set the icon text; see `docs/permissions.md`) |
+| 会社カレンダー     | `/settings/calendar`            | 会社カレンダー: 12 months of the year; a click cycles 平日 → 祝日 → 会社休日 → 半日出勤, saved at once; Sundays are closed unmarked; 初期データを読み込む (2026); everyone sees it read-only in the sidebar of 白石封筒 (`/erp/calendar`, Core `CompanyCalendarPage`) |
 
 ## User fields
 

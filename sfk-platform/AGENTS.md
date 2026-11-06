@@ -69,7 +69,13 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   numbers under the table, which fills the screen; cell values stay on one line (full text on hover). Record page:
   編集, 再利用, 「…」 (印刷 / 削除), エクスポート, ⚙, ‹ › at the top right; the page's other buttons and the legacy buttons
   under the name. Create / edit: キャンセル (left) and 保存 (right) in the form's footer, which stays at the bottom of the
-  screen; other buttons (e.g. FAX 読込) under the name. Every table on a record / form / dialog has the dark header row
+  screen; other buttons (e.g. FAX 読込) under the name. An app may add records in a panel over the screen instead of a
+  create page (`AppResource::quickCreateComponent()`, e.g. 08. 日報入力's step-by-step, mobile-first QuickDailyReport): Core
+  then opens it from 新規 (event `AppResource::QUICK_CREATE_EVENT`), the dashboard's 新規作成, `?new=1` (再利用:
+  `&duplicate=<id>`, all through `AppResource::newRecordUrl()`) and marks the saved record in the list (`?created=<id>`).
+  An app that is one screen (`AppResource::isSingleScreen()`, e.g. 12. 製袋予定管理's 製袋予定表 board) shows only its first
+  view — no 一覧 tabs, 絞り込む or toolbar — with ⚙ (administrators: アプリの権限 only) in place of 新規.
+  Every table on a record / form / dialog has the dark header row
   (`kt-subtable`, `sfk-related-table`, `sfk-data-table`).
 - A record page of another module's app can get tabs and cards from other modules (`Core\Filament\Records\RecordTabs`,
   e.g. 受注 / 請求書 / 売掛明細 on 01. 取引先マスタ, `ViewPartner::TABS`), read through the providing app's `onlyVisible()`;
