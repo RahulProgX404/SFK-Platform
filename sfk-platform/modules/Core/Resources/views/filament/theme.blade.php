@@ -653,6 +653,7 @@
         flex: 1;
         flex-direction: column;
         gap: 0;
+        margin-top: 1rem;
     }
 
     .sfk-app-page .fi-page-content {
