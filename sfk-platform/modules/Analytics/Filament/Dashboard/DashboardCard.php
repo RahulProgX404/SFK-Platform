@@ -70,6 +70,24 @@ abstract class DashboardCard extends Widget
         return (static::actor()?->seesFinancialAnalysis() ?? false) && SaleResource::canViewAny();
     }
 
+    /**
+     * 財務分析の範囲 全体 (bug.md 2026-11-07): 作業者ランキング, 上位の売上先, 担当者別売上 and 売れ筋 TOP3 are only for
+     * users who see everyone's money (super admins always).
+     */
+    protected static function seesEveryonesMoney(): bool
+    {
+        return static::actor()?->seesOverallFinance() ?? false;
+    }
+
+    /**
+     * Width of 休暇・勤怠予定 and クイックアクション in row 3: a third next to 作業者ランキング, else half each so the row
+     * stays full.
+     */
+    protected static function teamCardSpan(): int
+    {
+        return static::seesEveryonesMoney() ? 4 : 6;
+    }
+
     /** The list of an app in this dashboard, while the user may open it. */
     protected static function appUrl(string $appCode): ?string
     {

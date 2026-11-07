@@ -20,7 +20,7 @@ final class StaffSalesCard extends DashboardCard
 
     public static function canView(): bool
     {
-        return self::showsMoney();
+        return self::showsMoney() && self::seesEveryonesMoney();
     }
 
     /** @return array<string, mixed> */

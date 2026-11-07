@@ -18,6 +18,7 @@ use Filament\Support\Facades\FilamentIcon;
 use Filament\Support\Facades\FilamentView;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\View\TablesRenderHook;
+use Filament\View\PanelsIconAlias;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
@@ -131,6 +132,8 @@ final class CoreServiceProvider extends ModuleServiceProvider
             NotificationsIconAlias::NOTIFICATION_INFO => Heroicon::InformationCircle,
             NotificationsIconAlias::NOTIFICATION_WARNING => Heroicon::ExclamationTriangle,
             NotificationsIconAlias::NOTIFICATION_DANGER => Heroicon::XCircle,
+            // ≡ at the right end of the sidebar's header closes it (sidebar.png, bug.md 2026-11-07)
+            PanelsIconAlias::SIDEBAR_COLLAPSE_BUTTON => Heroicon::OutlinedBars3,
         ]);
 
         // 通知 of a コメント, in every app (RecordComments)

@@ -27,6 +27,7 @@ final class AbsencesCard extends DashboardCard
             'days' => app(TeamDashboard::class)->absences($today),
             'dates' => ['today' => $today, 'tomorrow' => $today->modify('+1 day')],
             'requestsUrl' => self::appUrl(LeaveRequestResource::appCode()),
+            'span' => self::teamCardSpan(),
         ];
     }
 }

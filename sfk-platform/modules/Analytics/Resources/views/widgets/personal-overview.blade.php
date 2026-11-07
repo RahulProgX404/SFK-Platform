@@ -1,11 +1,13 @@
 {{-- 個人の概要 (Modules\Analytics\Filament\Widgets\PersonalOverviewCard, …\Users\UserOverviewCard; overview.png): a dark
-     band across the whole row — the title, the period (or, on a user's page, its choice) and four figures with icons --}}
+     band across the whole row — the title, the period (or, on a user's page, its choice) and five figures with icons
+     (出勤日数 = the days with a 日報, bug.md 2026-11-07) --}}
 @php
     use Modules\Core\Filament\Support\AppFormat;
 
     $number = fn (float $value): string => rtrim(rtrim(number_format($value, 2), '0'), '.');
     $items = $figures === null ? [] : [
         ['label' => '勤務時間', 'icon' => 'heroicon-o-clock', 'value' => $number($figures['hours']), 'unit' => '時間'],
+        ['label' => '出勤日数', 'icon' => 'heroicon-o-briefcase', 'value' => number_format($figures['work_days']), 'unit' => '日'],
         ['label' => '収入', 'icon' => 'heroicon-o-banknotes', 'value' => AppFormat::yen($figures['income']), 'unit' => ''],
         ['label' => '休暇日数', 'icon' => 'heroicon-o-calendar-days', 'value' => $number($figures['leave_days']), 'unit' => '日'],
         ['label' => '有給休暇', 'icon' => 'heroicon-o-sun', 'value' => $number($figures['paid_leave_days']), 'unit' => '日'],
@@ -29,7 +31,7 @@
             .sfk-personal-range { height: 30px; padding: 0 28px 0 10px; border: 0; border-radius: var(--sfk-radius); background-color: rgba(255, 255, 255, .16); color: #fff; font: inherit; font-size: var(--sfk-fs-small); }
             .sfk-personal-range option { color: var(--sfk-ink); }
             .sfk-personal-range:focus { outline: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, .5); }
-            .sfk-personal-figures { position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sfk-space-4); margin: 0; }
+            .sfk-personal-figures { position: relative; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--sfk-space-4); margin: 0; }
             .sfk-personal-figure dt { display: flex; align-items: center; gap: var(--sfk-space-2); color: rgba(255, 255, 255, .88); font-size: var(--sfk-fs-label); font-weight: var(--sfk-fw-medium); }
             .sfk-personal-figure dt .fi-icon { width: 18px; height: 18px; flex: none; }
             .sfk-personal-figure dd { margin: 6px 0 0; font-size: 1.25rem; font-weight: var(--sfk-fw-bold); font-variant-numeric: tabular-nums; line-height: 1.3; overflow-wrap: anywhere; }

@@ -151,6 +151,29 @@ final class SalesDashboard
         return ['inflow' => $inflow, 'outflow' => $outflow, 'net' => $inflow - $outflow];
     }
 
+    /**
+     * 売上金額 per calendar month of a year (売上の推移, bug.md 2026-11-07; 個人: the 担当者's own sales).
+     *
+     * @return array<int, int> month (1–12) => amount
+     */
+    public function monthly(int $year): array
+    {
+        $month = MonthBucket::sql('sales.sold_on');
+        $amounts = array_fill(1, 12, 0);
+        $rows = $this->sales(Period::between(sprintf('%04d-01-01', $year), sprintf('%04d-12-31', $year), new DateTimeImmutable))
+            ->selectRaw("{$month} as month, coalesce(sum(sales.amount), 0) as amount")
+            ->groupByRaw($month)
+            ->toBase()
+            ->get();
+
+        foreach ($rows as $row) {
+            [, $number] = MonthBucket::parse((string) $row->month);
+            $amounts[$number] = (int) $row->amount;
+        }
+
+        return $amounts;
+    }
+
     /** @return list<array{id: int, name: string, code: string|null, count: int, amount: int}> by 売上金額 */
     public function topCustomers(Period $period, int $limit = 5): array
     {

@@ -63,6 +63,7 @@ final class QuickActionsCard extends DashboardCard
             'actions' => $actions,
             'more' => $user !== null && count($actions) >= 6 ? max(0, $service->pendingCount($user) - count($actions)) : 0,
             'recent' => $user !== null && $actions === [] ? self::recentRecords($user) : [],
+            'span' => self::teamCardSpan(),
         ];
     }
 

@@ -46,7 +46,10 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   hairline borders and small rounded corners (`--sfk-radius` 6px, cards `--sfk-radius-lg` 10px), the brand blue
   (`BasePanelProvider::BRAND_BLUE`, #05467E) as primary — through the `--sfk-primary` / `--kt-blue` tokens, never a
   hard-coded colour; dark text, soft grey table headers. No top bar except on the ERP home (/erp, ErpPanelProvider) —
-  elsewhere the sidebar (search, bell, user menu inside) collapses fully and a floating button opens it. While the
+  elsewhere the sidebar (search, bell, user menu inside) collapses fully and a floating button opens it. The sidebar
+  follows `../sidebar.png` (bug.md 2026-11-07): a grey column (`--sfk-sidebar`), the dashboard name with ≡ (closes it) at
+  the right, quiet section names (⌄ only on hover / when closed) with a hairline between sections, dark icon + label
+  rows, the open screen a white raised card with a blue bar on its left edge and dark text. While the
   server works, three dots move over a transparent blur (no text). Style new parts only with the `--sfk-*` tokens at the
   top of `core::filament.design` (ui-refine.md, 2026-11; sizes of `../index-ref.png`): type (`--sfk-fs-title` 18px,
   `-heading` 16, `-body` 14, `-label` 14 for labels / table headers / buttons / tabs / navigation, `-small` 13, `-badge` 12,
@@ -179,10 +182,15 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   `User::seesFinancialAnalysis()`, super admins always) and 財務分析の範囲 (`users.financial_scope`, bug.md 2026-11-06):
   全体 sees everyone's money and may switch to 個人, 個人のみ only the sales they are the first 担当者 of
   (`User::seesOverallFinance()`; money cards read `DashboardCard::salesData()`, 売上分析 its own row only). Users without
-  財務分析を表示 get 個人の概要 as the first row (their 勤務時間, 収入, 休暇日数, 有給休暇); the same card is on the user's
+  財務分析を表示 get 個人の概要 as the first row (their 勤務時間, 出勤日数 — the days they filled a 日報 for —, 収入, 休暇日数,
+  有給休暇), then 勤務時間・収入の推移 (`WorkTrendCard`, two 12-month charts: hours and yen never share an axis); the same card is on the user's
   page (ユーザー管理, 02. 従業員マスタ) for the person and administrators — other modules add cards there through Core
-  `UserDetailWidgets`. Rows 3–4 are for everyone (row 3 without 財務分析を表示: クイックアクション, 休暇・勤怠予定,
-  作業者ランキング — the user's own row framed; クイックアクション is called 最近表示した項目 while it lists recent apps). The
+  `UserDetailWidgets`. 作業者ランキング, 上位の売上先, 担当者別売上 and 売れ筋 TOP3 are only for 全体
+  (`DashboardCard::seesEveryonesMoney()`, bug.md 2026-11-07); 個人のみ users get 売上の推移 in row 2 instead (`SalesTrendCard`:
+  their own sales per month of a chosen year against the year before, personal-growth.png; 12-month charts are drawn by
+  `Dashboard\TrendChart` + `widgets.partials.trend-chart`). Rows 3–4 are for everyone (休暇・勤怠予定 and クイックアクション, half
+  the row each without 作業者ランキング, クイックアクション first without 財務分析を表示; 作業者ランキング frames the user's own
+  row; クイックアクション is called 最近表示した項目 while it lists recent apps). The
   top bar has アプリ in place of the search box (the search is in the sidebar): one panel over the whole screen with a
   search box, スペース, よく使うアプリ (the five the user opens most, `AppUsageLog` written by every app screen; before
   they opened any, those everyone opens most — always only apps they may open) and the apps. Administrators' drag

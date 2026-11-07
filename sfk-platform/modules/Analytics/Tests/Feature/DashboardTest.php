@@ -19,14 +19,18 @@ use Modules\Analytics\Application\PersonalOverview;
 use Modules\Analytics\Application\SalesDashboard;
 use Modules\Analytics\Application\TeamDashboard;
 use Modules\Analytics\Domain\Period;
+use Modules\Analytics\Filament\Dashboard\TrendChart;
 use Modules\Analytics\Filament\Users\UserOverviewCard;
 use Modules\Analytics\Filament\Widgets\AbsencesCard;
 use Modules\Analytics\Filament\Widgets\PersonalOverviewCard;
 use Modules\Analytics\Filament\Widgets\QuickActionsCard;
 use Modules\Analytics\Filament\Widgets\RevenueCard;
+use Modules\Analytics\Filament\Widgets\SalesTrendCard;
 use Modules\Analytics\Filament\Widgets\StaffSalesCard;
+use Modules\Analytics\Filament\Widgets\TopCustomersCard;
 use Modules\Analytics\Filament\Widgets\TopProductsCard;
 use Modules\Analytics\Filament\Widgets\TopWorkersCard;
+use Modules\Analytics\Filament\Widgets\WorkTrendCard;
 use Modules\Analytics\Models\SalesForecast;
 use Modules\Analytics\Models\SalesPlan;
 use Modules\Core\Application\Apps\AppUsageLog;
@@ -121,7 +125,7 @@ it('sums the money of a period: totals, statuses, target, cash and the tops', fu
         ->and(SalesDashboard::dueOn(new DateTimeImmutable('2026-01-15'), '翌月', '末日')->format('Y-m-d'))->toBe('2026-02-28');
 });
 
-it('shows the money cards with 財務分析を表示 only, the team cards to everyone', function () {
+it('shows the money cards with 財務分析を表示 only, the team cards to everyone (作業者ランキング: 全体 only)', function () {
     $this->actingAs($this->admin);
     Livewire::withQueryParams(['filters' => ['from' => '2026-10-01', 'to' => '2026-10-31']])->test(PortalPage::class)
         ->assertOk()
@@ -133,8 +137,8 @@ it('shows the money cards with 財務分析を表示 only, the team cards to eve
     // an employee: no money, no new records (no app may get one here), the team cards
     $this->actingAs($this->employee);
     Livewire::test(PortalPage::class)
-        ->assertDontSee(['売上合計', '売上概要', '入出金', '上位の売上先', '担当者別売上', '売れ筋 TOP3', '株式会社アルファ'])
-        ->assertSee(['作業者ランキング', '休暇・勤怠予定', 'クイックアクション', '最近のアクティビティ'])
+        ->assertDontSee(['売上合計', '売上概要', '入出金', '上位の売上先', '担当者別売上', '売れ筋 TOP3', '株式会社アルファ', '作業者ランキング', '売上の推移'])
+        ->assertSee(['勤務時間・収入の推移', '休暇・勤怠予定', 'クイックアクション', '最近のアクティビティ'])
         ->assertSee('title="追加できるアプリがありません"', escape: false);
 
     $this->employee->forceFill(['show_financial_analysis' => true])->save();
@@ -278,8 +282,8 @@ it('lets 全体 users switch the money to their own; 個人のみ users always s
     Livewire::withQueryParams(['filters' => [...$period, 'scope' => 'overall']])->test(PortalPage::class)
         ->assertSet('filters.scope', 'personal')
         ->assertDontSee('role="radiogroup"', escape: false)
-        ->assertSee(['¥150,000', '担当した売上', '角2封筒', '入金待ち'])
-        ->assertDontSee(['¥200,000', '担当者別売上', '株式会社ベータ', '差引'])
+        ->assertSee(['¥150,000', '入金待ち', '売上の推移', '2026年', '2025年'])
+        ->assertDontSee(['¥200,000', '担当者別売上', '担当した売上', '上位の売上先', '売れ筋 TOP3', '作業者ランキング', '株式会社ベータ', '差引'])
         ->call('setScope', 'overall')
         ->assertSet('filters.scope', 'personal');
 });
@@ -338,12 +342,13 @@ it('shows 個人の概要 to users without 財務分析を表示, and on the pag
 
     $this->actingAs($this->admin);
     expect(app(PersonalOverview::class)->for($worker, $this->period))
-        ->toBe(['hours' => 7.5, 'income' => 9450, 'reports' => 2, 'leave_days' => 2.0, 'paid_leave_days' => 1.5]);
+        ->toBe(['hours' => 7.5, 'income' => 9450, 'reports' => 2, 'work_days' => 2, 'leave_days' => 2.0, 'paid_leave_days' => 1.5]);
 
     // the employee on the dashboard: first row, their own figures (the requests they may see: their own)
     $this->actingAs($worker);
     Livewire::withQueryParams(['filters' => ['from' => '2026-10-01', 'to' => '2026-10-31']])->test(PortalPage::class)
-        ->assertSeeInOrder(['個人の概要', '2026/10/01 〜 2026/10/31', '勤務時間', '7.5', '時間', '収入', '¥9,450', '休暇日数', '1.5', '日', '有給休暇', '1', '日', '作業者ランキング']);
+        ->assertSeeInOrder(['個人の概要', '2026/10/01 〜 2026/10/31', '勤務時間', '7.5', '時間', '出勤日数', '2', '日', '収入', '¥9,450', '休暇日数', '1.5', '日', '有給休暇', '1', '日', '勤務時間・収入の推移'])
+        ->assertDontSee('作業者ランキング');
     expect(PersonalOverviewCard::canView())->toBeTrue();
     $this->actingAs($this->admin);
     expect(PersonalOverviewCard::canView())->toBeFalse(); // 財務分析を表示: the money instead
@@ -435,7 +440,7 @@ it('frames the user\'s own row in 作業者ランキング', function () {
         ->assertSeeInOrder(['sfk-workers-row is-1"', '営業 一郎', 'sfk-workers-row is-2 is-me"', 'aria-current="true"', '管理者'], escape: false);
 });
 
-it('puts クイックアクション first and 作業者ランキング last in row 3 for users without 財務分析を表示', function () {
+it('puts クイックアクション first in row 3 for users without 財務分析を表示, with no 作業者ランキング, half the row each', function () {
     $row3 = fn (): array => array_values(array_filter(
         (new PortalPage)->dashboardWidgets(),
         fn (string $widget): bool => in_array($widget, [TopWorkersCard::class, AbsencesCard::class, QuickActionsCard::class], true),
@@ -444,8 +449,141 @@ it('puts クイックアクション first and 作業者ランキング last in 
     $this->actingAs($this->admin);
     expect($row3())->toBe([TopWorkersCard::class, AbsencesCard::class, QuickActionsCard::class]);
 
+    Livewire::test(AbsencesCard::class)->assertSee('sfk-dash-span-4');
+
     $this->actingAs($this->employee);
-    expect($row3())->toBe([QuickActionsCard::class, AbsencesCard::class, TopWorkersCard::class])
-        ->and((new PortalPage)->dashboardWidgets()[0])->toBe(PersonalOverviewCard::class);
-    Livewire::test(PortalPage::class)->assertSeeInOrder(['個人の概要', 'sfk-quick-title', '休暇・勤怠予定', '作業者ランキング'], escape: false);
+    expect($row3())->toBe([QuickActionsCard::class, AbsencesCard::class])
+        ->and(array_slice((new PortalPage)->dashboardWidgets(), 0, 2))->toBe([PersonalOverviewCard::class, WorkTrendCard::class]);
+    Livewire::test(PortalPage::class)->assertSeeInOrder(['個人の概要', '勤務時間・収入の推移', 'sfk-quick-title', '休暇・勤怠予定'], escape: false);
+    Livewire::test(AbsencesCard::class)->assertSee('sfk-dash-span-6');
+    Livewire::test(QuickActionsCard::class)->assertSee('sfk-dash-span-6');
+});
+
+it('shows 作業者ランキング, 上位の売上先, 担当者別売上 and 売れ筋 TOP3 only to users who see everyone\'s money (bug.md 2026-11-07)', function () {
+    $space = Space::query()->create(['panel_id' => 'erp', 'name' => '営業スペース']);
+    $space->users()->attach([$this->staff->id, $this->employee->id]);
+    $app = new BusinessApp(['code' => 'sales-entry', 'name' => '06. 売上入力']);
+    $app->forceFill(['status' => AppStatus::Published])->save();
+    $app->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true]);
+    $app->spaces()->attach($space);
+    $overallOnly = [TopWorkersCard::class, TopCustomersCard::class, StaffSalesCard::class, TopProductsCard::class];
+    $visible = fn (): array => array_values(array_filter(
+        [...$overallOnly, SalesTrendCard::class, WorkTrendCard::class, PersonalOverviewCard::class],
+        fn (string $card): bool => $card::canView(),
+    ));
+
+    // 全体 (super admins always; and an employee ticked 全体)
+    $this->actingAs($this->admin);
+    expect($visible())->toBe($overallOnly);
+    grantDashboards($this->staff, 'erp')->forceFill(['show_financial_analysis' => true, 'financial_scope' => User::FINANCE_OVERALL])->save();
+    $this->actingAs($this->staff);
+    expect($visible())->toBe($overallOnly);
+
+    // 個人のみ: their sales over the year instead
+    $this->staff->forceFill(['financial_scope' => User::FINANCE_PERSONAL])->save();
+    expect($visible())->toBe([SalesTrendCard::class]);
+
+    // without 財務分析を表示: 個人の概要 and their hours and income over the year
+    $this->actingAs($this->employee);
+    expect($visible())->toBe([WorkTrendCard::class, PersonalOverviewCard::class]);
+});
+
+it('draws the 個人のみ user\'s own sales per month of a year against the year before', function () {
+    $this->actingAs($this->admin); // the sales the viewer may see
+    expect(app(SalesDashboard::class)->forStaff($this->staff->id)->monthly(2026))
+        ->toBe([1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0, 7 => 0, 8 => 0, 9 => 80000, 10 => 150000, 11 => 0, 12 => 0])
+        ->and(app(SalesDashboard::class)->monthly(2026)[10])->toBe(200000)
+        ->and(app(SalesDashboard::class)->forStaff($this->staff->id)->monthly(2025)[10])->toBe(160000);
+
+    $space = Space::query()->create(['panel_id' => 'erp', 'name' => '営業スペース']);
+    $space->users()->attach($this->staff);
+    $app = new BusinessApp(['code' => 'sales-entry', 'name' => '06. 売上入力']);
+    $app->forceFill(['status' => AppStatus::Published])->save();
+    $app->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true]);
+    $app->spaces()->attach($space);
+    grantDashboards($this->staff, 'erp')->forceFill(['show_financial_analysis' => true, 'financial_scope' => User::FINANCE_PERSONAL])->save();
+    $this->actingAs($this->staff);
+
+    // 2026 up to November: ¥230,000 against ¥160,000 in the same months of 2025
+    Livewire::test(SalesTrendCard::class)
+        ->assertSee(['売上の推移', '2026年', '2025年', '2026年の売上', '¥230,000', '前年比 ▲ 43.8%', '10月', '¥150,000', '¥160,000'])
+        ->assertDontSee('¥200,000') // someone else's sales are not in it
+        ->assertSee('<option value="2026" selected', escape: false)
+        ->set('year', '2025')
+        ->assertSee(['2025年の売上', '¥160,000', '2024年'])
+        ->assertSee('<option value="2025" selected', escape: false)
+        ->set('year', '1999')
+        ->assertSee('2026年の売上');
+
+    // the months after this one have no value yet (no line, nothing in the table)
+    Livewire::test(SalesTrendCard::class)->assertSeeInOrder(['<th scope="row">11月</th>', '<td>¥0</td>', '<td>¥0</td>', '<th scope="row">12月</th>', '<td>—</td>', '<td>¥0</td>'], escape: false);
+});
+
+it('counts the days with a 日報 as 出勤日数 and draws the employee\'s 勤務時間 and 収入 per month', function () {
+    $space = Space::query()->create(['panel_id' => 'erp', 'name' => '製造スペース']);
+    $space->users()->attach($this->employee);
+    $app = new BusinessApp(['code' => 'daily-report', 'name' => '08. 日報入力']);
+    $app->forceFill(['status' => AppStatus::Published])->save();
+    $app->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true]);
+    $app->spaces()->attach($space);
+    $this->employee->forceFill(['work_rate' => 1000, 'overtime_rate' => 1250])->save();
+
+    // two reports on 10/05 count as one day; 10/06 another; 09/30 is in September
+    DailyReport::query()->create(['worked_on' => '2026-10-05', 'user_id' => $this->employee->id, 'started_at' => '08:00', 'ended_at' => '12:00', 'break_time' => '00:00']);
+    DailyReport::query()->create(['worked_on' => '2026-10-05', 'user_id' => $this->employee->id, 'started_at' => '13:00', 'ended_at' => '15:00', 'break_time' => '00:00']);
+    DailyReport::query()->create(['worked_on' => '2026-10-06', 'user_id' => $this->employee->id, 'started_at' => '08:00', 'ended_at' => '10:00', 'break_time' => '00:00']);
+    DailyReport::query()->create(['worked_on' => '2026-09-30', 'user_id' => $this->employee->id, 'started_at' => '08:00', 'ended_at' => '11:00', 'break_time' => '00:00']);
+    DailyReport::query()->create(['worked_on' => '2026-10-07', 'user_id' => $this->other->id, 'started_at' => '08:00', 'ended_at' => '17:00', 'break_time' => '01:00']); // someone else
+
+    $this->actingAs($this->employee);
+    $figures = app(PersonalOverview::class)->for($this->employee, $this->period);
+    expect($figures['work_days'])->toBe(2)
+        ->and($figures['reports'])->toBe(3)
+        ->and($figures['hours'])->toBe(8.0);
+
+    $monthly = app(PersonalOverview::class)->monthly($this->employee, 2026);
+    expect($monthly['hours'][9])->toBe(3.0)
+        ->and($monthly['hours'][10])->toBe(8.0)
+        ->and($monthly['income'][10])->toBe(8000)
+        ->and($monthly['hours'][11])->toBe(0.0);
+
+    Livewire::withQueryParams(['filters' => ['from' => '2026-10-01', 'to' => '2026-10-31']])->test(PortalPage::class)
+        ->assertSeeInOrder(['個人の概要', '出勤日数', '2', '日', '勤務時間・収入の推移'], escape: false);
+
+    Livewire::test(WorkTrendCard::class)
+        ->assertSee(['勤務時間・収入の推移', '2026年の勤務時間', '11', '時間', '2026年の収入', '¥11,000', '8時間', '¥8,000'])
+        ->set('year', '2025')
+        ->assertSee(['2025年の勤務時間', '2025年の収入', '¥0']);
+});
+
+it('builds a 12-month chart on one axis with a round top, smooth lines that stay between their points, and no value after today', function () {
+    expect(TrendChart::niceStep(0))->toBe(1.0)
+        ->and(TrendChart::niceStep(37_500))->toBe(50_000.0)
+        ->and(TrendChart::niceStep(19_000))->toBe(20_000.0)
+        ->and(TrendChart::niceStep(2.2))->toBe(2.5)
+        ->and(TrendChart::yenAxis(0))->toBe('0')
+        ->and(TrendChart::yenAxis(5_000))->toBe('5,000')
+        ->and(TrendChart::yenAxis(1_200_000))->toBe('120万')
+        ->and(TrendChart::yenAxis(150_000_000))->toBe('1.5億');
+
+    $values = [1 => 0, 2 => 150, 3 => 0, 4 => 0, 5 => 400, 6 => 380, 7 => 10, 8 => 0, 9 => 0, 10 => 0, 11 => null, 12 => null];
+    $chart = TrendChart::build(
+        [['key' => 'a', 'label' => 'A', 'color' => '#2a78d6', 'values' => $values]],
+        fn (int|float $value): string => (string) $value,
+        fn (int|float $value): string => $value.'円',
+    );
+
+    expect(array_column($chart['ticks'], 'label'))->toBe(['400', '300', '200', '100', '0'])
+        ->and($chart['series'][0]['values'][1])->toBe('150円')
+        ->and($chart['series'][0]['values'][10])->toBeNull()
+        ->and($chart['series'][0]['points'][11])->toBeNull()
+        ->and($chart['empty'])->toBeFalse();
+
+    // every coordinate of the path (points and control points) stays inside the plot: never below 0 or above the top
+    preg_match_all('/-?\d+(?:\.\d+)?/', $chart['series'][0]['line'], $numbers);
+    $ys = array_values(array_filter($numbers[0], fn (int $index): bool => $index % 2 === 1, ARRAY_FILTER_USE_KEY));
+    expect(min(array_map('floatval', $ys)))->toBeGreaterThanOrEqual(0.0)
+        ->and(max(array_map('floatval', $ys)))->toBeLessThanOrEqual((float) TrendChart::HEIGHT);
+    // the line ends at October (x = 9/11 of the width)
+    expect($chart['series'][0]['line'])->toEndWith(sprintf('%.1f %.1f', 9 / 11 * TrendChart::WIDTH, (float) TrendChart::HEIGHT));
 });

@@ -5,7 +5,7 @@
     $weekdays = ['日', '月', '火', '水', '木', '金', '土'];
 @endphp
 
-<div class="sfk-dash-cell sfk-dash-span-4">
+<div class="sfk-dash-cell sfk-dash-span-{{ $span }}">
     <style>
         .sfk-absence-day + .sfk-absence-day { margin-top: var(--sfk-space-3); padding-top: var(--sfk-space-3); border-top: 1px solid var(--sfk-line); }
         .sfk-absence-day h3 { margin: 0 0 var(--sfk-space-2); color: var(--sfk-ink); font-size: var(--sfk-fs-small); font-weight: var(--sfk-fw-semibold); }

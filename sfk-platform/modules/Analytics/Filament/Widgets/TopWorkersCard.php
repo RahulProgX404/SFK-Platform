@@ -11,7 +11,7 @@ use Modules\Analytics\Filament\Pages\DailyReportAnalysis;
 /**
  * 作業者ランキング (row 3, every user; design of revenue-category.png, bug.md 2026-11-06): the five 作業者 who made the
  * most in the period (枚数単価 + 型替え単価 of 08. 日報入力), each with their share of what all 作業者 made and their hours
- * worked — the user's own row framed; → leads to 分析 → 日報分析.
+ * worked — the user's own row framed; → leads to 分析 → 日報分析. Shown to users who see everyone's money only.
  */
 final class TopWorkersCard extends DashboardCard
 {
@@ -19,10 +19,10 @@ final class TopWorkersCard extends DashboardCard
 
     protected string $view = 'analytics::widgets.top-workers';
 
-    /** Row 3: first — last for users without 財務分析を表示 (クイックアクション first for them; bug.md 2026-11-06). */
-    public static function getSort(): int
+    /** Only for users who see everyone's money (財務分析の範囲 全体; bug.md 2026-11-07). */
+    public static function canView(): bool
     {
-        return (self::actor()?->seesFinancialAnalysis() ?? false) ? 7 : 9;
+        return self::seesEveryonesMoney();
     }
 
     /** @return array<string, mixed> */

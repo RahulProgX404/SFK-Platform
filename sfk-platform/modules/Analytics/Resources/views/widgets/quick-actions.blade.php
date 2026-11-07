@@ -4,7 +4,7 @@
     $tones = ['is-blue', 'is-teal', 'is-green', 'is-orange', 'is-dark', 'is-purple'];
 @endphp
 
-<div class="sfk-dash-cell sfk-dash-span-4">
+<div class="sfk-dash-cell sfk-dash-span-{{ $span }}">
     <style>
         .sfk-quick { display: flex; flex-direction: column; gap: var(--sfk-space-3); margin: 0; padding: 0; list-style: none; }
         .sfk-quick-row { display: flex; align-items: center; gap: var(--sfk-space-3); min-height: 56px; padding: var(--sfk-space-2) var(--sfk-space-3); border-radius: var(--sfk-radius-lg); background: var(--sfk-quick); color: #fff; }

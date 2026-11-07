@@ -6,6 +6,9 @@
  */
 
 use App\Models\User;
+use Filament\Support\Facades\FilamentIcon;
+use Filament\Support\Icons\Heroicon;
+use Filament\View\PanelsIconAlias;
 use Modules\Core\Filament\Support\ThemeAssets;
 
 it('sends the browser protections with every page', function () {
@@ -69,4 +72,20 @@ it('serves the look of the panels as a stylesheet and a script the browser keeps
 
     expect($this->get(route('core.theme.js', ['v' => $bundle['version']]))->assertOk()->getContent())
         ->toContain("Alpine.data('sfkAppFilter'");
+});
+
+it('draws the sidebar of sidebar.png: a grey column, ≡ at the right of the header, the open screen a white card with a blue bar', function () {
+    $this->actingAs(User::factory()->superAdmin()->create());
+    $css = ThemeAssets::bundle()['css'];
+
+    expect($css)->toContain('--sfk-sidebar: #f3f4f6;')
+        ->and($css)->toMatch('/\.fi-sidebar \{\s*background-color: var\(--sfk-sidebar\);/')
+        ->and($css)->toMatch('/\.fi-sidebar-header>\.fi-sidebar-close-collapse-sidebar-btn \{\s*order: 2;\s*margin-inline-start: auto;/')
+        ->and($css)->toMatch('/\.fi-sidebar-item\.fi-active>\.fi-sidebar-item-btn \{\s*background-color: var\(--sfk-surface\);/')
+        ->and($css)->toMatch('/\.fi-sidebar-item\.fi-active>\.fi-sidebar-item-btn::before \{[^}]*background-color: var\(--sfk-primary\);/')
+        ->and($css)->toMatch('/\.fi-sidebar-nav>\.fi-sidebar-nav-groups>li\+li \{\s*border-top: 1px solid var\(--sfk-line\);/');
+
+    // ≡ (Bars 3) closes the sidebar: shown on an app screen (no top bar there)
+    $this->get('/erp/orders')->assertOk()->assertSee('fi-sidebar-close-collapse-sidebar-btn', false);
+    expect(FilamentIcon::resolve(PanelsIconAlias::SIDEBAR_COLLAPSE_BUTTON))->toBe(Heroicon::OutlinedBars3);
 });

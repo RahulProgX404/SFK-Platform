@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Analytics\Application;
 
 use App\Models\User;
+use DateTimeImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Analytics\Domain\Period;
 use Modules\HumanResources\Domain\LeaveRequests\LeaveRequestStatus;
@@ -16,6 +17,7 @@ use Modules\Production\Models\DailyReport;
 /**
  * 個人の概要 (bug.md 2026-11-06, overview.png) of one person for a period:
  * - 勤務時間: 作業時間 + 残業時間 of their 08. 日報入力 (作業者, 作業日; BR-PR-01);
+ * - 出勤日数: the days (作業日) they filled in a 日報 for — a day with several reports counts once;
  * - 収入: 時給計算 + 残業時給計算 of those reports (作業単価 × 作業時間 + 残業時間 × 残業単価, the rates the report
  *   copied from 02. 従業員マスタ — TaskCosting), cut to whole yen;
  * - 休暇日数 and 有給休暇: the 承認済 requests of 16. 申請管理 for them (作業員名, else 申請者) by 対象日付, counted by
@@ -38,11 +40,11 @@ final class PersonalOverview
         '半休(午後欠勤)' => [0.5, false],
     ];
 
-    /** @return array{hours: float, income: int, reports: int, leave_days: float, paid_leave_days: float} */
+    /** @return array{hours: float, income: int, reports: int, work_days: int, leave_days: float, paid_leave_days: float} */
     public function for(User $person, Period $period): array
     {
         $work = $this->reports($person, $period)
-            ->selectRaw('count(*) as reports, '
+            ->selectRaw('count(*) as reports, count(distinct daily_reports.worked_on) as work_days, '
                 .'coalesce(sum(coalesce(daily_reports.work_hours, 0) + coalesce(daily_reports.overtime_hours, 0)), 0) as hours, '
                 .'coalesce(sum(coalesce(daily_reports.work_hours, 0) * coalesce(daily_reports.work_rate, 0) + coalesce(daily_reports.overtime_hours, 0) * coalesce(daily_reports.overtime_rate, 0)), 0) as income')
             ->toBase()
@@ -61,9 +63,37 @@ final class PersonalOverview
             'hours' => round((float) ($work->hours ?? 0), 2),
             'income' => (int) floor((float) ($work->income ?? 0)),
             'reports' => (int) ($work->reports ?? 0),
+            'work_days' => (int) ($work->work_days ?? 0),
             'leave_days' => $leave,
             'paid_leave_days' => $paid,
         ];
+    }
+
+    /**
+     * 勤務時間 and 収入 (as in for()) per calendar month of a year (勤務時間・収入の推移, bug.md 2026-11-07).
+     *
+     * @return array{hours: array<int, float>, income: array<int, int>} month (1–12) => value
+     */
+    public function monthly(User $person, int $year): array
+    {
+        $month = MonthBucket::sql('daily_reports.worked_on');
+        $hours = array_fill(1, 12, 0.0);
+        $income = array_fill(1, 12, 0);
+        $rows = $this->reports($person, Period::between(sprintf('%04d-01-01', $year), sprintf('%04d-12-31', $year), new DateTimeImmutable))
+            ->selectRaw("{$month} as month, "
+                .'coalesce(sum(coalesce(daily_reports.work_hours, 0) + coalesce(daily_reports.overtime_hours, 0)), 0) as hours, '
+                .'coalesce(sum(coalesce(daily_reports.work_hours, 0) * coalesce(daily_reports.work_rate, 0) + coalesce(daily_reports.overtime_hours, 0) * coalesce(daily_reports.overtime_rate, 0)), 0) as income')
+            ->groupByRaw($month)
+            ->toBase()
+            ->get();
+
+        foreach ($rows as $row) {
+            [, $number] = MonthBucket::parse((string) $row->month);
+            $hours[$number] = round((float) $row->hours, 2);
+            $income[$number] = (int) floor((float) $row->income);
+        }
+
+        return ['hours' => $hours, 'income' => $income];
     }
 
     /** @return Builder<DailyReport> */

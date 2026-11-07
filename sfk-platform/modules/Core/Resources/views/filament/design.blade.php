@@ -53,6 +53,8 @@
         --sfk-surface: #ffffff;
         --sfk-page: #f5f7fa;
         --sfk-head: #f8f9fb;
+        /* the sidebar column (sidebar.png) */
+        --sfk-sidebar: #f3f4f6;
         /* the header row of the tables: a little darker than the other grey grounds (bug.md, 2026-11-04) */
         --sfk-table-head: #868686;
         --sfk-table-body: #eef1f5;
@@ -2512,60 +2514,155 @@
        Shared components (ui-refine.md, 2026-11): the same sizes, colours and spacing on every screen
        ============================================================================================================= */
 
-    /* ---- sidebar: white column, quiet group names, 38px items, the active item tinted with a bar ---------------- */
+    /* ---- sidebar (sidebar.png, bug.md 2026-11-07): a soft grey column; the dashboard name with ≡ on the right; quiet
+       section names, a hairline between sections; rows of a dark icon and label; the open screen a white raised card
+       with a blue bar on its left edge (the text stays dark) -------------------------------------------------------- */
     .fi-sidebar {
-        background-color: var(--sfk-surface);
+        background-color: var(--sfk-sidebar);
         border-inline-end: 1px solid var(--sfk-line);
     }
 
+    .fi-sidebar-header {
+        gap: var(--sfk-space-2);
+        padding-inline: var(--sfk-space-4) var(--sfk-space-3);
+        background-color: transparent;
+        box-shadow: none;
+    }
+
+    /* the name first, ≡ (closes the sidebar) at the right end */
+    .fi-sidebar-header>.sfk-dashboard-switcher {
+        order: 1;
+        flex: 1;
+    }
+
+    .fi-sidebar-header>.fi-sidebar-close-collapse-sidebar-btn {
+        order: 2;
+        margin-inline-start: auto;
+        color: var(--sfk-muted);
+    }
+
+    .fi-sidebar-header>.fi-sidebar-close-collapse-sidebar-btn:hover {
+        background-color: var(--sfk-hover-strong);
+        color: var(--sfk-ink);
+    }
+
+    .fi-sidebar .sfk-dashboard-switcher-btn {
+        padding-inline: 0;
+    }
+
     .fi-sidebar-nav {
-        padding-inline: var(--sfk-space-3);
+        row-gap: 0;
+        padding: var(--sfk-space-4) var(--sfk-space-3) var(--sfk-space-6);
+    }
+
+    .fi-sidebar-nav-groups {
+        row-gap: 0;
+    }
+
+    /* sections: a hairline between them (the first has none) */
+    .fi-sidebar-nav>.fi-sidebar-nav-groups>.fi-sidebar-group,
+    .fi-sidebar-nav>.fi-sidebar-nav-groups>li {
+        padding-block: var(--sfk-space-3);
+    }
+
+    .fi-sidebar-nav>.fi-sidebar-nav-groups+.fi-sidebar-nav-groups>li:first-child,
+    .fi-sidebar-nav>.fi-sidebar-nav-groups>li+li {
+        border-top: 1px solid var(--sfk-line);
+    }
+
+    .fi-sidebar-nav>.fi-sidebar-nav-groups:first-child>li:first-child {
+        padding-top: 0;
+    }
+
+    /* section name: small and quiet; its ⌃ (open / close the section) shows on hover or focus only */
+    .fi-sidebar-group-btn {
+        min-height: 28px;
+        padding: 0 var(--sfk-space-1) var(--sfk-space-1) var(--sfk-space-2);
+        cursor: pointer;
     }
 
     .fi-sidebar-group-label {
         color: var(--sfk-muted);
         font-size: var(--sfk-fs-small);
         font-weight: var(--sfk-fw-semibold);
-        letter-spacing: .04em;
+        letter-spacing: var(--sfk-tracking);
     }
 
+    .fi-sidebar-group-collapse-btn {
+        width: 24px;
+        height: 24px;
+        color: var(--sfk-subtle);
+        opacity: 0;
+        transition: opacity .15s;
+    }
+
+    .fi-sidebar-group-btn:hover .fi-sidebar-group-collapse-btn,
+    .fi-sidebar-group-collapse-btn:focus-visible,
+    .fi-sidebar-group.fi-collapsed .fi-sidebar-group-collapse-btn {
+        opacity: 1;
+    }
+
+    .fi-sidebar-group-items {
+        row-gap: 2px;
+    }
+
+    /* rows: dark icon and label */
     .fi-sidebar-item-btn {
+        position: relative;
         min-height: 38px;
-        padding-block: 7px;
+        padding: 7px var(--sfk-space-2) 7px var(--sfk-space-3);
         border-radius: var(--sfk-radius);
-        transition: background-color .15s, color .15s;
+        transition: background-color .15s, box-shadow .15s;
     }
 
     .fi-sidebar-item-label {
         color: var(--sfk-text);
         font-size: var(--sfk-fs-label);
-        font-weight: var(--sfk-fw-regular);
+        font-weight: var(--sfk-fw-medium);
     }
 
     .fi-sidebar-item-icon {
-        color: var(--sfk-subtle);
+        width: 20px;
+        height: 20px;
+        color: var(--sfk-muted);
     }
 
     .fi-sidebar-item:not(.fi-active)>.fi-sidebar-item-btn:hover {
-        background-color: var(--sfk-hover);
+        background-color: var(--sfk-hover-strong);
     }
 
     .fi-sidebar-item:not(.fi-active)>.fi-sidebar-item-btn:hover :is(.fi-sidebar-item-label, .fi-sidebar-item-icon) {
         color: var(--sfk-ink);
     }
 
+    /* the open screen: a white raised card, a 3px blue bar on its left edge */
     .fi-sidebar-item.fi-active>.fi-sidebar-item-btn {
-        background-color: var(--sfk-primary-soft);
-        box-shadow: inset 3px 0 0 var(--sfk-primary);
+        background-color: var(--sfk-surface);
+        box-shadow: 0 1px 3px rgba(16, 24, 40, .08), 0 0 0 1px var(--sfk-line);
     }
 
-    .fi-sidebar-item.fi-active :is(.fi-sidebar-item-label, .fi-sidebar-item-icon) {
-        color: var(--sfk-primary-dark);
+    .fi-sidebar-item.fi-active>.fi-sidebar-item-btn::before {
+        content: "";
+        position: absolute;
+        inset-block: 7px;
+        inset-inline-start: 0;
+        width: 3px;
+        border-radius: 0 3px 3px 0;
+        background-color: var(--sfk-primary);
+    }
+
+    .fi-sidebar-item.fi-active .fi-sidebar-item-label {
+        color: var(--sfk-ink);
         font-weight: var(--sfk-fw-semibold);
+    }
+
+    .fi-sidebar-item.fi-active .fi-sidebar-item-icon {
+        color: var(--sfk-primary);
     }
 
     .fi-sidebar-footer {
         border-top: 1px solid var(--sfk-line);
+        background-color: var(--sfk-sidebar);
     }
 
     .sfk-dashboard-switcher-btn {
