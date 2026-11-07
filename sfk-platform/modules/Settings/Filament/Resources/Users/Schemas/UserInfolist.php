@@ -11,6 +11,8 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Modules\Core\Access\EmployeeDataAccess;
+use Modules\Core\Access\UserType;
+use Modules\Core\Application\Apps\SpaceService;
 use Modules\Core\Domain\People\Gender;
 use Modules\Core\Http\Portal\DashboardDirectory;
 use Modules\Core\Http\Portal\DashboardEntry;
@@ -50,6 +52,17 @@ final class UserInfolist
                             ->badge()
                             ->color('info')
                             ->placeholder('なし（従業員カテゴリで設定します）'),
+                        TextEntry::make('space_names')
+                            ->label('スペース')
+                            // the spaces of the dashboards the user opens (named like on the form)
+                            ->state(fn (User $record): array => array_values(array_intersect_key(
+                                SpaceService::spaceOptions($record->grantedDashboards()),
+                                array_flip($record->spaces()->pluck('spaces.id')->map(fn (mixed $id): int => (int) $id)->all()),
+                            )))
+                            ->badge()
+                            ->color('info')
+                            ->placeholder('なし')
+                            ->visible(fn (User $record): bool => $record->user_type === UserType::Employee),
                         IconEntry::make('show_financial_analysis')
                             ->label('財務分析を表示')
                             ->state(fn (User $record): bool => $record->seesFinancialAnalysis())

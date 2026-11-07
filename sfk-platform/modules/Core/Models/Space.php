@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Modules\Core\Models;
 
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\Request;
 use WeakMap;
 
@@ -14,6 +16,10 @@ use WeakMap;
  * スペース: a group inside one dashboard (`panel_id`) holding member users and apps. A user may belong to
  * several spaces, and so may an app (of this dashboard or others). Employees use an app as members of one of its
  * spaces.
+ *
+ * Every space has one permission setting (スペースの権限, `permissions()`: rows for 全員 / 従業員カテゴリ / 個人, none
+ * when it is created): its members get those abilities in every app of the space, added to the apps' own
+ * permissions — and an app in several of the user's spaces gets the abilities of all of them (AppAccess).
  *
  * @property int $id
  * @property string $panel_id
@@ -32,6 +38,31 @@ final class Space extends Model
     /** @var WeakMap<Request, array<int, array<int, true>>>|null user id => ids of their spaces, per request */
     private static ?WeakMap $memberships = null;
 
+    /** @var WeakMap<Request, array<string, Collection<int, SpacePermission>>>|null "userId:spaceId" => rows, per request */
+    private static ?WeakMap $permissionRows = null;
+
+    /**
+     * The rows of the space's permission setting that apply to the user (全員, their own, their 従業員カテゴリ'), read
+     * once per request and space: the sidebar asks for every app of the space. Saving a row drops the memo.
+     *
+     * @param  list<int>  $categoryIds
+     * @return Collection<int, SpacePermission>
+     */
+    public function permissionRowsFor(User $user, array $categoryIds): Collection
+    {
+        self::$permissionRows ??= new WeakMap;
+        $request = request();
+        $cached = self::$permissionRows[$request] ?? [];
+        $key = $user->id.':'.$this->id;
+
+        if (! array_key_exists($key, $cached)) {
+            $cached[$key] = $this->permissions()->applyingTo($user, $categoryIds)->get();
+            self::$permissionRows[$request] = $cached;
+        }
+
+        return $cached[$key];
+    }
+
     /** Whether the user is a member; the user's spaces are read once per request (sidebar, app permissions). */
     public function hasMember(User $user): bool
     {
@@ -48,10 +79,11 @@ final class Space extends Model
         return isset($cached[$user->id][$this->id]);
     }
 
-    /** Drops the memos of the spaces (members here, the apps' spaces in BusinessApp::forCode()). */
+    /** Drops the memos of the spaces (members and permission rows here, the apps' spaces in BusinessApp::forCode()). */
     public static function forgetCached(): void
     {
         self::$memberships = null;
+        self::$permissionRows = null;
         BusinessApp::forgetCached();
     }
 
@@ -76,6 +108,14 @@ final class Space extends Model
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class)->withTimestamps();
+    }
+
+    /** @return HasMany<SpacePermission, $this> スペースの権限 (rows in the order 個人, 従業員カテゴリ, 全員) */
+    public function permissions(): HasMany
+    {
+        return $this->hasMany(SpacePermission::class)
+            ->orderByRaw("case subject_type when 'user' then 1 when 'category' then 2 else 3 end")
+            ->orderBy('id');
     }
 
     /** @return BelongsToMany<BusinessApp, $this> */

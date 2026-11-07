@@ -9,6 +9,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Livewire\Livewire;
 use Modules\Core\Access\AppAccess;
+use Modules\Core\Application\Apps\AppActionNotAllowed;
 use Modules\Core\Application\Apps\SpaceService;
 use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\AppStatus;
@@ -159,4 +160,129 @@ it('rejects a second 全員 row and duplicate subjects', function () {
 
 it('labels permission subjects in Japanese', function () {
     expect(PermissionSubject::options())->toBe(['user' => '個人', 'category' => '従業員カテゴリ', 'everyone' => '全員']);
+});
+
+it('creates every space with a permission setting for 全員 / 従業員カテゴリ / 個人 that applies in all its apps', function () {
+    $this->actingAs($this->admin);
+    $partners = placed_app('partner-master');
+    $orders = placed_app('order-entry');
+    $sales = EmployeeCategory::query()->where('name', '営業')->firstOrFail();
+    $salesPerson = grantDashboards(User::factory()->create(['name' => '営業 太郎']), 'erp');
+    $salesPerson->employeeCategories()->attach($sales);
+    $boss = grantDashboards(User::factory()->create(['name' => '佐藤 課長']), 'erp');
+
+    Livewire::test(ManageSpaces::class)
+        ->callAction('create', data: [
+            'name' => '営業スペース',
+            'user_ids' => [$this->employee->id, $salesPerson->id, $boss->id],
+            'app_ids' => [$partners->id, $orders->id],
+            'permissions' => [
+                ['subject_type' => 'everyone', 'can_view' => true],
+                ['subject_type' => 'category', 'employee_category_id' => $sales->id, 'can_view' => true, 'can_create' => true],
+                ['subject_type' => 'user', 'user_id' => $boss->id, 'can_view' => true, 'can_update' => true, 'can_delete' => true],
+            ],
+        ])
+        ->assertHasNoActionErrors();
+
+    $space = Space::query()->where('name', '営業スペース')->firstOrFail();
+    expect($space->permissions()->count())->toBe(3);
+
+    foreach ([$partners, $orders] as $app) {
+        expect(AppAccess::abilitiesFor($this->employee->fresh(), $app->fresh()))->toBe([AppAbility::View])
+            ->and(AppAccess::abilitiesFor($salesPerson->fresh(), $app->fresh()))->toBe([AppAbility::View, AppAbility::Create])
+            ->and(AppAccess::abilitiesFor($boss->fresh(), $app->fresh()))->toBe([AppAbility::View, AppAbility::Update, AppAbility::Delete]);
+    }
+
+    Livewire::test(ManageSpaces::class)
+        ->assertTableColumnStateSet('rights', ['個人：佐藤 課長：閲覧・編集・削除', '従業員カテゴリ：営業：閲覧・追加', '全員：閲覧'], $space);
+
+    // a space created without rows gives nothing
+    Livewire::test(ManageSpaces::class)
+        ->callAction('create', data: ['name' => '空のスペース'])
+        ->assertHasNoActionErrors();
+    expect(Space::query()->where('name', '空のスペース')->firstOrFail()->permissions()->count())->toBe(0);
+});
+
+it('edits the rows of a space and drops the 個人 row of a member who leaves', function () {
+    $this->actingAs($this->admin);
+    $app = placed_app('partner-master');
+    $space = Space::query()->create(['panel_id' => 'erp', 'name' => '営業']);
+    $space->users()->attach($this->employee);
+    $app->spaces()->attach($space);
+    $space->permissions()->create(['subject_type' => 'everyone', 'can_view' => true]);
+    $space->permissions()->create(['subject_type' => 'user', 'user_id' => $this->employee->id, 'can_view' => true, 'can_update' => true]);
+
+    Livewire::test(ManageSpaces::class)
+        ->callTableAction('edit', $space, data: [
+            'name' => '営業',
+            'user_ids' => [$this->employee->id],
+            'app_ids' => [$app->id],
+            'permissions' => [
+                ['subject_type' => 'everyone', 'can_view' => true, 'can_export' => true],
+            ],
+        ])
+        ->assertHasNoTableActionErrors();
+
+    expect($space->permissions()->count())->toBe(1)
+        ->and(AppAccess::abilitiesFor($this->employee->fresh(), $app->fresh()))->toBe([AppAbility::View, AppAbility::Export]);
+
+    // the 個人 row goes with the membership (SpaceService, without permissions given)
+    $space->permissions()->create(['subject_type' => 'user', 'user_id' => $this->employee->id, 'can_view' => true]);
+    app(SpaceService::class)->save($space, 'erp', ['name' => '営業', 'user_ids' => [], 'app_ids' => [$app->id]], $this->admin);
+    expect($space->permissions()->where('subject_type', 'user')->count())->toBe(0);
+});
+
+it('rejects a 個人 row for someone who is not a member, a second 全員 row and duplicate categories', function () {
+    $this->actingAs($this->admin);
+    $outsider = grantDashboards(User::factory()->create(), 'erp');
+    $sales = EmployeeCategory::query()->where('name', '営業')->firstOrFail();
+
+    Livewire::test(ManageSpaces::class)
+        ->callAction('create', data: [
+            'name' => 'X',
+            'user_ids' => [$this->employee->id],
+            'permissions' => [['subject_type' => 'user', 'user_id' => $outsider->id, 'can_view' => true]],
+        ]);
+    Livewire::test(ManageSpaces::class)
+        ->callAction('create', data: [
+            'name' => 'Y',
+            'permissions' => [['subject_type' => 'everyone', 'can_view' => true], ['subject_type' => 'everyone', 'can_view' => true]],
+        ]);
+    Livewire::test(ManageSpaces::class)
+        ->callAction('create', data: [
+            'name' => 'Z',
+            'permissions' => [
+                ['subject_type' => 'category', 'employee_category_id' => $sales->id, 'can_view' => true],
+                ['subject_type' => 'category', 'employee_category_id' => $sales->id, 'can_view' => true],
+            ],
+        ]);
+
+    expect(Space::query()->whereIn('name', ['X', 'Y', 'Z'])->count())->toBe(0);
+
+    expect(fn () => app(SpaceService::class)->save(null, 'erp', [
+        'name' => 'W',
+        'user_ids' => [$this->employee->id],
+        'permissions' => [['subject_type' => 'user', 'user_id' => $outsider->id, 'can_view' => true]],
+    ], $this->admin))->toThrow(AppActionNotAllowed::class, '個人の権限はこのスペースのメンバーにのみ設定できます。');
+});
+
+it('adds the rights of two spaces holding the same app (閲覧 + 閲覧・編集 = 閲覧・編集) and shows them on the app', function () {
+    $this->actingAs($this->admin);
+    $a = Space::query()->create(['panel_id' => 'erp', 'name' => 'A']);
+    $b = Space::query()->create(['panel_id' => 'erp', 'name' => 'B']);
+    $a->permissions()->create(['subject_type' => 'everyone', 'can_view' => true]);
+    $b->permissions()->create(['subject_type' => 'everyone', 'can_view' => true, 'can_update' => true]);
+    $a->users()->attach($this->employee);
+    $b->users()->attach($this->employee);
+    $app = placed_app('partner-master', space: $a);
+    $app->spaces()->attach($b);
+    Space::forgetCached();
+
+    expect(AppAccess::abilitiesFor($this->employee->fresh(), $app->fresh()))->toBe([AppAbility::View, AppAbility::Update]);
+
+    $this->get(EditAppSettings::getUrl(['record' => $app]))
+        ->assertOk()
+        ->assertSee('スペースの権限')
+        ->assertSee('A（全員）：閲覧')
+        ->assertSee('B（全員）：閲覧・編集');
 });

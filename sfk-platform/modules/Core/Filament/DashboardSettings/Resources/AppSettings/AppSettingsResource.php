@@ -4,18 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Core\Filament\DashboardSettings\Resources\AppSettings;
 
-use App\Models\User;
 use BackedEnum;
-use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\Checkbox;
-use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\Select;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Icons\Heroicon;
@@ -23,23 +17,21 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Modules\Core\Access\UserType;
 use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\AppStatus;
-use Modules\Core\Domain\Apps\PermissionSubject;
 use Modules\Core\Filament\DashboardSettings\DashboardSettingsPlugin;
 use Modules\Core\Filament\DashboardSettings\Resources\AppSettings\Pages\EditAppSettings;
 use Modules\Core\Filament\DashboardSettings\Resources\AppSettings\Pages\EditFieldPermissions;
 use Modules\Core\Filament\DashboardSettings\Resources\AppSettings\Pages\EditRecordPermissions;
 use Modules\Core\Filament\DashboardSettings\Resources\AppSettings\Pages\ListAppSettings;
 use Modules\Core\Models\BusinessApp;
-use Modules\Core\Models\EmployeeCategory;
 use UnitEnum;
 
 /**
  * アプリの権限 (permission.md "App"): the apps placed in this dashboard's spaces and, per app, who may do what —
  * 全員, a 従業員カテゴリ or one employee, each with 閲覧・追加・編集・削除・ファイル読み込み・ファイル書き出し.
- * 個人 overrides 従業員カテゴリ, which overrides 全員 (AppAccess). Per app also the レコード (EditRecordPermissions,
+ * 個人 overrides 従業員カテゴリ, which overrides 全員; the アクセス権 of the app's spaces (スペースの権限, shown read-only,
+ * set on スペース) are added to that for their members (AppAccess). Per app also the レコード (EditRecordPermissions,
  * RecordAccess) and フィールド (EditFieldPermissions, FieldAccess) アクセス権. Administrators only.
  */
 final class AppSettingsResource extends Resource
@@ -83,64 +75,20 @@ final class AppSettingsResource extends Resource
                             ->label('状態')
                             ->badge()
                             ->formatStateUsing(fn (AppStatus $state): string => $state->label()),
+                        TextEntry::make('space_rights')
+                            ->label('スペースの権限')
+                            ->state(fn (BusinessApp $record): array => self::spaceRights($record))
+                            ->badge()
+                            ->color('success')
+                            ->placeholder('なし')
+                            ->columnSpanFull(),
                     ]),
                 Section::make('アクセス権')
                     ->schema([
-                        Repeater::make('permissions')
-                            ->hiddenLabel()
+                        AccessEntryFields::permissionRows(fn (): array => AccessEntryFields::employees())
                             ->relationship(modifyQueryUsing: fn (Builder $query) => $query
                                 ->orderByRaw("case subject_type when 'user' then 1 when 'category' then 2 else 3 end")
-                                ->orderBy('id'))
-                            ->defaultItems(0)
-                            ->reorderable(false)
-                            ->addActionLabel('権限を追加')
-                            ->itemLabel(fn (array $state): string => AccessEntryFields::subjectLabel($state))
-                            ->extraAttributes(['class' => 'sfk-access'])
-                            ->columns(6)
-                            ->rule(fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
-                                $everyone = array_filter((array) $value, fn (mixed $item): bool => is_array($item)
-                                    && ($item['subject_type'] ?? null) === PermissionSubject::Everyone->value);
-                                if (count($everyone) > 1) {
-                                    $fail('「全員」の権限は1つだけ設定できます。');
-                                }
-                            })
-                            ->schema([
-                                Select::make('subject_type')
-                                    ->label('対象')
-                                    ->options(PermissionSubject::options())
-                                    ->default(PermissionSubject::Everyone->value)
-                                    ->required()
-                                    ->native(false)
-                                    ->live()
-                                    ->columnSpan(2),
-                                Select::make('employee_category_id')
-                                    ->live()
-                                    ->label('従業員カテゴリ')
-                                    ->options(fn (mixed $state): array => EmployeeCategory::options($state))
-                                    ->visible(fn (Get $get): bool => $get('subject_type') === PermissionSubject::Category->value)
-                                    ->required(fn (Get $get): bool => $get('subject_type') === PermissionSubject::Category->value)
-                                    ->distinct()
-                                    ->native(false)
-                                    ->columnSpan(4),
-                                Select::make('user_id')
-                                    ->live()
-                                    ->label('従業員')
-                                    ->options(fn (): array => User::query()
-                                        ->where('user_type', UserType::Employee->value)
-                                        ->orderBy('name')
-                                        ->pluck('name', 'id')
-                                        ->all())
-                                    ->visible(fn (Get $get): bool => $get('subject_type') === PermissionSubject::User->value)
-                                    ->required(fn (Get $get): bool => $get('subject_type') === PermissionSubject::User->value)
-                                    ->distinct()
-                                    ->searchable()
-                                    ->columnSpan(4),
-                                AccessEntryFields::rights(array_map(
-                                    fn (AppAbility $ability): Checkbox => Checkbox::make($ability->column())
-                                        ->label($ability->label()),
-                                    AppAbility::cases(),
-                                ))->columnSpanFull(),
-                            ]),
+                                ->orderBy('id')),
                     ]),
             ]);
     }
@@ -226,6 +174,29 @@ final class AppSettingsResource extends Resource
             'records' => EditRecordPermissions::route('/{record}/records'),
             'fields' => EditFieldPermissions::route('/{record}/fields'),
         ];
+    }
+
+    /**
+     * The rows of the アクセス権 of the app's spaces of this dashboard (added to the rows below for the spaces'
+     * members by AppAccess), e.g. 「営業（全員）：閲覧・編集」「営業（従業員カテゴリ：派遣）：閲覧」.
+     *
+     * @return list<string>
+     */
+    public static function spaceRights(BusinessApp $app): array
+    {
+        $lines = [];
+        $spaces = $app->spaces->where('panel_id', DashboardSettingsPlugin::currentPanelId());
+
+        foreach ($spaces as $space) {
+            foreach ($space->permissions()->with(['user', 'employeeCategory'])->get() as $row) {
+                $abilities = $row->abilities();
+                $lines[] = "{$space->name}（{$row->subjectLabel()}）：".($abilities === []
+                    ? 'なし'
+                    : implode('・', array_map(fn (AppAbility $ability): string => $ability->label(), $abilities)));
+            }
+        }
+
+        return $lines;
     }
 
     /** The app's spaces of this dashboard (an app may be in several). */

@@ -50,6 +50,11 @@ final class EditUser extends EditRecord
     protected function mutateFormDataBeforeFill(array $data): array
     {
         $data['employee_category_ids'] = $this->record->employeeCategories()->pluck('employee_categories.id')->all();
+        // the spaces the form offers (those of the dashboards the user opens); others are kept on save
+        $data['space_ids'] = $this->record->spaces()
+            ->whereIn('spaces.panel_id', $this->record->grantedDashboards())
+            ->pluck('spaces.id')
+            ->all();
 
         // The rates are hidden from serialization; only administrators reach this page.
         foreach (EmployeeDataAccess::RATE_ATTRIBUTES as $attribute) {

@@ -7,13 +7,12 @@ namespace Modules\Core\Models;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Validation\ValidationException;
-use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\PermissionSubject;
+use Modules\Core\Models\Concerns\GrantsAppAbilities;
 
 /**
- * One row of an app's permission list: 全員, one 従業員カテゴリ or one user, with the legacy abilities.
- * Like the legacy system, nothing but 閲覧 makes sense without 閲覧: removing 閲覧 removes everything else.
+ * One row of an app's permission list: 全員, one 従業員カテゴリ or one user, with the legacy abilities
+ * (GrantsAppAbilities: without 閲覧 nothing else, one 全員 row per app).
  *
  * @property int $id
  * @property int $business_app_id
@@ -29,6 +28,8 @@ use Modules\Core\Domain\Apps\PermissionSubject;
  */
 final class AppPermission extends Model
 {
+    use GrantsAppAbilities;
+
     protected $fillable = [
         'subject_type', 'employee_category_id', 'user_id',
         'can_view', 'can_create', 'can_update', 'can_delete', 'can_import', 'can_export',
@@ -47,45 +48,9 @@ final class AppPermission extends Model
         ];
     }
 
-    protected static function booted(): void
+    protected static function ownerColumn(): string
     {
-        self::saving(function (self $permission): void {
-            // Keep only the id that matches the subject.
-            if ($permission->subject_type !== PermissionSubject::Category) {
-                $permission->employee_category_id = null;
-            }
-            if ($permission->subject_type !== PermissionSubject::User) {
-                $permission->user_id = null;
-            }
-
-            if (! $permission->can_view) {
-                foreach (AppAbility::columns() as $column) {
-                    $permission->setAttribute($column, false);
-                }
-            }
-
-            $duplicateEveryone = $permission->subject_type === PermissionSubject::Everyone
-                && self::query()
-                    ->where('business_app_id', $permission->business_app_id)
-                    ->where('subject_type', PermissionSubject::Everyone->value)
-                    ->when($permission->exists, fn ($query) => $query->whereKeyNot($permission->getKey()))
-                    ->exists();
-
-            if ($duplicateEveryone) {
-                throw ValidationException::withMessages(['subject_type' => '「全員」の権限は1つだけ設定できます。']);
-            }
-        });
-    }
-
-    public function allows(AppAbility $ability): bool
-    {
-        return (bool) $this->getAttribute($ability->column());
-    }
-
-    /** @return list<AppAbility> */
-    public function abilities(): array
-    {
-        return array_values(array_filter(AppAbility::cases(), fn (AppAbility $ability): bool => $this->allows($ability)));
+        return 'business_app_id';
     }
 
     /** @return BelongsTo<BusinessApp, $this> */

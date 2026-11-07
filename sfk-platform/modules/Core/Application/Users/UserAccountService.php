@@ -9,7 +9,9 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\Core\Access\DashboardAccess;
 use Modules\Core\Access\UserType;
+use Modules\Core\Application\Apps\SpaceService;
 use Modules\Core\Models\EmployeeCategory;
+use Modules\Core\Models\Space;
 
 /**
  * Account lifecycle used by user management.
@@ -23,6 +25,10 @@ use Modules\Core\Models\EmployeeCategory;
  * here (SuperAdminProvisioner only). A null `$actor` is a trusted system call (console, seeders).
  * Dashboards: `dashboards` grants extra dashboards to the user on top of their 従業員カテゴリ; administrator-only
  * dashboards (共通管理) are always dropped from it because they follow ユーザー種別 (DashboardAccess).
+ * Spaces: `space_ids` sets the employee's スペース among the spaces of the dashboards they can open (own +
+ * 従業員カテゴリ, after this save); memberships in spaces of other dashboards are kept. Only employees are space
+ * members (as on スペース), so a user who stops being an employee leaves all spaces. Leaving a space drops their 個人
+ * row of its アクセス権.
  */
 final class UserAccountService
 {
@@ -35,6 +41,7 @@ final class UserAccountService
         unset($attributes['user_type']);
         $attributes = $this->withGrantableDashboards($attributes);
         [$attributes, $categoryIds] = $this->extractCategories($attributes);
+        [$attributes, $spaceIds] = $this->extractSpaces($attributes);
         $generated = blank($password) ? $this->generatePassword() : null;
 
         $user = new User($attributes);
@@ -43,6 +50,7 @@ final class UserAccountService
         if ($categoryIds !== null) {
             $user->employeeCategories()->sync($categoryIds);
         }
+        $this->syncSpaces($user, $spaceIds);
 
         return new IssuedCredentials($user, $generated);
     }
@@ -55,6 +63,7 @@ final class UserAccountService
         unset($attributes['user_type']);
         $attributes = $this->withGrantableDashboards($attributes);
         [$attributes, $categoryIds] = $this->extractCategories($attributes);
+        [$attributes, $spaceIds] = $this->extractSpaces($attributes);
 
         $user->fill($attributes);
         if ($type !== null) {
@@ -67,6 +76,7 @@ final class UserAccountService
         if ($categoryIds !== null) {
             $user->employeeCategories()->sync($categoryIds);
         }
+        $this->syncSpaces($user, $spaceIds);
 
         return new IssuedCredentials($user);
     }
@@ -150,6 +160,55 @@ final class UserAccountService
         unset($attributes['employee_category_ids']);
 
         return [$attributes, EmployeeCategory::query()->whereIn('id', $requested)->pluck('id')->map(fn (mixed $id): int => (int) $id)->values()->all()];
+    }
+
+    /**
+     * Takes `space_ids` (スペース) out of the attributes; null when not given.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return array{0: array<string, mixed>, 1: list<int>|null}
+     */
+    private function extractSpaces(array $attributes): array
+    {
+        if (! array_key_exists('space_ids', $attributes)) {
+            return [$attributes, null];
+        }
+
+        $requested = array_values(array_unique(array_map('intval', (array) $attributes['space_ids'])));
+        unset($attributes['space_ids']);
+
+        return [$attributes, $requested];
+    }
+
+    /**
+     * Sets the user's spaces among those of the dashboards they can open now (requested ids of other dashboards
+     * are ignored, memberships there kept). A user who is not an employee leaves every space.
+     *
+     * @param  list<int>|null  $spaceIds
+     */
+    private function syncSpaces(User $user, ?array $spaceIds): void
+    {
+        if ($user->user_type !== UserType::Employee) {
+            if ($user->spaces()->exists()) {
+                $user->spaces()->detach();
+                SpaceService::dropRowsOfFormerMembers(userId: $user->id);
+                Space::forgetCached();
+            }
+
+            return;
+        }
+
+        if ($spaceIds === null) {
+            return;
+        }
+
+        $panelIds = $user->grantedDashboards();
+        $offered = Space::query()->whereIn('panel_id', $panelIds)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
+        $kept = $user->spaces()->whereNotIn('spaces.panel_id', $panelIds)->pluck('spaces.id')->map(fn (mixed $id): int => (int) $id)->all();
+
+        $user->spaces()->sync([...$kept, ...array_values(array_intersect($spaceIds, $offered))]);
+        SpaceService::dropRowsOfFormerMembers(userId: $user->id);
+        Space::forgetCached();
     }
 
     /**

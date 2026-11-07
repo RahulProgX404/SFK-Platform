@@ -23,6 +23,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Modules\Core\Access\DashboardAccess;
 use Modules\Core\Access\UserType;
+use Modules\Core\Application\Apps\SpaceService;
 use Modules\Core\Domain\People\EmploymentStatus;
 use Modules\Core\Domain\People\Gender;
 use Modules\Core\Models\EmployeeCategory;
@@ -36,7 +37,9 @@ use Modules\Settings\Filament\Resources\Users\UserResource;
  *
  * Only administrators reach this form (UserResource::canCreate/canEdit) and may only assign the ユーザー種別
  * below them, so 従業員マスタ情報 is administrator-only (SYSTEM_BRAIN APP_02, 11_PERMISSIONS §3).
- * `employee_category_ids` and `generated_password` are not columns (UserAccountService / display only).
+ * `employee_category_ids`, `space_ids` and `generated_password` are not columns (UserAccountService / display only).
+ * スペース (employees only) lists the spaces of the dashboards the user will open; the space's アクセス権 then
+ * applies to the employee in its apps (AppAccess).
  */
 final class UserForm
 {
@@ -107,7 +110,8 @@ final class UserForm
                     ->default(UserType::Employee->value)
                     ->required()
                     ->in(fn (): array => array_map(fn (UserType $type): string => $type->value, UserResource::assignableTypes()))
-                    ->native(false),
+                    ->native(false)
+                    ->live(),
                 Select::make('employment_status')
                     ->label('在籍状況')
                     ->options(EmploymentStatus::options())
@@ -117,6 +121,15 @@ final class UserForm
                 CheckboxList::make('dashboards')
                     ->label('利用可能なダッシュボード')
                     ->options(fn (): array => DashboardAccess::grantableOptions())
+                    ->live()
+                    ->afterStateUpdated(fn (Get $get, Set $set) => self::keepOfferedSpaces($get, $set))
+                    ->columns(2)
+                    ->columnSpanFull(),
+                // the spaces of the dashboards the employee can open (ticked above or through their 従業員カテゴリ)
+                CheckboxList::make('space_ids')
+                    ->label('スペース')
+                    ->options(fn (Get $get): array => self::spaceOptions($get))
+                    ->visible(fn (Get $get): bool => self::isEmployee($get) && self::spaceOptions($get) !== [])
                     ->columns(2)
                     ->columnSpanFull(),
                 // the money of the dashboard and 分析 → 売上分析 (super admins always see it)
@@ -134,6 +147,46 @@ final class UserForm
                     ->visible(fn (Get $get): bool => (bool) $get('show_financial_analysis'))
                     ->columnSpanFull(),
             ]);
+    }
+
+    /**
+     * Spaces offered on the form: those of the dashboards ticked in 利用可能なダッシュボード and of the chosen
+     * 従業員カテゴリ — the dashboards the user will open (UserAccountService saves within the same set).
+     *
+     * @return array<int, string>
+     */
+    private static function spaceOptions(Get $get): array
+    {
+        $panelIds = array_map(fn (mixed $id): string => (string) $id, (array) $get('dashboards'));
+        $categoryIds = array_map('intval', (array) $get('employee_category_ids'));
+
+        if ($categoryIds !== []) {
+            foreach (EmployeeCategory::query()->whereIn('id', $categoryIds)->orderBy('sort_order')->pluck('dashboards') as $dashboards) {
+                foreach ((array) $dashboards as $id) {
+                    $panelIds[] = (string) $id;
+                }
+            }
+        }
+
+        return SpaceService::spaceOptions($panelIds);
+    }
+
+    /** Unticks spaces whose dashboard is no longer offered (they would not pass the options check). */
+    private static function keepOfferedSpaces(Get $get, Set $set): void
+    {
+        $offered = array_keys(self::spaceOptions($get));
+        $set('space_ids', array_values(array_filter(
+            (array) $get('space_ids'),
+            fn (mixed $id): bool => in_array((int) $id, $offered, true),
+        )));
+    }
+
+    /** Only employees are space members (administrators may do everything anyway). */
+    private static function isEmployee(Get $get): bool
+    {
+        $type = $get('user_type');
+
+        return ($type instanceof UserType ? $type : UserType::tryFrom((string) $type)) === UserType::Employee;
     }
 
     private static function profileSection(): Section
@@ -190,7 +243,9 @@ final class UserForm
                     ->maxLength(64),
                 self::optionSelect('employee_category_ids', '従業員カテゴリ', EmployeeCategory::class, '例：派遣')
                     ->multiple()
-                    ->required(),
+                    ->required()
+                    ->live()
+                    ->afterStateUpdated(fn (Get $get, Set $set) => self::keepOfferedSpaces($get, $set)),
                 self::optionSelect('position_id', '役職', Position::class, '例：課長')
                     ->placeholder('なし'),
                 self::rateInput('work_rate', '作業単価'),

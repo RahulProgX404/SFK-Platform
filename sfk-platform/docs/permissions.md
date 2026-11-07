@@ -10,11 +10,17 @@ permissions").
 | Concept                | the legacy system            | Here                                                                                                                              | Maintained by                                                           |
 | ---------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | Dashboard (department) | —                  | A Filament panel (白石封筒 `erp`, future products). 共通管理 (`settings`) is administrator-only                                   | code                                                                    |
-| Space (group)          | スペース           | `spaces` (per dashboard) + members `space_user` (employees only). A user may be in several spaces                                 | administrators, in the dashboard's **ダッシュボード設定 → スペース**    |
+| Space (group)          | スペース           | `spaces` (per dashboard) + members `space_user` (employees only). A user may be in several spaces. Each space has one permission setting (アクセス権, `space_permissions`: 全員 / 従業員カテゴリ / 個人 rows) for its members in all its apps | administrators, in the dashboard's **ダッシュボード設定 → スペース**; members also in **ユーザー管理** (スペース, after 利用可能なダッシュボード) |
 | App (feature)          | アプリ             | `business_apps` registry: `code`, name, status; placed in spaces via `business_app_space` (several, of any dashboards)          | the code (AppResource screens); s共通管理 **共通管理 → アプリ設定** |
 | App permission         | アプリのアクセス権 | `app_permissions`: rows for 全員 / one 従業員カテゴリ / one employee × 閲覧・追加・編集・削除・ファイル読み込み・ファイル書き出し | administrators, in **ダッシュボード設定 → アプリの権限**                |
 | Record permission      | レコードのアクセス権 | `app_record_rules` (condition = a 絞り込む filter, in order) + `app_record_rule_entries`: 作成者 / 個人 / 従業員カテゴリ / 全員 × 閲覧・編集・削除 | administrators, **アプリの権限 → レコード** (or アプリの設定 → 設定 → アクセス権) |
 | Field permission       | フィールドのアクセス権 | `app_field_permissions`: per field, in order, 個人 / 従業員カテゴリ / 全員 × 編集 / 閲覧 / なし | administrators, **アプリの権限 → フィールド** |
+
+## Space members from ユーザー管理
+
+The user form shows, after 利用可能なダッシュボード, the スペース of the dashboards the user will open (those ticked plus
+those of their 従業員カテゴリ; employees only). Saving sets the user's spaces among them; memberships in spaces of
+other dashboards are kept. A user who stops being an employee leaves every space (`UserAccountService`).
 
 ## Who may open a dashboard (`Modules\Core\Access\DashboardAccess`)
 
@@ -29,6 +35,14 @@ user's own `dashboards` plus the `dashboards` of all their 従業員カテゴリ
    dashboard they can open and of which they are a member. Then the first matching level wins: **個人 → 従業員カテゴリ → 全員**; a
    matching level replaces the lower ones entirely, so it can also take rights away. With several categories, the
    rights of all their matching category rows are combined. No row ⇒ no access.
+   **Plus the spaces' permission settings** (スペースの権限, `space_permissions`): every space has one, empty when the
+   space is created, edited on the space (アクセス権). Its rows are like the app rows — 全員 (one), a 従業員カテゴリ or
+   one member (個人 only for members) × 閲覧・追加・編集・削除・ファイル読み込み・ファイル書き出し — and are read the same
+   way within the space (個人 → 従業員カテゴリ → 全員, the first matching level). The members get the result in every app
+   of the space. The results are **added**: the user gets each ability that the app rows or any of their spaces
+   holding the app (of a dashboard they can open) give — app in space A (閲覧) and space B (閲覧・編集) ⇒ 閲覧・編集.
+   Neither an app row nor another space can take away what a space gives. Leaving a space drops one's 個人 row there.
+   The app's アプリの権限 page lists its spaces' rows (スペースの権限).
    During メンテナンス中 only 閲覧 and ファイル書き出し remain. Without 閲覧 a row grants nothing (like the legacy system).
 
 ## Which records (`Modules\Core\Access\RecordAccess`)

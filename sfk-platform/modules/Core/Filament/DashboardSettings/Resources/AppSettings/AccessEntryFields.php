@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Filament\DashboardSettings\Resources\AppSettings;
 
 use App\Models\User;
+use Closure;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
@@ -14,7 +15,9 @@ use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Utilities\Get;
 use Modules\Core\Access\UserType;
 use Modules\Core\Domain\Apps\AccessSubject;
+use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\FieldAccessLevel;
+use Modules\Core\Domain\Apps\PermissionSubject;
 use Modules\Core\Models\EmployeeCategory;
 
 /**
@@ -32,6 +35,69 @@ final class AccessEntryFields
                 Checkbox::make('can_delete')->label('削除'),
             ])->columnSpanFull(),
         ]);
+    }
+
+    /**
+     * Rows of an app's or a space's アクセス権 (`permissions`): 全員 (one), a 従業員カテゴリ or one employee, each with
+     * 閲覧・追加・編集・削除・ファイル読み込み・ファイル書き出し. 個人 overrides 従業員カテゴリ, which overrides 全員.
+     *
+     * @param  Closure(Get): array<int, string>  $employeeOptions  employees a 個人 row may name
+     */
+    public static function permissionRows(Closure $employeeOptions): Repeater
+    {
+        return Repeater::make('permissions')
+            ->hiddenLabel()
+            ->defaultItems(0)
+            ->reorderable(false)
+            ->addActionLabel('権限を追加')
+            ->itemLabel(fn (array $state): string => self::subjectLabel($state))
+            ->extraAttributes(['class' => 'sfk-access'])
+            ->columns(6)
+            ->rule(fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
+                $everyone = array_filter((array) $value, fn (mixed $item): bool => is_array($item)
+                    && ($item['subject_type'] ?? null) === PermissionSubject::Everyone->value);
+                if (count($everyone) > 1) {
+                    $fail('「全員」の権限は1つだけ設定できます。');
+                }
+            })
+            ->schema([
+                Select::make('subject_type')
+                    ->label('対象')
+                    ->options(PermissionSubject::options())
+                    ->default(PermissionSubject::Everyone->value)
+                    ->required()
+                    ->native(false)
+                    ->live()
+                    ->columnSpan(2),
+                Select::make('employee_category_id')
+                    ->live()
+                    ->label('従業員カテゴリ')
+                    ->options(fn (mixed $state): array => EmployeeCategory::options($state))
+                    ->visible(fn (Get $get): bool => $get('subject_type') === PermissionSubject::Category->value)
+                    ->required(fn (Get $get): bool => $get('subject_type') === PermissionSubject::Category->value)
+                    ->distinct()
+                    ->native(false)
+                    ->columnSpan(4),
+                Select::make('user_id')
+                    ->live()
+                    ->label('従業員')
+                    ->options($employeeOptions)
+                    ->visible(fn (Get $get): bool => $get('subject_type') === PermissionSubject::User->value)
+                    ->required(fn (Get $get): bool => $get('subject_type') === PermissionSubject::User->value)
+                    ->distinct()
+                    ->searchable()
+                    ->columnSpan(4),
+                self::rights(array_map(
+                    fn (AppAbility $ability): Checkbox => Checkbox::make($ability->column())->label($ability->label()),
+                    AppAbility::cases(),
+                ))->columnSpanFull(),
+            ]);
+    }
+
+    /** @return array<int, string> every employee, by name */
+    public static function employees(): array
+    {
+        return User::query()->where('user_type', UserType::Employee->value)->orderBy('name')->pluck('name', 'id')->all();
     }
 
     /**

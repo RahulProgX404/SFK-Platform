@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Modules\Core\Access;
 
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\PermissionSubject;
 use Modules\Core\Models\AppPermission;
 use Modules\Core\Models\BusinessApp;
 use Modules\Core\Models\Space;
+use Modules\Core\Models\SpacePermission;
 use WeakMap;
 
 /**
@@ -24,6 +26,10 @@ use WeakMap;
  *    - then the app's permission rows decide: the user's own row, else the rows of their 従業員カテゴリ (a user
  *      may have several: their abilities are combined), else the 全員 row, else nothing. A matching level
  *      replaces the lower ones entirely (like the legacy system's first match).
+ *    - the permission setting of each of those spaces is added (スペースの権限, Space::permissions(): rows for 全員 /
+ *      従業員カテゴリ / 個人, the same first match as the app rows within one space): the user gets every ability the
+ *      app rows or any of their spaces holding the app give (space A 閲覧 + space B 閲覧・編集 ⇒ 閲覧・編集). App rows
+ *      cannot take away what a space gives, nor one space what another gives.
  *    - メンテナンス中 keeps only the read-only abilities (閲覧, ファイル書き出し).
  *
  * Results are memoized per user and app for the current request: screens ask many times per page.
@@ -96,14 +102,18 @@ final class AppAccess
             return [];
         }
 
-        $member = $app->spaces->contains(fn (Space $space): bool => DashboardAccess::allows($user, $space->panel_id)
+        $spaces = $app->spaces->filter(fn (Space $space): bool => DashboardAccess::allows($user, $space->panel_id)
             && $space->hasMember($user));
 
-        if (! $member) {
+        if ($spaces->isEmpty()) {
             return [];
         }
 
-        $abilities = self::matchingAbilities($user, $app);
+        $categoryIds = self::categoryIds($user);
+        $abilities = self::combined([
+            self::firstMatch($app->permissions()->applyingTo($user, $categoryIds)->get()),
+            ...$spaces->map(fn (Space $space): array => self::spaceAbilities($user, $space, $categoryIds))->values()->all(),
+        ]);
 
         if ($app->status->isReadOnlyForEmployees()) {
             $abilities = array_values(array_filter($abilities, fn (AppAbility $ability): bool => $ability->isReadOnly()));
@@ -113,33 +123,53 @@ final class AppAccess
     }
 
     /**
-     * The user's own row, else the union of their categories' rows, else 全員, else nothing.
+     * Every ability any of the lists gives (in AppAbility order): A 閲覧 + B 閲覧・編集 ⇒ 閲覧・編集.
      *
+     * @param  list<list<AppAbility>>  $lists
      * @return list<AppAbility>
      */
-    private static function matchingAbilities(User $user, BusinessApp $app): array
+    private static function combined(array $lists): array
     {
-        $categoryIds = $user->employeeCategories()->pluck('employee_categories.id')->all();
+        return array_values(array_filter(
+            AppAbility::cases(),
+            fn (AppAbility $ability): bool => array_any($lists, fn (array $list): bool => in_array($ability, $list, true)),
+        ));
+    }
 
-        $rows = $app->permissions()
-            ->where(function ($query) use ($user, $categoryIds): void {
-                $query->where('subject_type', PermissionSubject::Everyone->value)
-                    ->orWhere(fn ($query) => $query
-                        ->where('subject_type', PermissionSubject::User->value)
-                        ->where('user_id', $user->id))
-                    ->orWhere(fn ($query) => $query
-                        ->where('subject_type', PermissionSubject::Category->value)
-                        ->whereIn('employee_category_id', $categoryIds));
-            })
-            ->get()
-            ->groupBy(fn (AppPermission $permission): string => $permission->subject_type->value);
+    /**
+     * The abilities a member gets from a space's permission setting (the same first match as the app rows).
+     *
+     * @param  list<int>  $categoryIds
+     * @return list<AppAbility>
+     */
+    private static function spaceAbilities(User $user, Space $space, array $categoryIds): array
+    {
+        return self::firstMatch($space->permissionRowsFor($user, $categoryIds));
+    }
+
+    /** @return list<int> ids of the user's 従業員カテゴリ */
+    private static function categoryIds(User $user): array
+    {
+        return array_map('intval', $user->employeeCategories()->pluck('employee_categories.id')->all());
+    }
+
+    /**
+     * Of the rows that apply to the user: their own row, else the union of their categories' rows, else 全員, else
+     * nothing. A matching level replaces the lower ones entirely.
+     *
+     * @param  Collection<int, AppPermission>|Collection<int, SpacePermission>  $rows
+     * @return list<AppAbility>
+     */
+    private static function firstMatch(Collection $rows): array
+    {
+        $byLevel = $rows->groupBy(fn (AppPermission|SpacePermission $row): string => $row->subject_type->value);
 
         foreach ([PermissionSubject::User, PermissionSubject::Category, PermissionSubject::Everyone] as $level) {
-            $matches = $rows->get($level->value);
+            $matches = $byLevel->get($level->value);
             if ($matches !== null && $matches->isNotEmpty()) {
                 return array_values(array_filter(
                     AppAbility::cases(),
-                    fn (AppAbility $ability): bool => $matches->contains(fn (AppPermission $permission): bool => $permission->allows($ability)),
+                    fn (AppAbility $ability): bool => $matches->contains(fn (AppPermission|SpacePermission $row): bool => $row->allows($ability)),
                 ));
             }
         }
