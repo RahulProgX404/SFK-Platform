@@ -1,0 +1,78 @@
+# Render Blueprint (https://render.com/docs/blueprint-spec): the SFK platform (sfk-platform/) on Render's free plan, in
+# Singapore — the region nearest to Japan — as one Docker web service (nginx + PHP-FPM, queue and scheduler inside,
+# sfk-platform/docker/render) and a PostgreSQL database. A demo / staging set-up: the free service sleeps after 15 minutes
+# without visitors, the free database expires after its trial period and has no backups.
+# Values marked `sync: false` are asked for when the Blueprint is created (secrets and the service's own URL).
+services:
+  - type: web
+    name: sfk-platform
+    runtime: docker
+    plan: free
+    region: singapore
+    branch: main
+    dockerContext: ./sfk-platform
+    dockerfilePath: ./sfk-platform/docker/render/Dockerfile
+    healthCheckPath: /up
+    # deploy only when the app changed (not for edits of SYSTEM_BRAIN and the other folders)
+    buildFilter:
+      paths:
+        - sfk-platform/**
+    envVars:
+      - key: APP_NAME
+        value: SFK Platform
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: APP_LOCALE
+        value: ja
+      - key: APP_FALLBACK_LOCALE
+        value: en
+      - key: APP_TIMEZONE
+        value: Asia/Tokyo
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: LOG_LEVEL
+        value: warning
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_URL
+        fromDatabase:
+          name: sfk-db
+          property: connectionString
+      # no Redis on the free plan: sessions, cache and the queue in PostgreSQL
+      - key: SESSION_DRIVER
+        value: database
+      - key: SESSION_SECURE_COOKIE
+        value: "true"
+      - key: CACHE_STORE
+        value: database
+      - key: QUEUE_CONNECTION
+        value: database
+      # Render's proxy terminates HTTPS
+      - key: TRUSTED_PROXIES
+        value: "*"
+      # files on the instance are lost when it sleeps: set UPLOADS_DISK=s3 and the AWS_* values for a bucket
+      # (e.g. Cloudflare R2) to keep uploads
+      - key: UPLOADS_DISK
+        value: local
+      - key: MAIL_MAILER
+        value: log
+      - key: SUPER_ADMIN_NAME
+        value: システム管理者
+      - key: SUPER_ADMIN_EMAIL
+        sync: false
+      - key: SUPER_ADMIN_PASSWORD
+        sync: false
+
+databases:
+  - name: sfk-db
+    plan: free
+    region: singapore
+    postgresMajorVersion: "17"
+    databaseName: sfk_platform
+    user: sfk

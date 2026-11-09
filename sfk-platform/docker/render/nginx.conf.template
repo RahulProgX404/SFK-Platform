@@ -1,0 +1,55 @@
+# nginx of the Render image (docker/render/Dockerfile): docker/nginx/default.conf with PHP-FPM in the same container
+# and Render's port. ${PORT} is filled in by docker/render/start.sh.
+server {
+    listen ${PORT};
+    server_name _;
+    root /var/www/html/public;
+    index index.php;
+    charset utf-8;
+    client_max_body_size 55m;
+    server_tokens off;
+
+    add_header X-Frame-Options "SAMEORIGIN";
+    add_header X-Content-Type-Options "nosniff";
+
+    gzip on;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_proxied any;
+    gzip_vary on;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ ^/(css|js|fonts)/filament/ {
+        expires 1y;
+        access_log off;
+        try_files $uri =404;
+    }
+
+    location ^~ /fonts/noto-sans-jp/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+        try_files $uri =404;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    location ~ \.php$ {
+        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+        fastcgi_hide_header X-Powered-By;
+        fastcgi_hide_header X-Frame-Options;
+        fastcgi_hide_header X-Content-Type-Options;
+        fastcgi_read_timeout 120;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}

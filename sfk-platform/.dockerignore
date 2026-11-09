@@ -1,0 +1,21 @@
+# Not part of the image (docker/render/Dockerfile): local settings and secrets, the host's packages and caches, the
+# legacy export, development files.
+.env
+.env.*
+!.env.example
+.git
+vendor
+node_modules
+data_json
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/framework/testing/*
+storage/app/*
+bootstrap/cache/*.php
+tests
+modules/*/Tests
+.phpunit.result.cache
+.idea
+.vscode
