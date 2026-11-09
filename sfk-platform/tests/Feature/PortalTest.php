@@ -194,10 +194,11 @@ it('offers the + buttons to the right people', function () {
         ->assertSee('スペースを作成・管理')
         ->assertDontSee('title="アプリ設定"', escape: false);
 
+    // super admins too: the + to アプリ設定 is no longer in the アプリ panel (2026-11-09)
     $this->actingAs(User::factory()->superAdmin()->create());
     Livewire::test(PortalPage::class)
         ->assertSee('スペースを作成・管理')
-        ->assertSee('title="アプリ設定"', escape: false)
+        ->assertDontSee('title="アプリ設定"', escape: false)
         ->assertSee('09. 見積書管理')
         ->assertSee('開発中');
 });

@@ -1149,7 +1149,7 @@
 
     {{-- 新規作成 of an app adding records in a panel over the screen (PortalPage::quickCreateComponents) --}}
     @foreach ($this->quickCreateComponents() as $quickApp => $quickComponent)
-        @livewire($quickComponent, ['app' => $quickApp], key('sfk-quick-create-'.$quickApp))
+        @livewire($quickComponent, ['app' => $quickApp], key('sfk-quick-create-' . $quickApp))
     @endforeach
 
     {{-- アプリ: opened by the button of the top bar (core::filament.app-launcher-button) --}}
@@ -1167,9 +1167,6 @@
             </label>
             <div class="sfk-apps-tools">
                 @if ($appsSettingsUrl !== null)
-                    <a href="{{ $appsSettingsUrl }}" class="sfk-add" title="アプリ設定" aria-label="アプリ設定">
-                        <x-filament::icon icon="heroicon-m-plus" />
-                    </a>
                 @endif
                 @if ($this->reorderAppsAction->isVisible())
                     {{ $this->reorderAppsAction }}

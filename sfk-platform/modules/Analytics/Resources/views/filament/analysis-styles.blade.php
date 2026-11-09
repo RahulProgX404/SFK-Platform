@@ -245,14 +245,14 @@
     .sfk-an-edit {
         width: 100%;
         padding: 4px 6px;
-        border-radius: 4px;
+        /* border-radius: 4px; */
         color: var(--sfk-text);
         text-align: right;
         box-shadow: inset 0 -1px 0 var(--sfk-line-strong);
     }
 
     .sfk-an-edit:hover {
-        background: var(--sfk-primary-soft);
+        /* background: var(--sfk-primary-soft); */
         color: var(--sfk-primary-dark);
     }
 
