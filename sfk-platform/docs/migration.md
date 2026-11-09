@@ -73,3 +73,8 @@ not taken over, reconciliation differences).
 
 **Open question**: 製造済数量 of a job = Σ 出来上 of all its daily reports (08N rule) counts each process step; whether
 only the last step (or the reports with ステータスの更新) should count is a business decision.
+
+## Render
+
+The Render deployment gets the data by importing into a separate local database and copying it over in one go:
+[render-legacy-data.md](render-legacy-data.md).
