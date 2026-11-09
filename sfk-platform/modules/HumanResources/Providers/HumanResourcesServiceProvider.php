@@ -7,6 +7,7 @@ namespace Modules\HumanResources\Providers;
 use App\Models\User;
 use App\Modules\ModuleServiceProvider;
 use Filament\Support\Icons\Heroicon;
+use Livewire\Livewire;
 use Modules\Core\Application\Legacy\LegacyImporter;
 use Modules\Core\Application\Notifications\NotificationKind;
 use Modules\Core\Application\Notifications\NotificationKinds;
@@ -15,6 +16,9 @@ use Modules\HumanResources\Application\LeaveRequests\LeaveRequestWorkflow;
 use Modules\HumanResources\Application\Legacy\LegacyAlcoholCheckImport;
 use Modules\HumanResources\Application\Legacy\LegacyLeaveRequestImport;
 use Modules\HumanResources\Application\Legacy\LegacySafetyCheckImport;
+use Modules\HumanResources\Filament\Resources\AlcoholChecks\QuickEntry\QuickAlcoholCheck;
+use Modules\HumanResources\Filament\Resources\LeaveRequests\QuickEntry\QuickLeaveRequest;
+use Modules\HumanResources\Filament\Resources\SafetyChecks\QuickEntry\QuickSafetyCheck;
 use Modules\HumanResources\Models\AlcoholCheck;
 
 final class HumanResourcesServiceProvider extends ModuleServiceProvider
@@ -52,5 +56,10 @@ final class HumanResourcesServiceProvider extends ModuleServiceProvider
         };
         AlcoholCheck::created(fn (AlcoholCheck $check) => $alert($check, true));
         AlcoholCheck::updated(fn (AlcoholCheck $check) => $alert($check, false));
+
+        // 新規 of 16 / 17 / 18: their quick entries over the lists (Core QuickEntry)
+        Livewire::component('hr.quick-leave-request', QuickLeaveRequest::class);
+        Livewire::component('hr.quick-safety-check', QuickSafetyCheck::class);
+        Livewire::component('hr.quick-alcohol-check', QuickAlcoholCheck::class);
     }
 }

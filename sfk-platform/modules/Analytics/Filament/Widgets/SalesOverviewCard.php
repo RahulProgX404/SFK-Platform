@@ -39,6 +39,8 @@ final class SalesOverviewCard extends DashboardCard
             'countChange' => self::change($overview['count'], $before['count']),
             'yearChange' => self::change($overview['amount'], $lastYear['amount']),
             'salesUrl' => self::appUrl('sales-entry'),
+            // 個人: the rest of row 1 next to 売上合計 (no 入出金, bug.md 2026-11-09)
+            'span' => $this->inPersonalLayout() ? 8 : 6,
         ];
     }
 }

@@ -10,10 +10,11 @@ use Modules\Analytics\Filament\Dashboard\TrendChart;
 use Modules\Core\Filament\Support\AppFormat;
 
 /**
- * 売上の推移 (row 2 for 財務分析の範囲 個人のみ, bug.md 2026-11-07, personal-growth.png): the user's own sales (the sales
- * they are the first 担当者 of, SalesDashboard::forStaff) per month of the chosen year against the year before, with the
- * year's total and its change against the same months of the year before. Users who see everyone's money get 上位の売上先,
- * 担当者別売上 and 売れ筋 TOP3 in this row instead.
+ * 売上の推移 (row 2 of the 個人 layout — 個人のみ, and 全体 switched to 個人 —, bug.md 2026-11-07 / 2026-11-09,
+ * personal-growth.png): the user's own sales (the sales they are the first 担当者 of, SalesDashboard::forStaff) per month of
+ * the chosen year against the year before, with the year's total and its change against the same months of the year
+ * before; about 70% of the row, 最近表示した項目 next to it. 全体 gets 上位の売上先, 担当者別売上 and 売れ筋 TOP3 in this row
+ * instead.
  */
 final class SalesTrendCard extends DashboardCard
 {
@@ -27,9 +28,13 @@ final class SalesTrendCard extends DashboardCard
 
     public static function canView(): bool
     {
-        $user = self::actor();
+        return self::showsMoney();
+    }
 
-        return $user !== null && self::showsMoney() && ! $user->seesOverallFinance();
+    /** Only in the 個人 layout. */
+    protected static function shownInLayout(bool $personal): bool
+    {
+        return $personal;
     }
 
     /** @return array<string, mixed> */

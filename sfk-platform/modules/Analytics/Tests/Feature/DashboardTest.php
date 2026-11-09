@@ -22,9 +22,12 @@ use Modules\Analytics\Domain\Period;
 use Modules\Analytics\Filament\Dashboard\TrendChart;
 use Modules\Analytics\Filament\Users\UserOverviewCard;
 use Modules\Analytics\Filament\Widgets\AbsencesCard;
+use Modules\Analytics\Filament\Widgets\CashFlowCard;
 use Modules\Analytics\Filament\Widgets\PersonalOverviewCard;
 use Modules\Analytics\Filament\Widgets\QuickActionsCard;
+use Modules\Analytics\Filament\Widgets\RecentActivityCard;
 use Modules\Analytics\Filament\Widgets\RevenueCard;
+use Modules\Analytics\Filament\Widgets\SalesOverviewCard;
 use Modules\Analytics\Filament\Widgets\SalesTrendCard;
 use Modules\Analytics\Filament\Widgets\StaffSalesCard;
 use Modules\Analytics\Filament\Widgets\TopCustomersCard;
@@ -466,10 +469,10 @@ it('shows 作業者ランキング, 上位の売上先, 担当者別売上 and �
     $app->forceFill(['status' => AppStatus::Published])->save();
     $app->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true]);
     $app->spaces()->attach($space);
-    $overallOnly = [TopWorkersCard::class, TopCustomersCard::class, StaffSalesCard::class, TopProductsCard::class];
-    $visible = fn (): array => array_values(array_filter(
+    $overallOnly = [TopCustomersCard::class, StaffSalesCard::class, TopProductsCard::class, TopWorkersCard::class];
+    $visible = fn (): array => array_values(array_intersect(
+        (new PortalPage)->dashboardWidgets(),
         [...$overallOnly, SalesTrendCard::class, WorkTrendCard::class, PersonalOverviewCard::class],
-        fn (string $card): bool => $card::canView(),
     ));
 
     // 全体 (super admins always; and an employee ticked 全体)
@@ -485,7 +488,63 @@ it('shows 作業者ランキング, 上位の売上先, 担当者別売上 and �
 
     // without 財務分析を表示: 個人の概要 and their hours and income over the year
     $this->actingAs($this->employee);
-    expect($visible())->toBe([WorkTrendCard::class, PersonalOverviewCard::class]);
+    expect($visible())->toBe([PersonalOverviewCard::class, WorkTrendCard::class]);
+});
+
+it('lays out 個人 the same for 個人のみ and for 全体 switched to 個人, with the user\'s own figures (bug.md 2026-11-09)', function () {
+    $space = Space::query()->create(['panel_id' => 'erp', 'name' => '営業スペース']);
+    $space->users()->attach($this->staff);
+    foreach (['sales-entry' => '06. 売上入力', ReceiptResource::appCode() => '21. 売入金管理'] as $code => $name) {
+        $app = new BusinessApp(['code' => $code, 'name' => $name]);
+        $app->forceFill(['status' => AppStatus::Published])->save();
+        $app->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true]);
+        $app->spaces()->attach($space);
+    }
+    $period = ['from' => '2026-10-01', 'to' => '2026-10-31'];
+    // 売上合計 · 売上概要 | 売上の推移 · 最近表示した項目 | 休暇・勤怠予定 · 最近のアクティビティ
+    $layout = [RevenueCard::class, SalesOverviewCard::class, SalesTrendCard::class, QuickActionsCard::class, AbsencesCard::class, RecentActivityCard::class];
+    $cards = function (?string $scope): array {
+        $page = new PortalPage;
+        $page->filters = ['from' => '2026-10-01', 'to' => '2026-10-31', 'scope' => $scope];
+
+        return $page->dashboardWidgets();
+    };
+    $spans = function (array $filters): void {
+        Livewire::test(RevenueCard::class, ['pageFilters' => $filters])->assertSee('sfk-dash-span-4');
+        Livewire::test(SalesOverviewCard::class, ['pageFilters' => $filters])->assertSee('sfk-dash-span-8');
+        Livewire::test(SalesTrendCard::class, ['pageFilters' => $filters])->assertSee('sfk-dash-span-8');
+        Livewire::test(QuickActionsCard::class, ['pageFilters' => $filters])->assertSee('sfk-dash-span-4');
+        Livewire::test(AbsencesCard::class, ['pageFilters' => $filters])->assertSee('sfk-dash-span-6');
+        Livewire::test(RecentActivityCard::class, ['pageFilters' => $filters])->assertSee(['sfk-dash-span-6', 'class="sfk-activity is-single"'], escape: false);
+    };
+
+    // 全体: everyone's cards; 個人: the 個人 layout with their own sales
+    grantDashboards($this->staff, 'erp')->forceFill(['show_financial_analysis' => true, 'financial_scope' => User::FINANCE_OVERALL])->save();
+    $this->staff->notifyNow(new SystemNotification(['title' => '06. 売上入力: 長3封筒', 'body' => '更新しました', 'format' => 'filament', 'actions' => []]), ['database']);
+    $this->actingAs($this->staff);
+    expect($cards('overall'))->toBe([RevenueCard::class, SalesOverviewCard::class, CashFlowCard::class, TopCustomersCard::class, StaffSalesCard::class,
+        TopProductsCard::class, TopWorkersCard::class, AbsencesCard::class, QuickActionsCard::class, RecentActivityCard::class])
+        ->and($cards('personal'))->toBe($layout);
+    Livewire::test(SalesOverviewCard::class, ['pageFilters' => [...$period, 'scope' => 'overall']])->assertSee('sfk-dash-span-6');
+    Livewire::test(RecentActivityCard::class, ['pageFilters' => [...$period, 'scope' => 'overall']])->assertSee('sfk-dash-span-12')->assertDontSee('class="sfk-activity is-single"', escape: false);
+    Livewire::test(AbsencesCard::class, ['pageFilters' => [...$period, 'scope' => 'overall']])->assertSee('sfk-dash-span-4');
+    $spans([...$period, 'scope' => 'personal']);
+    Livewire::withQueryParams(['filters' => $period])->test(PortalPage::class)
+        ->assertSee(['¥200,000', '上位の売上先', '入出金'])
+        ->call('setScope', 'personal')
+        ->assertSet('filters.scope', 'personal');
+    Livewire::withQueryParams(['filters' => [...$period, 'scope' => 'personal']])->test(PortalPage::class)
+        ->assertSeeInOrder(['売上合計', '¥150,000', '売上概要', '売上の推移', '2026年', 'sfk-quick-title', '休暇・勤怠予定', '最近のアクティビティ'], escape: false)
+        ->assertDontSee(['¥200,000', '入出金', '上位の売上先', '担当者別売上', '担当した売上', '売れ筋 TOP3', '作業者ランキング']);
+
+    // 個人のみ: the same, whatever the filters say
+    $this->staff->forceFill(['financial_scope' => User::FINANCE_PERSONAL])->save();
+    expect($cards('overall'))->toBe($layout)->and($cards(null))->toBe($layout);
+    $spans([...$period, 'scope' => 'overall']);
+
+    // without 財務分析を表示: their own layout (個人の概要 first) is kept
+    $this->actingAs($this->employee);
+    expect($cards('personal'))->toBe([PersonalOverviewCard::class, WorkTrendCard::class, QuickActionsCard::class, AbsencesCard::class, RecentActivityCard::class]);
 });
 
 it('draws the 個人のみ user\'s own sales per month of a year against the year before', function () {

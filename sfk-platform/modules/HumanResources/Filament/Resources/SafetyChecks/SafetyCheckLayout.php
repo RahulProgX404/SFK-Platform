@@ -85,7 +85,7 @@ final class SafetyCheckLayout
                 }),
             'user_id' => Employees::user($name, 'user', $label)->required()->default(fn (): ?int => auth()->id() === null ? null : (int) auth()->id()),
             'employee_id' => Employees::employee($name, 'employee', $label),
-            'checked_on' => DatePicker::make($name)->label($label)->required()->default(fn (): string => now()->toDateString()),
+            'checked_on' => DatePicker::make($name)->label($label)->required()->maxDate(fn (): string => now()->toDateString())->default(fn (): string => now()->toDateString()),
             'items' => self::itemsForm(),
             'legacy_id' => TextInput::make($name)->label($label)->numeric()->integer()->minValue(1)->unique(ignoreRecord: true),
             default => null,
@@ -134,7 +134,7 @@ final class SafetyCheckLayout
             self::headers(),
             ['answer' => HrChoices::ANSWERS[0]],
         )->schema([
-            TextInput::make('number')->hiddenLabel()->numeric()->step('any')->minValue(0)->maxValue(9999)->live(onBlur: true)
+            TextInput::make('number')->hiddenLabel()->numeric()->step(1)->minValue(1)->maxValue(999)->required($filled)->live(onBlur: true)
                 // a typed No brings its item (e.g. drivers adding 20–25)
                 ->afterStateUpdated(function (mixed $state, Get $get, Set $set): void {
                     $item = is_numeric($state) ? ChecklistTemplate::item((int) $state) : null;

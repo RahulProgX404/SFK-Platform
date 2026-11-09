@@ -8,7 +8,7 @@
     $peak = max(1, ...$overview['parts']);
 @endphp
 
-<div class="sfk-dash-cell sfk-dash-span-6">
+<div class="sfk-dash-cell sfk-dash-span-{{ $span }}">
     <style>
         .sfk-overview-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: var(--sfk-space-5); align-items: start; }
         .sfk-overview-box { display: flex; flex-direction: column; gap: var(--sfk-space-3); padding: var(--sfk-space-4); border-radius: var(--sfk-radius-lg); background: var(--sfk-primary-soft); box-shadow: inset 0 0 0 1px var(--sfk-primary-soft-strong); }

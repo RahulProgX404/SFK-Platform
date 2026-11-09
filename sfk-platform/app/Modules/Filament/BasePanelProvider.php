@@ -26,6 +26,7 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Modules\Core\Access\DashboardAccess;
+use Modules\Core\Filament\AppPages\AppSidebarState;
 use Modules\Core\Filament\DashboardSettings\DashboardSettingsPlugin;
 use Modules\Core\Filament\Profile\ProfilePage;
 use Modules\Core\Filament\Support\InitialAvatarProvider;
@@ -85,6 +86,8 @@ abstract class BasePanelProvider extends PanelProvider
             // the look (core::filament.theme) and the Alpine components of the app lists (core::filament.app-filter-script),
             // as a stylesheet and a script the browser keeps
             ->renderHook(PanelsRenderHook::HEAD_END, fn (): string => ThemeAssets::headTags())
+            // an app opens with the sidebar collapsed; other screens get back the state the user had before the apps
+            ->renderHook(PanelsRenderHook::BODY_START, fn (array $scopes): string => AppSidebarState::script($scopes))
             // no top bar: the screens use the whole height; the sidebar hides completely and a floating button opens it
             // (core::filament.design), the search, the bell and the user menu are in the sidebar
             ->topbar(false)

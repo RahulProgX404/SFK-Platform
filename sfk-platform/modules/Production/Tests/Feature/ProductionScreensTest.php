@@ -11,13 +11,14 @@
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
-use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
+use Illuminate\Testing\Constraints\SeeInOrder;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Modules\Core\Application\Apps\AppDiscovery;
 use Modules\Core\Application\Apps\AppLifecycle;
 use Modules\Core\Application\Calendar\CompanyCalendar;
+use Modules\Core\Application\Records\RecordValidator;
 use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\AppStatus;
 use Modules\Core\Domain\Apps\PermissionSubject;
@@ -36,10 +37,12 @@ use Modules\MasterData\Models\Machine;
 use Modules\MasterData\Models\Partner;
 use Modules\Orders\Filament\Resources\Orders\Pages\ViewOrder;
 use Modules\Orders\Models\Order;
+use Modules\Production\Application\AccidentReports\AccidentReportRules;
 use Modules\Production\Filament\Resources\AccidentReports\AccidentReportResource;
-use Modules\Production\Filament\Resources\AccidentReports\Pages\CreateAccidentReport;
+use Modules\Production\Filament\Resources\AccidentReports\Pages\EditAccidentReport;
 use Modules\Production\Filament\Resources\AccidentReports\Pages\ListAccidentReports;
 use Modules\Production\Filament\Resources\AccidentReports\Pages\ViewAccidentReport;
+use Modules\Production\Filament\Resources\AccidentReports\QuickEntry\QuickAccidentReport;
 use Modules\Production\Filament\Resources\BagSchedules\BagScheduleResource;
 use Modules\Production\Filament\Resources\BagSchedules\Board\BagScheduleBoard;
 use Modules\Production\Filament\Resources\BagSchedules\Pages\EditBagSchedule;
@@ -56,6 +59,7 @@ use Modules\Production\Models\AccidentReport;
 use Modules\Production\Models\BagSchedule;
 use Modules\Production\Models\DailyReport;
 use Modules\Sales\Models\Sale;
+use PHPUnit\Framework\Assert as PHPUnit;
 
 /** The three production apps, published in a space of 白石封筒 as アプリ設定 would add them (registry sync). */
 function publishProductionApps(): void
@@ -117,6 +121,17 @@ function quickTask(array $values): Testable
     }
 
     return $panel->call('register');
+}
+
+/**
+ * The quick entry (Core QuickEntry) shows these texts in this order — on its HTML after the updates (Livewire's
+ * assertSeeInOrder reads the last HTTP response, the JSON of an update).
+ *
+ * @param  list<string>  $texts
+ */
+function quickEntryShows(Testable $entry, array $texts): void
+{
+    PHPUnit::assertThat(array_map(e(...), $texts), new SeeInOrder($entry->html(true)));
 }
 
 beforeEach(function () {
@@ -682,25 +697,82 @@ it('edits a schedule in the form as the board does', function () {
     expect($legacy->fresh()?->only(['product_name', 'usage_status']))->toBe(['product_name' => '試作封筒', 'usage_status' => '完了']);
 });
 
-it('reports an incident with its damage', function () {
+it('reports an incident with its damage in the quick entry (user, 2026-11-09)', function () {
     $job = productionJob();
     $sales = User::factory()->create(['name' => '営業 花子']);
     $this->actingAs($this->admin);
-    $undoFake = Repeater::fake();
 
-    Livewire::test(CreateAccidentReport::class)
-        ->fillForm(['occurred_on' => '2026-10-20', 'reporter_id' => $this->worker->id, 'order_id' => $job->id, 'quantity' => '200', 'machine_id' => $this->machine->id,
-            'maker1_id' => $this->worker->id, 'sales_users' => [$sales->id], 'description' => '糊がはみ出した', 'cause' => '糊量の設定ミス',
-            'damages' => [
-                ['item' => '紙', 'sheets' => '200', 'cost' => '12.5', 'quantity' => '200'],
-                ['item' => '印刷', 'sheets' => null, 'cost' => '3000', 'quantity' => '1'],
-            ]])
-        ->call('create')
-        ->assertHasNoFormErrors();
-    $undoFake();
+    $entry = Livewire::test(QuickAccidentReport::class, ['open' => true])
+        ->assertSee('事故報告を追加')
+        ->assertSet('screen', 'occurred')
+        ->assertSet('data.occurred_on', '2026-10-21')
+        ->assertSet('data.reporter_id', $this->admin->id)
+        ->set('data.occurred_on', '2026-10-20')
+        ->call('next')
+        ->assertSet('screen', 'reporter')
+        // a tap moves on
+        ->call('choose', 'reporter_id', (string) $this->worker->id)
+        ->assertSet('screen', 'order')
+        ->set('search', '長3')
+        ->assertSee($job->order_number)
+        ->call('choose', 'order_id', (string) $job->id)
+        ->assertSet('screen', 'quantity')
+        ->set('data.quantity', '200')
+        ->call('next')
+        // 担当機械 is required: 次へ stays
+        ->assertSet('screen', 'machine')
+        ->call('next')
+        ->assertHasErrors(['data.machine_id' => 'required'])
+        ->assertSet('screen', 'machine')
+        ->call('choose', 'machine_id', (string) $this->machine->id)
+        ->assertSet('screen', 'makers')
+        ->set('data.maker1_id', (string) $this->worker->id)
+        ->call('next')
+        ->set('data.sales_users', [(string) $sales->id])
+        ->call('next')
+        ->set('data.description', '糊がはみ出した')
+        ->call('next')
+        ->set('data.cause', '糊量の設定ミス')
+        ->call('next')
+        ->call('next')
+        ->call('next')
+        ->assertSet('screen', 'damages')
+        // 損害: a card per row, its 小計 and the 合計損害額 as they are typed; an empty row goes
+        ->call('addDamage')
+        ->call('addDamage')
+        ->call('addDamage')
+        ->set('data.damages.0.item', '紙')
+        ->set('data.damages.0.sheets', '200')
+        ->set('data.damages.0.cost', '12.5')
+        ->set('data.damages.0.quantity', '200')
+        ->set('data.damages.1.item', '印刷')
+        ->set('data.damages.1.cost', '3000')
+        ->set('data.damages.1.quantity', '1')
+        ->tap(fn (Testable $entry) => quickEntryShows($entry, ['合計損害額', '¥5,500', '損害 1', '紙', '¥2,500', '損害 2', '印刷', '¥3,000', '損害 3']))
+        ->call('removeDamage', 2)
+        ->assertDontSee('損害 3')
+        ->call('next')
+        ->assertSet('screen', 'review')
+        ->tap(fn (Testable $entry) => quickEntryShows($entry, ['事故発生日', '2026-10-20', '報告者氏名', '製造 太郎', '注番', $job->order_number, '数量', '200', '担当機械',
+            '製袋機1号', '営業関係者', '営業 花子', '損害', '紙', '¥2,500', '印刷', '¥3,000', '合計損害額', '¥5,500']))
+        // an answer corrected from the check: 次へ comes back to it
+        ->call('goTo', 'quantity')
+        ->assertSet('screen', 'quantity')
+        ->set('data.quantity', '250')
+        ->call('next')
+        ->assertSet('screen', 'review')
+        ->call('register');
 
     $report = AccidentReport::query()->sole();
-    expect($report->total_damage)->toBe(5500)->and($report->salesUsers->pluck('name')->all())->toBe(['営業 花子']);
+    $entry->assertRedirect(AccidentReportResource::getUrl('view', ['record' => $report]));
+    expect($report->total_damage)->toBe(5500)
+        ->and((string) $report->quantity)->toBe('250.0000')
+        ->and($report->reporter_id)->toBe($this->worker->id)
+        ->and($report->maker1_id)->toBe($this->worker->id)
+        ->and($report->salesUsers->pluck('name')->all())->toBe(['営業 花子'])
+        ->and($report->damages->pluck('item')->all())->toBe(['紙', '印刷'])
+        ->and($report->created_by)->toBe($this->admin->id)
+        ->and(RecordVersion::query()->where('record_type', $report->getMorphClass())->where('record_id', $report->id)->count())->toBe(1);
 
     Livewire::test(ViewAccidentReport::class, ['record' => $report->getRouteKey()])
         ->assertSeeInOrder(['事故発生日', '2026-10-20', '報告者氏名', '製造 太郎', '注番', $job->order_number, '得意先名', '株式会社得意先', '品名', '長3封筒',
@@ -711,6 +783,15 @@ it('reports an incident with its damage', function () {
         ->assertCanSeeTableRecords([$report])
         ->sortTable('customer')
         ->sortTable('total_damage');
+
+    // 新規 opens the quick entry (no create page); レコードを再利用する starts on the check with the rows
+    expect(AccidentReportResource::hasPage('create'))->toBeFalse()
+        ->and(AccidentReportResource::newRecordUrl())->toBe(AccidentReportResource::getUrl('index', ['new' => 1]));
+    Livewire::test(QuickAccidentReport::class, ['open' => true, 'duplicate' => (string) $report->id])
+        ->assertSet('screen', 'review')
+        ->assertSet('data.damages.1.cost', '3000')
+        ->assertSet('data.sales_users', [(string) $sales->id])
+        ->assertSee('¥5,500');
 });
 
 it('notifies the administrators and 営業関係者 of a new incident', function () {
@@ -721,18 +802,69 @@ it('notifies the administrators and 営業関係者 of a new incident', function
     openAppTo('accident-report', $sales);
     $this->actingAs($this->admin);
 
-    Livewire::test(CreateAccidentReport::class)
-        ->fillForm(['occurred_on' => '2026-10-20', 'reporter_id' => $this->worker->id, 'order_id' => $job->id, 'machine_id' => $this->machine->id, 'sales_users' => [$sales->id, $outsider->id],
-            'description' => '糊がはみ出した'])
-        ->call('create')
-        ->assertHasNoFormErrors();
+    Livewire::test(QuickAccidentReport::class, ['open' => true])
+        ->set('data.occurred_on', '2026-10-20')
+        ->set('data.reporter_id', $this->worker->id)
+        ->set('data.order_id', $job->id)
+        ->set('data.machine_id', $this->machine->id)
+        ->set('data.sales_users', [(string) $sales->id, (string) $outsider->id])
+        ->set('data.description', '糊がはみ出した')
+        ->call('register')
+        ->assertHasNoErrors();
 
     $report = AccidentReport::query()->sole();
     $notice = $sales->notifications()->sole();
-    expect($notice->data['title'])->toBe(AccidentReportResource::appName().': '.AccidentReportResource::titleOf($report))
+    expect($notice->data['title'])->toBe(AccidentReportResource::displayName().': '.AccidentReportResource::titleOf($report))
         ->and($notice->data['body'])->toBe('事故発生日: 2026-10-20 / 報告者: 製造 太郎 / 長3封筒')
         ->and($manager->notifications()->count())->toBe(1)
         // the writer knows; who may not open the app is not told
         ->and($this->admin->notifications()->count())->toBe(0)
         ->and($outsider->notifications()->count())->toBe(0);
+});
+
+it('requires what a report says, two different 製造者 and complete 損害 rows, and no future date (user, 2026-11-09)', function () {
+    $rules = new AccidentReportRules;
+    $errors = fn (array $data): array => RecordValidator::errors($rules, $data, null);
+    $maker = User::factory()->create(['name' => '製造 次郎']);
+    $report = ['occurred_on' => '2026-10-20', 'reporter_id' => $this->worker->id, 'machine_id' => $this->machine->id, 'description' => '糊がはみ出した'];
+
+    expect($errors($report))->toBe([])
+        ->and(array_keys($errors(['occurred_on' => null, 'reporter_id' => null, 'machine_id' => null, 'description' => ''])))
+        ->toEqualCanonicalizing(['occurred_on', 'reporter_id', 'machine_id', 'description'])
+        ->and($errors([...$report, 'occurred_on' => '2026-10-22'])['occurred_on'])->toBe(['事故発生日に未来の日付は入力できません。'])
+        ->and($errors([...$report, 'quantity' => '-1']))->toHaveKey('quantity')
+        // 製造者2 only with 製造者1, and someone else
+        ->and($errors([...$report, 'maker2_id' => $maker->id])['maker1_id'])->toBe(['製造者2を入力するときは製造者1も入力してください。'])
+        ->and($errors([...$report, 'maker1_id' => (string) $maker->id, 'maker2_id' => $maker->id])['maker2_id'])->toBe(['製造者2には製造者1と別の人を選んでください。'])
+        ->and($errors([...$report, 'maker1_id' => $this->worker->id, 'maker2_id' => $maker->id]))->toBe([])
+        ->and($errors([...$report, 'sales_users' => [$maker->id, (string) $maker->id]]))->toHaveKey('sales_users.0');
+
+    // 損害: a figure makes 項目, 原価 and 数量 required; the legacy preset row (項目 only) is fine; no figure below 0
+    $damage = $errors([...$report, 'damages' => ['x' => ['item' => null, 'sheets' => null, 'cost' => '12.5', 'quantity' => null], 'y' => ['item' => '紙'],
+        'z' => ['item' => '印刷', 'sheets' => '-5', 'cost' => '10', 'quantity' => '2']]]);
+    expect(array_keys($damage))->toEqualCanonicalizing(['damages.x.item', 'damages.x.quantity', 'damages.z.sheets'])
+        ->and($damage['damages.x.item'])->toBe(['枚数・原価・数量を入力した損害は項目を選んでください。']);
+
+    // the quick entry: 事故内容 is asked for
+    $this->actingAs($this->admin);
+    Livewire::test(QuickAccidentReport::class, ['open' => true])
+        ->set('data.machine_id', $this->machine->id)
+        ->call('goTo', 'description')
+        ->call('next')
+        ->assertHasErrors(['data.description' => 'required'])
+        ->assertSet('screen', 'description');
+
+    // a legacy record (preset 紙 / 印刷 rows without figures) still saves; the same rules on its edit page
+    $legacy = AccidentReport::query()->create($report);
+    $legacy->damages()->createMany([['sort' => 1, 'item' => '紙'], ['sort' => 2, 'item' => '印刷']]);
+    Livewire::test(EditAccidentReport::class, ['record' => $legacy->getRouteKey()])
+        ->fillForm(['notes' => '確認済'])
+        ->call('save')
+        ->assertHasNoErrors();
+    expect($legacy->fresh()?->notes)->toBe('確認済');
+    Livewire::test(EditAccidentReport::class, ['record' => $legacy->getRouteKey()])
+        ->fillForm(['maker1_id' => $maker->id, 'maker2_id' => $maker->id, 'description' => ''])
+        ->call('save')
+        ->assertHasErrors(['data.maker2_id', 'data.description']);
+    expect($legacy->fresh()?->maker2_id)->toBeNull();
 });

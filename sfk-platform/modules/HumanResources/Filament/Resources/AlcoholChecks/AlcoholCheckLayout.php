@@ -63,14 +63,17 @@ final class AlcoholCheckLayout
     {
         $label = self::label($name);
         $block = str_starts_with($name, 'after_') ? 'after' : 'before';
-        $select = fn (array $choices): Select => Select::make($name)->label($label)->placeholder('-----')->options(HrChoices::options($choices))->native(false);
+        // 運転前 is required as a whole (BR-HR-04, AlcoholCheckRules); 運転後 once it is begun, checked on save
+        $required = $block === 'before';
+        $select = fn (array $choices): Select => Select::make($name)->label($label)->placeholder('-----')->options(HrChoices::options($choices))->native(false)
+            ->required($required);
 
         return match (true) {
-            $name === 'checked_on' => DatePicker::make($name)->label($label)->required()->default(fn (): string => now()->toDateString()),
-            str_ends_with($name, '_time') => TimePicker::make($name)->label($label)->native()->seconds(false)->default(fn (): string => now()->format('H:i')),
+            $name === 'checked_on' => DatePicker::make($name)->label($label)->required()->maxDate(fn (): string => now()->toDateString())->default(fn (): string => now()->toDateString()),
+            str_ends_with($name, '_time') => TimePicker::make($name)->label($label)->native()->seconds(false)->required($required)->default(fn (): string => now()->format('H:i')),
             $name === 'driver_id' => Employees::user($name, 'driver', $label)->required()->default(fn (): ?int => auth()->id() === null ? null : (int) auth()->id()),
             $name === 'employee_id' => Employees::employee($name, 'employee', $label),
-            str_ends_with($name, '_checker_id') => Employees::user($name, self::USERS[$name], $label),
+            str_ends_with($name, '_checker_id') => Employees::user($name, self::USERS[$name], $label)->required($required),
             str_ends_with($name, '_vehicle') => $select(HrChoices::VEHICLES),
             str_ends_with($name, '_method') => $select(HrChoices::METHODS),
             str_ends_with($name, '_detected') => $select(HrChoices::DETECTED),

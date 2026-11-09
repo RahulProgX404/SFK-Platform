@@ -6,10 +6,11 @@
         'updated' => ['tone' => 'purple', 'icon' => 'heroicon-o-pencil-square'],
         'comment' => ['tone' => 'amber', 'icon' => 'heroicon-o-chat-bubble-left-ellipsis'],
     ];
-    $columns = array_chunk($items, max(1, (int) ceil(count($items) / 2)));
+    // two columns over the whole width; one when the card has half the row (個人)
+    $columns = $half ? [$items] : array_chunk($items, max(1, (int) ceil(count($items) / 2)));
 @endphp
 
-<div class="sfk-dash-cell sfk-dash-span-12">
+<div class="sfk-dash-cell sfk-dash-span-{{ $half ? 6 : 12 }}">
     <style>
         .sfk-activity { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--sfk-space-8); }
         .sfk-activity ol { margin: 0; padding: 0; list-style: none; }
@@ -25,6 +26,7 @@
         .sfk-activity-body { display: block; margin-top: 2px; color: var(--sfk-text); font-size: var(--sfk-fs-small); overflow-wrap: anywhere; }
         a.sfk-activity-text { color: inherit; text-decoration: none; }
         a.sfk-activity-text:hover strong { color: var(--sfk-primary); }
+        .sfk-activity.is-single { grid-template-columns: minmax(0, 1fr); }
         @media (max-width: 1023px) { .sfk-activity { grid-template-columns: minmax(0, 1fr); } }
     </style>
 
@@ -36,7 +38,7 @@
         @if ($items === [])
             <p class="sfk-dash-empty">まだアクティビティはありません。</p>
         @else
-            <div class="sfk-activity">
+            <div @class(['sfk-activity', 'is-single' => $half])>
                 @foreach ($columns as $column)
                     <ol>
                         @foreach ($column as $item)

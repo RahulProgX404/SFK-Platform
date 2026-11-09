@@ -33,7 +33,7 @@ final class AppRecordDirectory implements RecordDirectory
     public function appName(Model $record): ?string
     {
         foreach ($this->resourcesFor($record) as [$resource]) {
-            return $resource::app()->name ?? $resource::appName();
+            return $resource::displayName();
         }
 
         return null;

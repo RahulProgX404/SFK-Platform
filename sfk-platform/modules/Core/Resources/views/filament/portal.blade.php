@@ -204,6 +204,7 @@
             }
 
             .sfk-dash-span-6,
+            .sfk-dash-span-8,
             .sfk-dash-span-12 {
                 grid-column: 1 / -1;
             }
@@ -232,6 +233,10 @@
 
             .sfk-dash-span-6 {
                 grid-column: span 6;
+            }
+
+            .sfk-dash-span-8 {
+                grid-column: span 8;
             }
 
             .sfk-dash-span-12 {

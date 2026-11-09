@@ -10,14 +10,16 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Modules\Core\Application\Records\RecordRules;
 use Modules\Core\Filament\AppResource;
 use Modules\Erp\Filament\NavigationGroup;
-use Modules\HumanResources\Filament\Resources\LeaveRequests\Pages\CreateLeaveRequest;
+use Modules\HumanResources\Application\LeaveRequests\LeaveRequestRules;
 use Modules\HumanResources\Filament\Resources\LeaveRequests\Pages\EditLeaveRequest;
 use Modules\HumanResources\Filament\Resources\LeaveRequests\Pages\LeaveRequestListViewSettings;
 use Modules\HumanResources\Filament\Resources\LeaveRequests\Pages\LeaveRequestSettings;
 use Modules\HumanResources\Filament\Resources\LeaveRequests\Pages\ListLeaveRequests;
 use Modules\HumanResources\Filament\Resources\LeaveRequests\Pages\ViewLeaveRequest;
+use Modules\HumanResources\Filament\Resources\LeaveRequests\QuickEntry\QuickLeaveRequest;
 use Modules\HumanResources\Filament\Resources\LeaveRequests\Tables\LeaveRequestsTable;
 use Modules\HumanResources\Models\LeaveRequest;
 use UnitEnum;
@@ -78,6 +80,18 @@ final class LeaveRequestResource extends AppResource
         return $user instanceof User ? $query->visibleTo($user) : $query->whereRaw('1 = 0');
     }
 
+    /** What a record must be on every screen (user, 2026-11-09): LeaveRequestRules. */
+    public static function recordRules(): RecordRules
+    {
+        return new LeaveRequestRules;
+    }
+
+    /** 新規 (list, 再利用): the quick entry over the list (user, 2026-11-09); there is no create page. */
+    public static function quickCreateComponent(): string
+    {
+        return QuickLeaveRequest::class;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return LeaveRequestLayout::form($schema);
@@ -103,7 +117,6 @@ final class LeaveRequestResource extends AppResource
     {
         return [
             'index' => ListLeaveRequests::route('/'),
-            'create' => CreateLeaveRequest::route('/create'),
             'views' => LeaveRequestListViewSettings::route('/views'),
             'settings' => LeaveRequestSettings::route('/settings'),
             'view' => ViewLeaveRequest::route('/{record}'),

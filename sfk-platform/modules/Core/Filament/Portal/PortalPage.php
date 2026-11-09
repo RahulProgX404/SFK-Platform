@@ -201,15 +201,20 @@ final class PortalPage extends Dashboard
     }
 
     /**
-     * The cards of the dashboard: the panel's widgets the user may see, in their order.
+     * The cards of the dashboard: the panel's widgets the user may see, in their order — for the page filters when a
+     * card follows them (FollowsDashboardFilters, e.g. the 個人 layout of the money cards).
      *
      * @return list<class-string<Widget>>
      */
     public function dashboardWidgets(): array
     {
+        $filters = $this->filters ?? [];
+        $sort = fn (string $widget): int => is_subclass_of($widget, FollowsDashboardFilters::class) ? $widget::sortOnDashboard($filters) : $widget::getSort();
+
         $widgets = array_map(fn (string|WidgetConfiguration $widget): string => $widget instanceof WidgetConfiguration ? $widget->widget : $widget, $this->getWidgets());
-        $widgets = array_values(array_filter($widgets, fn (string $widget): bool => $widget::canView()));
-        usort($widgets, fn (string $a, string $b): int => $a::getSort() <=> $b::getSort());
+        $widgets = array_values(array_filter($widgets, fn (string $widget): bool => $widget::canView()
+            && (! is_subclass_of($widget, FollowsDashboardFilters::class) || $widget::shownOnDashboard($filters))));
+        usort($widgets, fn (string $a, string $b): int => $sort($a) <=> $sort($b));
 
         return $widgets;
     }

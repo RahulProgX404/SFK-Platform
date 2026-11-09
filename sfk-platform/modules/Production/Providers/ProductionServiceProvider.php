@@ -19,6 +19,7 @@ use Modules\Production\Application\Legacy\LegacyBagScheduleImport;
 use Modules\Production\Application\Legacy\LegacyDailyReportImport;
 use Modules\Production\Application\Legacy\LegacyNewDailyReportImport;
 use Modules\Production\Application\ProductionObserver;
+use Modules\Production\Filament\Resources\AccidentReports\QuickEntry\QuickAccidentReport;
 use Modules\Production\Filament\Resources\BagSchedules\Board\BagScheduleBoard;
 use Modules\Production\Filament\Resources\DailyReports\DailyReportRows;
 use Modules\Production\Filament\Resources\DailyReports\QuickEntry\QuickDailyReport;
@@ -44,7 +45,7 @@ final class ProductionServiceProvider extends ModuleServiceProvider
         // the jobs' production totals and the box stock follow the daily reports
         DailyReport::observe(ProductionObserver::class);
 
-        // a new 14. 事故報告管理 record → administrators and 営業関係者 (CreateAccidentReport)
+        // a new 14. 事故報告管理 record → administrators and 営業関係者 (QuickAccidentReport)
         $this->app->make(NotificationKinds::class)->register(new NotificationKind(
             key: AccidentAlert::NOTIFICATION,
             label: '事故報告',
@@ -55,6 +56,9 @@ final class ProductionServiceProvider extends ModuleServiceProvider
 
         // 新規 of 08. 日報入力: the quick-entry panel over the list and the dashboard
         Livewire::component('production.quick-daily-report', QuickDailyReport::class);
+
+        // 新規 of 14. 事故報告管理: its quick entry over the list (Core QuickEntry)
+        Livewire::component('production.quick-accident-report', QuickAccidentReport::class);
 
         // 12. 製袋予定管理: the 製袋予定表 board (view 製袋予定表 of the list)
         Livewire::component('production.bag-schedule-board', BagScheduleBoard::class);

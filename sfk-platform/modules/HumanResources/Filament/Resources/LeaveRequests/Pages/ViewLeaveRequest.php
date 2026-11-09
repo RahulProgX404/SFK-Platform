@@ -70,7 +70,7 @@ final class ViewLeaveRequest extends AppViewRecord
                         $this->record,
                         $actor,
                         $action,
-                        LeaveRequestResource::appName().' '.LeaveRequestResource::titleOf($this->record),
+                        LeaveRequestResource::displayName().' '.LeaveRequestResource::titleOf($this->record),
                         LeaveRequestResource::getUrl('view', ['record' => $this->record]),
                     );
                 } catch (HrActionNotAllowed $exception) {

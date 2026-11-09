@@ -88,7 +88,7 @@ final class AccidentReportLayout
             ->orderByDesc('id');
 
         return match (true) {
-            $name === 'occurred_on' => DatePicker::make($name)->label($label)->required()->default(fn (): string => now()->toDateString()),
+            $name === 'occurred_on' => DatePicker::make($name)->label($label)->required()->maxDate(fn (): string => now()->toDateString())->default(fn (): string => now()->toDateString()),
             in_array($name, ['reporter_id', 'maker1_id', 'maker2_id'], true) => Select::make($name)
                 ->label($label)
                 ->relationship(substr($name, 0, -3), 'name', $employees($name, $name))
@@ -106,7 +106,7 @@ final class AccidentReportLayout
                 ->live(),
             $name === 'customer' => $text(fn (Get $get): ?string => $order($get)?->customer?->name),
             $name === 'product_name' => $text(fn (Get $get): ?string => $order($get)?->product_name),
-            $name === 'quantity' => TextInput::make($name)->label($label)->numeric()->step('any')->rule('decimal:0,4')->minValue(-999999999999)->maxValue(999999999999),
+            $name === 'quantity' => TextInput::make($name)->label($label)->numeric()->step('any')->rule('decimal:0,4')->minValue(0)->maxValue(999999999999),
             $name === 'machine_id' => Select::make($name)
                 ->label($label)
                 ->relationship('machine', 'name', fn (Builder $query): Builder => $query->orderByDesc('id'))
@@ -115,7 +115,8 @@ final class AccidentReportLayout
                 ->placeholder('-----')
                 ->required(),
             $name === 'sales_users' => Select::make($name)->label($label)->placeholder('-----')->relationship('salesUsers', 'name')->multiple()->searchable()->preload(),
-            in_array($name, self::TEXTS, true) => Textarea::make($name)->label($label)->rows(4)->maxLength(4000),
+            // 事故内容 is required (AccidentReportRules, the rules of every screen of the app)
+            in_array($name, self::TEXTS, true) => Textarea::make($name)->label($label)->rows(4)->maxLength(4000)->required($name === 'description'),
             $name === 'damages' => self::damagesForm(),
             $name === 'total_damage' => $text(fn (Get $get): string => AppFormat::yen(array_sum(array_map(
                 fn (mixed $row): int => is_array($row) ? AccidentDamage::subtotalOf($row['cost'] ?? null, $row['quantity'] ?? null) : 0,
@@ -182,10 +183,11 @@ final class AccidentReportLayout
     private static function damagesForm(): Repeater
     {
         $number = fn (string $field): TextInput => TextInput::make($field)->hiddenLabel()->numeric()->step('any')->rule('decimal:0,4')
-            ->minValue(-999999999999)->maxValue(999999999999)->live(onBlur: true);
+            ->minValue(0)->maxValue(999999999999)->live(onBlur: true);
 
         return RecordTable::form(
-            Repeater::make('damages')->label(self::label('damages'))->relationship('damages')->orderColumn('sort'),
+            // the group heading 損害 names it: the label is kept for 帳票出力 and screen readers, not shown twice
+            Repeater::make('damages')->label(self::label('damages'))->hiddenLabel()->relationship('damages')->orderColumn('sort'),
             self::damageHeaders(),
         )->schema([
             Select::make('item')->hiddenLabel()->native()->placeholder('-----')->options(ProductionChoices::options(ProductionChoices::DAMAGE_ITEMS)),
@@ -202,7 +204,7 @@ final class AccidentReportLayout
         $number = fn (string $field): TextEntry => TextEntry::make($field)->placeholder('')->alignEnd()->formatStateUsing(fn (mixed $state): string => AppFormat::number($state));
 
         return RecordTable::entry(
-            RepeatableEntry::make('damages')->label(self::label('damages'))->placeholder(''),
+            RepeatableEntry::make('damages')->label(self::label('damages'))->hiddenLabel()->placeholder(''),
             self::damageHeaders(),
         )->schema([
             TextEntry::make('item')->placeholder(''),

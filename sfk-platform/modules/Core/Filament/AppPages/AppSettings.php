@@ -8,6 +8,7 @@ use App\Models\User;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
 use LogicException;
+use Modules\Core\Application\Apps\AppLifecycle;
 use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
 use Modules\Core\Filament\AppPages\Concerns\ManagesDocuments;
 use Modules\Core\Filament\AppResource;
@@ -15,7 +16,8 @@ use Modules\Core\Models\BusinessApp;
 
 /**
  * アプリの設定 → 設定 of an app (legacy App settings tab, administrators only; register it as the resource's
- * `settings` page): アクセス権 (the app's permissions) and 高度な設定 → その他の設定 with インライン編集, コメント,
+ * `settings` page): アプリ名 (user 2026-11-09: the name shown everywhere, AppLifecycle::rename()), アクセス権 (the app's
+ * permissions) and 高度な設定 → その他の設定 with インライン編集, コメント,
  * 「レコードの再利用」, 「変更履歴」 and 一括削除 (all on by default). Changes apply when saved.
  * The same page holds the tab 帳票出力 (?tab=documents, ManagesDocuments): 帳票テンプレート, their designer and 出力設定.
  */
@@ -25,6 +27,9 @@ abstract class AppSettings extends Page
     use ManagesDocuments;
 
     protected string $view = 'core::filament.app-settings';
+
+    /** アプリ名 */
+    public string $appTitle = '';
 
     /** その他の設定: インライン編集 (pencil and × on the list rows) */
     public bool $inlineEditEnabled = true;
@@ -53,6 +58,7 @@ abstract class AppSettings extends Page
         abort_unless(static::canAccess(), 403);
 
         $app = $this->app();
+        $this->appTitle = $app->name;
         $this->inlineEditEnabled = $app->inline_edit_enabled;
         $this->commentsEnabled = $app->record_comments_enabled;
         $this->duplicateEnabled = $app->record_duplicate_enabled;
@@ -102,6 +108,36 @@ abstract class AppSettings extends Page
         return $this->appAccessUrl($this->app(), $page);
     }
 
+    /** The name the app is built with (AppResource::appName()): what 「元の名前に戻す」 gives back. */
+    public function codeName(): string
+    {
+        $resource = static::getResource();
+
+        return is_subclass_of($resource, AppResource::class) ? $resource::appName() : $this->app()->name;
+    }
+
+    public function hasCustomName(): bool
+    {
+        return $this->app()->name_customized;
+    }
+
+    /** アプリ名 → 保存: shown everywhere at once (the page is reloaded, so the sidebar and the title follow). */
+    public function saveName(): void
+    {
+        abort_unless(static::canAccess(), 403);
+        $this->validate(['appTitle' => ['nullable', 'string', 'max:64']], [], ['appTitle' => 'アプリ名']);
+
+        $this->rename($this->appTitle);
+    }
+
+    /** 元の名前に戻す */
+    public function resetName(): void
+    {
+        abort_unless(static::canAccess(), 403);
+
+        $this->rename(null);
+    }
+
     /** その他の設定 → 保存 */
     public function saveMisc(): void
     {
@@ -116,6 +152,18 @@ abstract class AppSettings extends Page
         ])->save();
 
         Notification::make()->title('設定を保存しました')->success()->send();
+    }
+
+    private function rename(?string $name): void
+    {
+        $user = auth()->user();
+        abort_unless($user instanceof User, 403);
+
+        $app = app(AppLifecycle::class)->rename($this->app(), $name, $this->codeName(), $user);
+        $this->appTitle = $app->name;
+
+        Notification::make()->title('アプリ名を保存しました')->success()->send();
+        $this->redirect(static::getUrl());
     }
 
     protected function app(): BusinessApp

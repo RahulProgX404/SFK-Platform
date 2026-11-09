@@ -64,7 +64,7 @@ final class ViewConsumableOrder extends AppViewRecord
                     app(ConsumableOrderWorkflow::class)->advance(
                         $this->record,
                         $actor,
-                        ConsumableOrderResource::appName().' '.ConsumableOrderResource::titleOf($this->record),
+                        ConsumableOrderResource::displayName().' '.ConsumableOrderResource::titleOf($this->record),
                         ConsumableOrderResource::getUrl('view', ['record' => $this->record]),
                     );
                 } catch (PurchasingActionNotAllowed $exception) {

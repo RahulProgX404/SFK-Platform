@@ -238,7 +238,7 @@ final class RecordDeletion
             foreach ($panel->getResources() as $resource) {
                 if (is_subclass_of($resource, AppResource::class)) {
                     $model = $resource::getModel();
-                    $this->apps[(new $model)->getTable()] ??= $resource::appName();
+                    $this->apps[(new $model)->getTable()] ??= $resource::displayName();
                 }
             }
         }

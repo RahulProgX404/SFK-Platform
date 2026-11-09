@@ -13,7 +13,8 @@ use Modules\Core\Models\BusinessApp;
  * The app registry follows the code: an app appears (開発中, outside any dashboard or space) as soon as a screen
  * for it is built (an AppResource with its code) and disappears, with its permissions, when that code is
  * deleted (AppDiscovery, syncWithCode). People only move apps between statuses — AppStatus::targets() for the
- * actor's ユーザー種別 — and super admins may set the icon text.
+ * actor's ユーザー種別 — super admins may set the icon text, and administrators the name (rename(); the code's name is then
+ * no longer applied until the name is set back).
  */
 final class AppLifecycle
 {
@@ -43,7 +44,7 @@ final class AppLifecycle
                         ...array_intersect_key($settingDefaults[$code] ?? [], array_flip(BusinessApp::SETTINGS)),
                     ])->save();
                     $added[] = $code;
-                } elseif ($app->name !== $name) {
+                } elseif ($app->name !== $name && ! $app->name_customized) {
                     $app->update(['name' => $name]);
                 }
             }
@@ -53,6 +54,24 @@ final class AppLifecycle
 
             return ['added' => $added, 'removed' => array_values(array_map('strval', $removed))];
         });
+    }
+
+    /**
+     * アプリ名 (アプリの設定 → 設定, administrators; user 2026-11-09): the name shown for the app everywhere — the sidebar, its
+     * screens, the アプリ panel, notices. Blank, or the name of its code ($codeName), sets it back to the code's name, which
+     * the registry then follows again.
+     */
+    public function rename(BusinessApp $app, ?string $name, string $codeName, User $actor): BusinessApp
+    {
+        if (! $actor->user_type->isAdministrator()) {
+            throw new AppActionNotAllowed('アプリ名を変更する権限がありません。');
+        }
+
+        $name = trim((string) preg_replace('/\s+/u', ' ', (string) $name));
+        $custom = $name !== '' && $name !== $codeName;
+        $app->forceFill(['name' => $custom ? $name : $codeName, 'name_customized' => $custom])->save();
+
+        return $app;
     }
 
     public function updateIconText(BusinessApp $app, ?string $iconText, User $actor): BusinessApp

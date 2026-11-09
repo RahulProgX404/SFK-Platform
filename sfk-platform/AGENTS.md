@@ -46,7 +46,9 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   hairline borders and small rounded corners (`--sfk-radius` 6px, cards `--sfk-radius-lg` 10px), the brand blue
   (`BasePanelProvider::BRAND_BLUE`, #05467E) as primary — through the `--sfk-primary` / `--kt-blue` tokens, never a
   hard-coded colour; dark text, soft grey table headers. No top bar except on the ERP home (/erp, ErpPanelProvider) —
-  elsewhere the sidebar (search, bell, user menu inside) collapses fully and a floating button opens it. The sidebar
+  elsewhere the sidebar (search, bell, user menu inside) collapses fully and a floating button opens it. An app's
+  screens (`HasAppChrome`) always open with the sidebar collapsed; other screens get back the state the user had before
+  the apps (Core `AppPages\AppSidebarState`, a body-start script before Alpine reads Filament's stored state). The sidebar
   follows `../sidebar.png` (bug.md 2026-11-07): a grey column (`--sfk-sidebar`), the dashboard name with ≡ (closes it) at
   the right, quiet section names (⌄ only on hover / when closed) with a hairline between sections, dark icon + label
   rows, the open screen a white raised card with a blue bar on its left edge and dark text. While the
@@ -76,6 +78,12 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   create page (`AppResource::quickCreateComponent()`, e.g. 08. 日報入力's step-by-step, mobile-first QuickDailyReport): Core
   then opens it from 新規 (event `AppResource::QUICK_CREATE_EVENT`), the dashboard's 新規作成, `?new=1` (再利用:
   `&duplicate=<id>`, all through `AppResource::newRecordUrl()`) and marks the saved record in the list (`?created=<id>`).
+  New quick entries extend Core `Filament\QuickEntry\QuickEntry` (user 2026-11-09; 14. 事故報告管理, 16. 申請管理,
+  17. 安全衛生チェック, 18. アルコールチェック — their create pages are gone): the app lists `QuickStep`s of `QuickField`s
+  (choice / person / lookup taps move on, date / time chips, number, text, select, custom partials such as 損害 and the
+  チェックリスト as cards), the optional fields (追加情報), defaults, the record form's rules and `create()`; the engine
+  keeps 戻る / 次へ, the check (a tap on a row goes back to its step, 次へ there returns to the check), フィールドのアクセス権,
+  再利用, 変更履歴 and opens the saved record. Look: `core::filament.quick-entry-styles` (shared with QuickDailyReport).
   An app that is one screen (`AppResource::isSingleScreen()`, e.g. 12. 製袋予定管理's 製袋予定表 board) shows only its first
   view — no 一覧 tabs, 絞り込む or toolbar — with ⚙ (administrators: アプリの権限 only) in place of 新規.
   Every table on a record / form / dialog has the dark header row
@@ -91,7 +99,19 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   showing 「-----」 when blank, lookups listing their choices when opened. Table fields (サブテーブル) are built with
   `Modules\Core\Filament\Records\RecordTable::form()` / `entry()`: legacy column widths, the first row always shown,
   ⊕ / ⊖ at the end of each row, empty rows not saved; drop-downs inside a table are native selects (a custom
-  drop-down is cut off by the table's scroll box).
+  drop-down is cut off by the table's scroll box). The table's frame is as wide as its columns (`--kt-subtable-width`),
+  not the whole row; a group heading with the table's own name hides its label (`->hiddenLabel()`, e.g. 損害).
+- What a record must be — required fields, values that must differ or be unique, rules between fields — is one
+  `Modules\Core\Application\Records\RecordRules` class per app (`AppResource::recordRules()`, e.g.
+  `AccidentReportRules`, `LeaveRequestRules`, `SafetyCheckRules`, `AlcoholCheckRules`), checked by Core on every screen
+  that saves: the quick entry (`QuickEntry::recordRules()`), the edit page (`AppEditRecord::beforeValidate()`, shown with
+  the inputs' own errors) and インライン編集 (the edited fields only, so a legacy record is not blocked by what it lacks
+  elsewhere). Uniqueness is checked there, not by database constraints (legacy records hold a few duplicates); decide
+  rules from SYSTEM_BRAIN and the legacy data, and mark the inputs `->required()` to match.
+- App names: `AppResource::appName()` is the name the app is built with (the registry starts with it); what users see —
+  sidebar, titles, notices, delete warnings — is `AppResource::displayName()`, the registry name, which administrators
+  change in アプリの設定 → 設定 → アプリ名 (`AppLifecycle::rename()`, `business_apps.name_customized`; the code sync then
+  leaves it alone until 元の名前に戻す). Never show `appName()` to users.
 - On record forms every field is either typeable or visibly not: inputs that cannot be changed are `->disabled()`,
   and calculated values / lookup copies are shown with an entry (`TextEntry`, state from the form) — the Core theme
   draws both as a grey disabled input with the not-allowed cursor. Never show a non-editable value that looks like
@@ -181,14 +201,18 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   分析 → 売上分析) needs 財務分析を表示 (`users.show_financial_analysis`, ticked by administrators in ユーザー管理;
   `User::seesFinancialAnalysis()`, super admins always) and 財務分析の範囲 (`users.financial_scope`, bug.md 2026-11-06):
   全体 sees everyone's money and may switch to 個人, 個人のみ only the sales they are the first 担当者 of
-  (`User::seesOverallFinance()`; money cards read `DashboardCard::salesData()`, 売上分析 its own row only). Users without
+  (`User::seesOverallFinance()`; money cards read `DashboardCard::salesData()`, 売上分析 its own row only; 分析 → 日報分析 and its tab only for 全体 — user
+  2026-11-09). Users without
   財務分析を表示 get 個人の概要 as the first row (their 勤務時間, 出勤日数 — the days they filled a 日報 for —, 収入, 休暇日数,
   有給休暇), then 勤務時間・収入の推移 (`WorkTrendCard`, two 12-month charts: hours and yen never share an axis); the same card is on the user's
   page (ユーザー管理, 02. 従業員マスタ) for the person and administrators — other modules add cards there through Core
   `UserDetailWidgets`. 作業者ランキング, 上位の売上先, 担当者別売上 and 売れ筋 TOP3 are only for 全体
-  (`DashboardCard::seesEveryonesMoney()`, bug.md 2026-11-07); 個人のみ users get 売上の推移 in row 2 instead (`SalesTrendCard`:
-  their own sales per month of a chosen year against the year before, personal-growth.png; 12-month charts are drawn by
-  `Dashboard\TrendChart` + `widgets.partials.trend-chart`). Rows 3–4 are for everyone (休暇・勤怠予定 and クイックアクション, half
+  (`DashboardCard::seesEveryonesMoney()`, bug.md 2026-11-07). 個人 has one layout for 個人のみ and for 全体 switched to 個人
+  (bug.md 2026-11-09; `DashboardCard::personalLayout()`, cards say `shownInLayout()` / `sortInLayout()`, PortalPage asks
+  through Core `FollowsDashboardFilters`): 売上合計 · 売上概要 (span 4 + 8, no 入出金); 売上の推移 · 最近表示した項目 (8 + 4;
+  `SalesTrendCard`: their own sales per month of a chosen year against the year before, personal-growth.png; 12-month
+  charts are drawn by `Dashboard\TrendChart` + `widgets.partials.trend-chart`); 休暇・勤怠予定 · 最近のアクティビティ (6 + 6,
+  the activity in one column). Rows 3–4 are for everyone (休暇・勤怠予定 and クイックアクション, half
   the row each without 作業者ランキング, クイックアクション first without 財務分析を表示; 作業者ランキング frames the user's own
   row; クイックアクション is called 最近表示した項目 while it lists recent apps). The
   top bar has アプリ in place of the search box (the search is in the sidebar): one panel over the whole screen with a

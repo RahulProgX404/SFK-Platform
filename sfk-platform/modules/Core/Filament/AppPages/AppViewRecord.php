@@ -216,7 +216,7 @@ abstract class AppViewRecord extends ViewRecord
             $user,
             trim((string) $data['body']),
             array_map('intval', (array) ($data['mentions'] ?? [])),
-            $this->appResource()::appName().': '.$this->getRecordTitle(),
+            $this->appResource()::displayName().': '.$this->getRecordTitle(),
             static::getResource()::getUrl('view', ['record' => $this->record]),
         );
 

@@ -9,7 +9,8 @@ use Modules\Analytics\Filament\Dashboard\DashboardCard;
 
 /**
  * 最近のアクティビティ (row 4, every user, the whole width; design_ref quick-actions.png, Recent Activity): only what
- * concerns the user — their 通知 and what they did themselves (ActivityFeed).
+ * concerns the user — their 通知 and what they did themselves (ActivityFeed). In the 個人 layout (bug.md 2026-11-09) half
+ * of row 3, next to 休暇・勤怠予定, as one column.
  */
 final class RecentActivityCard extends DashboardCard
 {
@@ -22,6 +23,9 @@ final class RecentActivityCard extends DashboardCard
     {
         $user = self::actor();
 
-        return ['items' => $user !== null ? app(ActivityFeed::class)->for($user, 10) : []];
+        return [
+            'items' => $user !== null ? app(ActivityFeed::class)->for($user, 10) : [],
+            'half' => $this->inPersonalLayout(),
+        ];
     }
 }

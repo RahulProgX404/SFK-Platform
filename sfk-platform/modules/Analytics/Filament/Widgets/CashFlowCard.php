@@ -23,6 +23,12 @@ final class CashFlowCard extends DashboardCard
         return (self::actor()?->seesFinancialAnalysis() ?? false) && (ReceiptResource::canViewAny() || PaymentResource::canViewAny());
     }
 
+    /** Not in the 個人 layout (bug.md 2026-11-09). */
+    protected static function shownInLayout(bool $personal): bool
+    {
+        return ! $personal;
+    }
+
     /** @return array<string, mixed> */
     protected function getViewData(): array
     {

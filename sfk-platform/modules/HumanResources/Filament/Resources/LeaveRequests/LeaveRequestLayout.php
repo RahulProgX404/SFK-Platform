@@ -12,6 +12,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Component;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Support\HtmlString;
 use Modules\Core\Filament\Records\RecordSections;
@@ -80,9 +81,10 @@ final class LeaveRequestLayout
             'request_type' => Select::make($name)->label($label)->placeholder('-----')->options(HrChoices::options(HrChoices::REQUEST_TYPES))->native(false)->required(),
             'applicant_id' => Employees::user($name, 'applicant', $label)->required()->default(fn (): ?int => auth()->id() === null ? null : (int) auth()->id()),
             'worker_id' => Employees::employee($name, 'worker', $label),
-            'category' => Select::make($name)->label($label)->placeholder('-----')->options(HrChoices::options(HrChoices::CATEGORIES))->native(false)->required(),
+            'category' => Select::make($name)->label($label)->placeholder('-----')->options(HrChoices::options(HrChoices::CATEGORIES))->native(false)->required()->live(),
             'target_on' => DatePicker::make($name)->label($label)->required(),
-            'total_time', 'clock_time' => $time(),
+            // required for an absence by the hour (LeaveRequestRules)
+            'total_time', 'clock_time' => $time()->required(fn (Get $get): bool => in_array($get('category'), HrChoices::HOURLY, true)),
             'reason' => Textarea::make($name)->label($label)->rows(4)->maxLength(4000)->required(),
             'legacy_id' => TextInput::make($name)->label($label)->numeric()->integer()->minValue(1)->unique(ignoreRecord: true),
             default => null,

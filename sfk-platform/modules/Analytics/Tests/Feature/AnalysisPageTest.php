@@ -4,7 +4,7 @@
  * 分析 (legacy SalesAnalysis.bundle.js and DailyReportAnalysis.bundle.js), two pages, not apps (yet):
  * - 売上分析 (/erp/analysis/sales, 財務分析を表示): 06. 売上入力 per first 担当者, business year (May–April) and month, the
  *   売上先 of a month, 予想 / 仕掛 typed in;
- * - 日報分析 (/erp/analysis/daily-reports, everyone with 08. 日報入力): the 作業者 ranked by 枚数単価 + 型替え単価 (cut to
+ * - 日報分析 (/erp/analysis/daily-reports, 財務分析の範囲 全体 with 08. 日報入力): the 作業者 ranked by 枚数単価 + 型替え単価 (cut to
  *   whole yen per month) with their hours (作業時間 + 残業時間).
  */
 
@@ -132,12 +132,12 @@ it('ranks the 作業者 by 枚数単価 + 型替え単価 of their daily reports
         ->assertSeeInOrder(['総作業時間', '7.5時間', '年度別金額ランキング', '2026年度（2026年5月〜2027年4月）', '1', '製造 花子', '¥4,000', '2', '製造 太郎', '¥2,266', '7.5時間', '合計', '¥6,266']);
 });
 
-it('opens 売上分析 with 財務分析を表示 only, 日報分析 with 08. 日報入力, and neither is an app', function () {
+it('opens 売上分析 with 財務分析を表示, 日報分析 only with 財務分析の範囲 全体, and neither is an app', function () {
     $this->actingAs($this->admin);
-    $this->get('/erp/analysis/sales')->assertOk()->assertSee(['売上分析', '日報分析']);
-    $this->get('/erp/analysis/daily-reports')->assertOk()->assertSee('総作業時間');
+    $this->get('/erp/analysis/sales')->assertOk()->assertSee(['売上分析', '日報分析', '/erp/analysis/daily-reports"'], false);
+    $this->get('/erp/analysis/daily-reports')->assertOk()->assertSee(['総作業時間', '/erp/analysis/sales"'], false);
 
-    // an administrator without 財務分析を表示: 日報分析 only (both apps open to everyone here)
+    // an administrator (both apps open to everyone here)
     foreach (['sales-entry' => '06. 売上入力', 'daily-report' => '08. 日報入力'] as $code => $name) {
         $app = new BusinessApp(['code' => $code, 'name' => $name]);
         $app->forceFill(['status' => AppStatus::Published])->save();
@@ -145,11 +145,23 @@ it('opens 売上分析 with 財務分析を表示 only, 日報分析 with 08. �
     }
     $admin = grantDashboards(User::factory()->admin()->create(), 'erp');
     $this->actingAs($admin);
+
+    // without 財務分析を表示: neither
     expect($admin->seesFinancialAnalysis())->toBeFalse();
     $this->get('/erp/analysis/sales')->assertForbidden();
-    $this->get('/erp/analysis/daily-reports')->assertOk()->assertDontSee('/erp/analysis/sales"', false);
-    $admin->forceFill(['show_financial_analysis' => true])->save();
-    $this->get('/erp/analysis/sales')->assertOk();
+    $this->get('/erp/analysis/daily-reports')->assertForbidden();
+
+    // 財務分析の範囲 全体: both, each with the tab of the other
+    $admin->forceFill(['show_financial_analysis' => true, 'financial_scope' => User::FINANCE_OVERALL])->save();
+    expect(SalesAnalysis::canAccess())->toBeTrue()->and(DailyReportAnalysis::canAccess())->toBeTrue();
+    $this->get('/erp/analysis/sales')->assertOk()->assertSee('/erp/analysis/daily-reports"', false);
+    $this->get('/erp/analysis/daily-reports')->assertOk()->assertSee('/erp/analysis/sales"', false);
+
+    // 個人のみ: 売上分析 only — no tabs (日報分析 is not one of them) (user, 2026-11-09)
+    $admin->forceFill(['financial_scope' => User::FINANCE_PERSONAL])->save();
+    expect(SalesAnalysis::canAccess())->toBeTrue()->and(DailyReportAnalysis::canAccess())->toBeFalse();
+    $this->get('/erp/analysis/sales')->assertOk()->assertDontSee(['class="sfk-app-tabs"', '/erp/analysis/daily-reports"', '>日報分析</a>'], false);
+    $this->get('/erp/analysis/daily-reports')->assertForbidden();
 
     // an employee without 06. 売上入力 / 08. 日報入力 gets into neither
     $this->actingAs($this->first);

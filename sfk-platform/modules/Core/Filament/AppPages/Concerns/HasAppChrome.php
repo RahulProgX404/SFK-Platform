@@ -63,7 +63,7 @@ trait HasAppChrome
     public function appChrome(): array
     {
         $resource = $this->appResource();
-        $app = $resource::app() ?? new BusinessApp(['name' => $resource::appName()]);
+        $app = $resource::app() ?? new BusinessApp(['name' => $resource::displayName()]);
         $user = auth()->user();
 
         return [

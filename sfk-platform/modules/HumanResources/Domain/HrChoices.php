@@ -17,6 +17,9 @@ final class HrChoices
     public const CATEGORIES = ['有給休暇', '半有給(午前有給)', '半有給(午後有給)', '振替休暇(代休)', '慶弔休暇', '休暇(欠勤)', '半休(午前欠勤)', '半休(午後欠勤)',
         '遅刻(時間欠勤)', '早退(時間欠勤)'];
 
+    /** 申請分類 of an absence by the hour (時間欠勤): its 合計時間 and 出勤・退勤時間 are needed (BR-HR-02). */
+    public const HOURLY = ['遅刻(時間欠勤)', '早退(時間欠勤)'];
+
     /** 部署 of 17. */
     public const DEPARTMENTS = ['製造', '製造パート', '営業', '制作', '事務', '工務'];
 

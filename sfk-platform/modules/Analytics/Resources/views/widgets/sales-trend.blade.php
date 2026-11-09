@@ -4,7 +4,7 @@
     use Modules\Core\Filament\Support\AppFormat;
 @endphp
 
-<div class="sfk-dash-cell sfk-dash-span-12">
+<div class="sfk-dash-cell sfk-dash-span-8">
     @include('analytics::widgets.partials.trend-style')
 
     <section class="sfk-dash-card" aria-labelledby="sfk-sales-trend-title">

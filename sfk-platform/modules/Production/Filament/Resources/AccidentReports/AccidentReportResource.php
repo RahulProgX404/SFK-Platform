@@ -8,14 +8,16 @@ use BackedEnum;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Modules\Core\Application\Records\RecordRules;
 use Modules\Core\Filament\AppResource;
 use Modules\Erp\Filament\NavigationGroup;
+use Modules\Production\Application\AccidentReports\AccidentReportRules;
 use Modules\Production\Filament\Resources\AccidentReports\Pages\AccidentReportListViewSettings;
 use Modules\Production\Filament\Resources\AccidentReports\Pages\AccidentReportSettings;
-use Modules\Production\Filament\Resources\AccidentReports\Pages\CreateAccidentReport;
 use Modules\Production\Filament\Resources\AccidentReports\Pages\EditAccidentReport;
 use Modules\Production\Filament\Resources\AccidentReports\Pages\ListAccidentReports;
 use Modules\Production\Filament\Resources\AccidentReports\Pages\ViewAccidentReport;
+use Modules\Production\Filament\Resources\AccidentReports\QuickEntry\QuickAccidentReport;
 use Modules\Production\Filament\Resources\AccidentReports\Tables\AccidentReportsTable;
 use Modules\Production\Models\AccidentReport;
 use UnitEnum;
@@ -65,6 +67,18 @@ final class AccidentReportResource extends AppResource
         return ['bulk_delete_enabled' => false];
     }
 
+    /** What a record must be on every screen (user, 2026-11-09): AccidentReportRules. */
+    public static function recordRules(): RecordRules
+    {
+        return new AccidentReportRules;
+    }
+
+    /** 新規 (list, 再利用): the quick entry over the list (user, 2026-11-09); there is no create page. */
+    public static function quickCreateComponent(): string
+    {
+        return QuickAccidentReport::class;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return AccidentReportLayout::form($schema);
@@ -90,7 +104,6 @@ final class AccidentReportResource extends AppResource
     {
         return [
             'index' => ListAccidentReports::route('/'),
-            'create' => CreateAccidentReport::route('/create'),
             'views' => AccidentReportListViewSettings::route('/views'),
             'settings' => AccidentReportSettings::route('/settings'),
             'view' => ViewAccidentReport::route('/{record}'),

@@ -10,8 +10,8 @@ Analytics: 22 過去の売上データ (past sales per salesperson and fiscal ye
     view 06. 売上入力): 06. 売上入力 summed per first 担当者, business year (May–April) and month; a month opens its 売上先 and
     their lines. 予想 / 仕掛 are typed in for the current year (`sales_forecasts`; administrators, or the 担当者 for their
     own rows — the legacy script allowed one e-mail address). 財務分析の範囲 個人のみ: only the user's own row.
-  - 日報分析 (`/erp/analysis/daily-reports`, `DailyReportAnalysis` + `Application/DailyReportRanking`; everyone who may view
-    08. 日報入力 — user 2026-11-05): 枚数単価 + 型替え単価 per 作業者 and month (cut to whole yen per month) with the hours
+  - 日報分析 (`/erp/analysis/daily-reports`, `DailyReportAnalysis` + `Application/DailyReportRanking`; users with 財務分析の範囲
+    全体 who may view 08. 日報入力 — user 2026-11-09; 個人のみ get 売上分析 only): 枚数単価 + 型替え単価 per 作業者 and month (cut to whole yen per month) with the hours
     worked (作業時間 + 残業時間), ranked by 年間合計.
   - Both sum the source rows the user may see (`onlyVisible()`) on every visit; the legacy daily copy into apps 338 / 685
     is not kept, so there is nothing to import.

@@ -34,6 +34,12 @@ final class QuickActionsCard extends DashboardCard
         return (self::actor()?->seesFinancialAnalysis() ?? false) ? 9 : 7;
     }
 
+    /** 個人 layout (bug.md 2026-11-09): row 2, after 売上の推移. */
+    protected static function sortInLayout(bool $personal): int
+    {
+        return $personal ? 5 : self::getSort();
+    }
+
     public function runAction(string $key): void
     {
         $user = self::actor();
@@ -63,7 +69,8 @@ final class QuickActionsCard extends DashboardCard
             'actions' => $actions,
             'more' => $user !== null && count($actions) >= 6 ? max(0, $service->pendingCount($user) - count($actions)) : 0,
             'recent' => $user !== null && $actions === [] ? self::recentRecords($user) : [],
-            'span' => self::teamCardSpan(),
+            // 個人: the rest of row 2 next to 売上の推移
+            'span' => $this->inPersonalLayout() ? 4 : $this->teamCardSpan(),
         ];
     }
 
@@ -86,8 +93,8 @@ final class QuickActionsCard extends DashboardCard
             $app = BusinessApp::forCode($usage->app_code);
             $list[] = [
                 'code' => $usage->app_code,
-                'app' => $resource::appName(),
-                'icon' => $app?->iconText() ?? mb_substr($resource::appName(), 0, 2),
+                'app' => $resource::displayName(),
+                'icon' => $app?->iconText() ?? mb_substr($resource::displayName(), 0, 2),
                 'record' => $record !== null ? (int) $record->getKey() : null,
                 'title' => $record !== null ? self::recordTitle($resource, $record) : null,
                 'url' => $record !== null && $resource::hasPage('view') && $resource::canView($record)

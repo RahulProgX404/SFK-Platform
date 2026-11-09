@@ -8,14 +8,16 @@ use BackedEnum;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Modules\Core\Application\Records\RecordRules;
 use Modules\Core\Filament\AppResource;
 use Modules\Erp\Filament\NavigationGroup;
+use Modules\HumanResources\Application\AlcoholChecks\AlcoholCheckRules;
 use Modules\HumanResources\Filament\Resources\AlcoholChecks\Pages\AlcoholCheckListViewSettings;
 use Modules\HumanResources\Filament\Resources\AlcoholChecks\Pages\AlcoholCheckSettings;
-use Modules\HumanResources\Filament\Resources\AlcoholChecks\Pages\CreateAlcoholCheck;
 use Modules\HumanResources\Filament\Resources\AlcoholChecks\Pages\EditAlcoholCheck;
 use Modules\HumanResources\Filament\Resources\AlcoholChecks\Pages\ListAlcoholChecks;
 use Modules\HumanResources\Filament\Resources\AlcoholChecks\Pages\ViewAlcoholCheck;
+use Modules\HumanResources\Filament\Resources\AlcoholChecks\QuickEntry\QuickAlcoholCheck;
 use Modules\HumanResources\Filament\Resources\AlcoholChecks\Tables\AlcoholChecksTable;
 use Modules\HumanResources\Models\AlcoholCheck;
 use UnitEnum;
@@ -65,6 +67,18 @@ final class AlcoholCheckResource extends AppResource
         return ['bulk_delete_enabled' => false];
     }
 
+    /** What a record must be on every screen (user, 2026-11-09): AlcoholCheckRules. */
+    public static function recordRules(): RecordRules
+    {
+        return new AlcoholCheckRules;
+    }
+
+    /** 新規 (list, 再利用): the quick entry over the list (user, 2026-11-09); there is no create page. */
+    public static function quickCreateComponent(): string
+    {
+        return QuickAlcoholCheck::class;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return AlcoholCheckLayout::form($schema);
@@ -90,7 +104,6 @@ final class AlcoholCheckResource extends AppResource
     {
         return [
             'index' => ListAlcoholChecks::route('/'),
-            'create' => CreateAlcoholCheck::route('/create'),
             'views' => AlcoholCheckListViewSettings::route('/views'),
             'settings' => AlcoholCheckSettings::route('/settings'),
             'view' => ViewAlcoholCheck::route('/{record}'),

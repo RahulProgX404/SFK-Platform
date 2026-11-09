@@ -43,6 +43,7 @@ use Modules\Core\Application\Filters\RecordFilterQuery;
 use Modules\Core\Application\History\HasRecordHistory;
 use Modules\Core\Application\History\RecordHistory;
 use Modules\Core\Application\Records\RecordDeletion;
+use Modules\Core\Application\Records\RecordValidator;
 use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Application\Views\ListViewInvalid;
@@ -260,6 +261,14 @@ abstract class AppListRecords extends ListRecords
 
         /** @var array<string, mixed> $data */
         $data = $this->validate($rules, [], $attributes)['inlineData'] ?? [];
+
+        // the app's RecordRules (e.g. unique per person and month), for the fields changed here only — whatever else a
+        // legacy record lacks does not keep this edit from being saved
+        $recordRules = $this->appResource()::recordRules();
+        if ($recordRules !== null) {
+            $fields = array_map(fn (InlineField $field): string => $field->name, $this->allowedInlineFields());
+            RecordValidator::throwIfAny(RecordValidator::split($recordRules, [...$recordRules->values($record), ...$data], $record, 'inlineData', $fields)[0]);
+        }
         foreach ($this->allowedInlineFields() as $field) {
             $data[$field->name] = match (true) {
                 $field->isBoolean() => (bool) ($data[$field->name] ?? false),
@@ -372,7 +381,7 @@ abstract class AppListRecords extends ListRecords
 
     public function getTitle(): string
     {
-        return $this->appResource()::appName();
+        return $this->appResource()::displayName();
     }
 
     /** Every column of a database field sorts by a click on its header; columns of other data define their own sort. */

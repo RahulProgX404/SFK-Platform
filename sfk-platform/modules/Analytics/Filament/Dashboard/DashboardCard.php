@@ -12,6 +12,7 @@ use Filament\Widgets\Widget;
 use Modules\Analytics\Application\SalesDashboard;
 use Modules\Analytics\Domain\Period;
 use Modules\Core\Filament\AppResource;
+use Modules\Core\Filament\Portal\FollowsDashboardFilters;
 use Modules\Sales\Filament\Resources\Sales\SaleResource;
 
 /**
@@ -19,8 +20,13 @@ use Modules\Sales\Filament\Resources\Sales\SaleResource;
  * erp panel drawn in the dashboard's grid (its view's root says `sfk-dash-span-<n>` of 12 columns; core::filament.portal) for the period of
  * the header's date button (page filters `from` / `to`). Rows 1–2 are the money (財務分析を表示), rows 3–4 for everyone.
  * The money is everyone's or, 個人 (page filter `scope`, or 財務分析の範囲 個人のみ), only the user's own sales.
+ *
+ * 個人 has its own layout (bug.md 2026-11-09), the same for 個人のみ and for 全体 switched to 個人 — only the figures are
+ * the user's: 売上合計 · 売上概要 (the rest of the row); 売上の推移 (about 70%) · 最近表示した項目 (クイックアクション);
+ * 休暇・勤怠予定 · 最近のアクティビティ (half each). A card says whether it is in it (shownInLayout()) and where
+ * (sortInLayout()); PortalPage asks through FollowsDashboardFilters.
  */
-abstract class DashboardCard extends Widget
+abstract class DashboardCard extends Widget implements FollowsDashboardFilters
 {
     use InteractsWithPageFilters;
 
@@ -44,6 +50,50 @@ abstract class DashboardCard extends Widget
         }
 
         return ! $user->seesOverallFinance() || ($this->pageFilters['scope'] ?? null) === User::FINANCE_PERSONAL ? $user->id : null;
+    }
+
+    /** @param  array<string, mixed>  $filters */
+    public static function shownOnDashboard(array $filters): bool
+    {
+        return static::shownInLayout(static::personalLayout($filters));
+    }
+
+    /** @param  array<string, mixed>  $filters */
+    public static function sortOnDashboard(array $filters): int
+    {
+        return static::sortInLayout(static::personalLayout($filters));
+    }
+
+    /**
+     * The 個人 layout of the dashboard: a user with 財務分析を表示 who sees only their own money — 個人のみ, or 全体 with
+     * 個人 chosen in the header. Users without 財務分析を表示 keep theirs (個人の概要 first).
+     *
+     * @param  array<string, mixed>|null  $filters  the page filters
+     */
+    public static function personalLayout(?array $filters): bool
+    {
+        $user = static::actor();
+
+        return $user !== null && static::showsMoney()
+            && (! $user->seesOverallFinance() || ($filters['scope'] ?? null) === User::FINANCE_PERSONAL);
+    }
+
+    /** whether the card is in the dashboard's layout (canView() aside): every layout unless it says otherwise */
+    protected static function shownInLayout(bool $personal): bool
+    {
+        return true;
+    }
+
+    /** its place in the dashboard's layout */
+    protected static function sortInLayout(bool $personal): int
+    {
+        return static::getSort();
+    }
+
+    /** this card is drawn in the 個人 layout */
+    protected function inPersonalLayout(): bool
+    {
+        return static::personalLayout($this->pageFilters);
     }
 
     /** The money of the dashboard for the chosen scope (everyone's or the user's own). */
@@ -80,12 +130,12 @@ abstract class DashboardCard extends Widget
     }
 
     /**
-     * Width of 休暇・勤怠予定 and クイックアクション in row 3: a third next to 作業者ランキング, else half each so the row
-     * stays full.
+     * Width of 休暇・勤怠予定 and クイックアクション in row 3: a third next to 作業者ランキング (全体), else half each so the
+     * row stays full.
      */
-    protected static function teamCardSpan(): int
+    protected function teamCardSpan(): int
     {
-        return static::seesEveryonesMoney() ? 4 : 6;
+        return static::seesEveryonesMoney() && ! $this->inPersonalLayout() ? 4 : 6;
     }
 
     /** The list of an app in this dashboard, while the user may open it. */

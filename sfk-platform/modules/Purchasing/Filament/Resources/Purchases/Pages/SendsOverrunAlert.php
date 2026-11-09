@@ -19,7 +19,7 @@ trait SendsOverrunAlert
         app(OverrunAlert::class)->send(
             $purchase,
             $actor instanceof User ? $actor : null,
-            PurchaseResource::appName().' '.$purchase->purchase_number,
+            PurchaseResource::displayName().' '.$purchase->purchase_number,
             PurchaseResource::getUrl('view', ['record' => $purchase]),
         );
     }

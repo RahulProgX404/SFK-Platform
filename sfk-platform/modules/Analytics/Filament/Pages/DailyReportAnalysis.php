@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Analytics\Filament\Pages;
 
+use App\Models\User;
 use Filament\Pages\Page;
 use Modules\Analytics\Application\DailyReportRanking;
 use Modules\Analytics\Domain\FiscalYear;
@@ -13,9 +14,10 @@ use Modules\Production\Filament\Resources\DailyReports\DailyReportResource;
 
 /**
  * 分析 → 日報分析 (/erp/analysis/daily-reports; legacy DailyReportAnalysis.bundle.js), not an app yet: per 作業者 and month
- * the amount made (枚数単価 + 型替え単価 of 08. 日報入力) and the hours worked (作業時間 + 残業時間), ranked by 年間合計. For
- * everyone who may view 08. 日報入力 (the dashboard's 作業者 card leads here and is shown to all, user 2026-11-05); the
- * figures follow what the user may see of the reports.
+ * the amount made (枚数単価 + 型替え単価 of 08. 日報入力) and the hours worked (作業時間 + 残業時間), ranked by 年間合計. Only
+ * for users who see everyone's money (財務分析の範囲 全体, User::seesOverallFinance(); user 2026-11-09 — 個人のみ get
+ * 売上分析 only) and may view 08. 日報入力; the dashboard's 作業者ランキング (全体 only) leads here. The figures follow what
+ * the user may see of the reports.
  */
 final class DailyReportAnalysis extends Page
 {
@@ -33,7 +35,9 @@ final class DailyReportAnalysis extends Page
 
     public static function canAccess(): bool
     {
-        return DailyReportResource::canViewAny();
+        $user = auth()->user();
+
+        return $user instanceof User && $user->seesOverallFinance() && DailyReportResource::canViewAny();
     }
 
     public function mount(): void

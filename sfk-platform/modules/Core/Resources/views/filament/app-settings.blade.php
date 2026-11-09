@@ -1,5 +1,5 @@
 {{--
-    アプリの設定 → 設定 (Modules\Core\Filament\AppPages\AppSettings): アクセス権 (アプリ / レコード / フィールド) and 高度な設定 → その他の設定
+    アプリの設定 → 設定 (Modules\Core\Filament\AppPages\AppSettings): アプリ名, アクセス権 (アプリ / レコード / フィールド) and 高度な設定 → その他の設定
     (インライン編集, コメント, 「レコードの再利用」, 「変更履歴」, 一括削除) with 保存; tab 帳票出力 (core::filament.documents.*).
 --}}
 @php
@@ -16,6 +16,24 @@
         @endif
     @else
     <div class="sfk-settings">
+        <section class="sfk-settings-group" aria-labelledby="sfk-settings-name">
+            <h2 id="sfk-settings-name" class="sfk-settings-group-title">アプリ名</h2>
+            <form class="sfk-filter-section sfk-settings-form" wire:submit="saveName">
+                <label class="fi-sr-only" for="sfk-settings-app-name">アプリ名</label>
+                <input id="sfk-settings-app-name" type="text" class="sfk-filter-input" style="width: 100%; max-width: 480px" wire:model="appTitle" maxlength="64" autocomplete="off"
+                    placeholder="{{ $this->codeName() }}">
+                @error('appTitle')
+                    <p class="sfk-filter-error">{{ $message }}</p>
+                @enderror
+                <div class="sfk-settings-form-foot">
+                    @if ($this->hasCustomName())
+                        <button type="button" class="sfk-filter-btn" wire:click="resetName">元の名前に戻す</button>
+                    @endif
+                    <button type="submit" class="sfk-filter-btn sfk-filter-btn-submit">保存</button>
+                </div>
+            </form>
+        </section>
+
         @if ($permissionsUrl = $this->permissionsUrl())
             <section class="sfk-settings-group" aria-labelledby="sfk-settings-permissions">
                 <h2 id="sfk-settings-permissions" class="sfk-settings-group-title">アクセス権</h2>

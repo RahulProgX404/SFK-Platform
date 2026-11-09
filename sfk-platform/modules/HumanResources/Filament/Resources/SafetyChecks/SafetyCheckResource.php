@@ -8,14 +8,16 @@ use BackedEnum;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Modules\Core\Application\Records\RecordRules;
 use Modules\Core\Filament\AppResource;
 use Modules\Erp\Filament\NavigationGroup;
-use Modules\HumanResources\Filament\Resources\SafetyChecks\Pages\CreateSafetyCheck;
+use Modules\HumanResources\Application\SafetyChecks\SafetyCheckRules;
 use Modules\HumanResources\Filament\Resources\SafetyChecks\Pages\EditSafetyCheck;
 use Modules\HumanResources\Filament\Resources\SafetyChecks\Pages\ListSafetyChecks;
 use Modules\HumanResources\Filament\Resources\SafetyChecks\Pages\SafetyCheckListViewSettings;
 use Modules\HumanResources\Filament\Resources\SafetyChecks\Pages\SafetyCheckSettings;
 use Modules\HumanResources\Filament\Resources\SafetyChecks\Pages\ViewSafetyCheck;
+use Modules\HumanResources\Filament\Resources\SafetyChecks\QuickEntry\QuickSafetyCheck;
 use Modules\HumanResources\Filament\Resources\SafetyChecks\Tables\SafetyChecksTable;
 use Modules\HumanResources\Models\SafetyCheck;
 use UnitEnum;
@@ -65,6 +67,18 @@ final class SafetyCheckResource extends AppResource
         return ['bulk_delete_enabled' => false];
     }
 
+    /** What a record must be on every screen (user, 2026-11-09): SafetyCheckRules. */
+    public static function recordRules(): RecordRules
+    {
+        return new SafetyCheckRules;
+    }
+
+    /** 新規 (list, 再利用): the quick entry over the list (user, 2026-11-09); there is no create page. */
+    public static function quickCreateComponent(): string
+    {
+        return QuickSafetyCheck::class;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return SafetyCheckLayout::form($schema);
@@ -90,7 +104,6 @@ final class SafetyCheckResource extends AppResource
     {
         return [
             'index' => ListSafetyChecks::route('/'),
-            'create' => CreateSafetyCheck::route('/create'),
             'views' => SafetyCheckListViewSettings::route('/views'),
             'settings' => SafetyCheckSettings::route('/settings'),
             'view' => ViewSafetyCheck::route('/{record}'),

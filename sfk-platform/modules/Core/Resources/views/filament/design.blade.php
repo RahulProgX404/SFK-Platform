@@ -1822,8 +1822,12 @@
         font-weight: var(--sfk-fw-semibold);
     }
 
-    /* tables of a record (サブテーブル): a dark header row, rounded box */
+    /* tables of a record (サブテーブル): a dark header row, rounded box — as wide as the table (its legacy column widths, set by
+       RecordTable as --kt-subtable-width), not the whole row, so the frame and the header end with the last column; narrower
+       screens scroll it sideways (+1px: the collapsed cell borders) */
     .kt-subtable {
+        width: calc(var(--kt-subtable-width, calc(100% - 1px)) + 1px);
+        max-width: 100%;
         border-radius: var(--sfk-radius-lg);
         box-shadow: 0 0 0 1px var(--sfk-line);
         overflow: auto;

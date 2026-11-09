@@ -135,14 +135,14 @@ final class TeamDashboard
         if ($kind === 'leave') {
             $request = LeaveRequestResource::onlyVisible(LeaveRequest::query())->find((int) $id) ?? throw new HrActionNotAllowed('この操作を行う権限がありません。');
             $step = $this->leaveStep($request, $user) ?? throw new HrActionNotAllowed('この操作を行う権限がありません。');
-            $this->leaveWorkflow->run($request, $user, $step, LeaveRequestResource::appName().' '.LeaveRequestResource::titleOf($request), LeaveRequestResource::getUrl('view', ['record' => $request]));
+            $this->leaveWorkflow->run($request, $user, $step, LeaveRequestResource::displayName().' '.LeaveRequestResource::titleOf($request), LeaveRequestResource::getUrl('view', ['record' => $request]));
 
             return '「'.$request->status->value.'」にしました';
         }
 
         if ($kind === 'order') {
             $order = ConsumableOrderResource::onlyVisible(ConsumableOrder::query())->find((int) $id) ?? throw new PurchasingActionNotAllowed('この操作を行う権限がありません。');
-            $this->orderWorkflow->advance($order, $user, ConsumableOrderResource::appName().' '.ConsumableOrderResource::titleOf($order), ConsumableOrderResource::getUrl('view', ['record' => $order]));
+            $this->orderWorkflow->advance($order, $user, ConsumableOrderResource::displayName().' '.ConsumableOrderResource::titleOf($order), ConsumableOrderResource::getUrl('view', ['record' => $order]));
 
             return '「'.$order->status->value.'」にしました';
         }

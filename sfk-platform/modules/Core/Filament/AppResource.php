@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Access\AppAccess;
 use Modules\Core\Access\RecordAccess;
 use Modules\Core\Application\Filters\FilterField;
+use Modules\Core\Application\Records\RecordRules;
 use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\AppStatus;
 use Modules\Core\Filament\AppPages\AppListRecords;
@@ -32,10 +33,27 @@ abstract class AppResource extends Resource
     /** Registry code of the app this resource belongs to (see 共通管理 → アプリ設定). */
     abstract public static function appCode(): string;
 
-    /** App name in the registry (e.g. 「01. 取引先マスタ」); defaults to the navigation label. */
+    /**
+     * The name the app is built with (e.g. 「01. 取引先マスタ」; the registry starts with it, AppDiscovery); defaults to the
+     * navigation label of the code. What users see is displayName().
+     */
     public static function appName(): string
     {
-        return (string) static::getNavigationLabel();
+        return (string) parent::getNavigationLabel();
+    }
+
+    /** The name shown for the app: its registry name — an administrator may change it (アプリの設定) — else appName(). */
+    public static function displayName(): string
+    {
+        $name = static::app()?->name;
+
+        return $name !== null && $name !== '' ? $name : static::appName();
+    }
+
+    /** The sidebar shows the app's displayName() (renamed by an administrator, user 2026-11-09). */
+    public static function getNavigationLabel(): string
+    {
+        return static::displayName();
     }
 
     /** Shown under the app's title bar (core::filament.app-header) unless the registry row has its own description. */
@@ -103,6 +121,15 @@ abstract class AppResource extends Resource
     public static function isSingleScreen(): bool
     {
         return false;
+    }
+
+    /**
+     * What a record of the app must be wherever it is saved (quick entry, edit page, インライン編集): RecordRules; null =
+     * only the rules of the inputs.
+     */
+    public static function recordRules(): ?RecordRules
+    {
+        return null;
     }
 
     /** Browser event opening an app's quick-create panel, detail { app: <app code> }. */

@@ -27,6 +27,7 @@ use WeakMap;
  * @property AppStatus $status
  * @property int $sort_order
  * @property Carbon|null $list_views_seeded_at when the code-defined 一覧 were stored (ListViewService)
+ * @property bool $name_customized アプリ名 set by an administrator: kept when the registry follows the code
  * @property bool $record_duplicate_enabled その他の設定: 「レコードの再利用」 on the record page
  * @property bool $record_history_enabled その他の設定: 「変更履歴」 of the records
  * @property bool $inline_edit_enabled その他の設定: インライン編集 (pencil and × on the list rows)
@@ -98,6 +99,7 @@ final class BusinessApp extends Model
         return [
             'status' => AppStatus::class,
             'sort_order' => 'integer',
+            'name_customized' => 'boolean',
             'list_views_seeded_at' => 'datetime',
             'record_duplicate_enabled' => 'boolean',
             'record_history_enabled' => 'boolean',
