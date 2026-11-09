@@ -1166,8 +1166,6 @@
                     x-on:keydown.enter.prevent="const first = $root.querySelector('.sfk-apps-grid li:not([hidden]) a'); if (first) window.location.href = first.href">
             </label>
             <div class="sfk-apps-tools">
-                @if ($appsSettingsUrl !== null)
-                @endif
                 @if ($this->reorderAppsAction->isVisible())
                     {{ $this->reorderAppsAction }}
                 @endif

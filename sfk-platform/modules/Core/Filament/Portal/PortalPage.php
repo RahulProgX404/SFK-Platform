@@ -20,7 +20,6 @@ use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Route;
 use Livewire\Attributes\Url;
 use Modules\Core\Access\AppAccess;
 use Modules\Core\Application\Apps\AppLifecycle;
@@ -273,9 +272,6 @@ final class PortalPage extends Dashboard
             'hasOwnOrder' => ! self::isAdministrator() && $user?->app_order !== null,
             'isSuperAdmin' => $user?->isSuperAdmin() ?? false,
             'spacesUrl' => self::isAdministrator() ? SpaceResource::getUrl('index') : null,
-            'appsSettingsUrl' => ($user?->isSuperAdmin() ?? false) && Route::has('filament.settings.pages.apps')
-                ? route('filament.settings.pages.apps')
-                : null,
         ];
     }
 
