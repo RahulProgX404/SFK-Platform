@@ -2120,9 +2120,50 @@
         padding-top: 8px;
     }
 
-    /* ユーザー情報 popup (core::components.user-popup) */
+    /* icons of the row menu of the app lists (AppRecordActions): drawn by CSS, once for the page, instead of an SVG in
+       each of the hundreds of rows (speed, 2026-11-09); they take the size of Filament's icon box and the item's colour */
+    .sfk-i {
+        display: block;
+        width: 100%;
+        height: 100%;
+        background-color: currentColor;
+        -webkit-mask: var(--sfk-i) center / contain no-repeat;
+        mask: var(--sfk-i) center / contain no-repeat;
+    }
+
+    .sfk-i-edit {
+        --sfk-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10'/%3E%3C/svg%3E");
+    }
+
+    .sfk-i-delete {
+        --sfk-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0'/%3E%3C/svg%3E");
+    }
+
+    .sfk-i-more {
+        --sfk-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='black' d='M3 10a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0ZM8.5 10a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0ZM15.5 8.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z'/%3E%3C/svg%3E");
+    }
+
+    /* the one menu of 「…」 of the list rows (core::filament.row-menu-script), with Filament's dropdown look */
+    .sfk-row-menu-panel {
+        position: fixed;
+        z-index: 60;
+        width: max-content;
+        min-width: 10rem;
+    }
+
+    /* ユーザー情報 popup (UserPopup: the name; core::filament.user-popup-script: the one card of the page) */
     .sfk-user {
         display: inline-flex;
+    }
+
+    .sfk-user-pop {
+        position: fixed;
+        z-index: 60;
+        min-width: 240px;
+        max-width: min(320px, calc(100vw - 16px));
+        border-radius: var(--sfk-radius-lg, 10px);
+        background: var(--sfk-surface, #ffffff);
+        box-shadow: 0 0 0 1px var(--sfk-line, #e2e5e9), 0 12px 28px -8px rgba(16, 24, 40, .22);
     }
 
     .sfk-user-line {
@@ -2134,6 +2175,9 @@
         align-items: center;
         gap: 4px;
         padding: 0;
+        border: 0;
+        background: transparent;
+        cursor: pointer;
         color: var(--kt-blue-dark);
         font-size: inherit;
         text-align: left;

@@ -5,6 +5,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Middleware\SecurityHeaders;
+use Modules\Core\Http\Middleware\StripHtmlIndentation;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -15,6 +16,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // browser protections on every response (CSP, framing, HSTS over HTTPS …)
         $middleware->append(SecurityHeaders::class);
+        // pages without the indentation of their HTML: about two thirds smaller (Modules\Core\Http\HtmlIndentation)
+        $middleware->append(StripHtmlIndentation::class);
 
         // behind a load balancer / TLS proxy: its addresses (comma separated, or *), so HTTPS and client IPs are seen
         if (filled($proxies = env('TRUSTED_PROXIES'))) {

@@ -26,6 +26,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Events\ConnectionEstablished;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Livewire\ComponentHookRegistry;
 use Modules\Core\Access\DashboardAccess;
 use Modules\Core\Application\Apps\AppDiscovery;
 use Modules\Core\Application\Comments\RecordComments;
@@ -50,6 +51,7 @@ use Modules\Core\Filament\Users\UserDetailWidgets;
 use Modules\Core\Http\Portal\DashboardDirectory;
 use Modules\Core\Http\Portal\DashboardEntry;
 use Modules\Core\Http\Responses\LoginPageLogoutResponse;
+use Modules\Core\Livewire\StripsIndentation;
 
 final class CoreServiceProvider extends ModuleServiceProvider
 {
@@ -65,6 +67,10 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
     protected function registerModule(): void
     {
+        // every Livewire component without the indentation of its HTML (speed; Http\HtmlIndentation). Here, not in
+        // boot: Livewire wires the component hooks known when it boots
+        ComponentHookRegistry::register(StripsIndentation::class);
+
         $this->app->singleton(DocumentNumberGenerator::class);
         $this->app->singleton(RelatedLists::class);
         $this->app->singleton(RecordTabs::class);

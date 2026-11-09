@@ -7,9 +7,9 @@ namespace Modules\Core\Filament\Tables;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Contracts\HasTable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\HtmlString;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\AppResource;
 use Modules\Core\Filament\Support\GuardedDelete;
@@ -34,22 +34,27 @@ final class AppRecordActions
 
         $edit = Action::make('inlineEdit')
             ->label('編集する')
-            ->icon(Heroicon::OutlinedPencilSquare)
+            ->icon(self::icon('edit'))
             ->visible(fn (HasTable $livewire, Model $record): bool => $icons($livewire, $record) && $resource::canEdit($record))
             ->url(fn (Model $record): string => $resource::getUrl('edit', ['record' => $record]));
         // a record still used elsewhere is not deleted (GuardedDelete)
         $delete = GuardedDelete::apply(DeleteAction::make())
             ->label('削除する')
-            ->icon(Heroicon::OutlinedTrash)
+            ->icon(self::icon('delete'))
+            // no ⌘/Ctrl+D (DeleteAction's default) on a list: every row bound it to the whole page — 100 listeners, and
+            // the browser's bookmark key opened a delete
+            ->keyBindings(null)
             ->visible(fn (HasTable $livewire, Model $record): bool => $icons($livewire, $record) && $resource::canDelete($record));
 
         return [
             ActionGroup::make([$edit, $delete])
                 ->label('操作')
-                ->icon(Heroicon::EllipsisHorizontal)
+                ->icon(self::icon('more'))
                 ->iconButton()
                 ->color('gray')
-                ->extraAttributes(['class' => 'sfk-row-menu']),
+                ->extraAttributes(['class' => 'sfk-row-menu'])
+                // one small button per row; the page's one menu (core::filament.row-menu-script) opens on it
+                ->view('core::filament.tables.row-menu'),
             Action::make('inlineSave')
                 ->label('保存')
                 ->button()
@@ -72,5 +77,11 @@ final class AppRecordActions
                     }
                 }),
         ];
+    }
+
+    /** An icon of the row menu drawn by CSS (.sfk-i-<name>, core::filament.theme): the rows carry no SVG each. */
+    private static function icon(string $name): HtmlString
+    {
+        return new HtmlString('<span class="sfk-i sfk-i-'.$name.'"></span>');
     }
 }

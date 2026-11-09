@@ -11,13 +11,15 @@ use Illuminate\Support\Facades\Cache;
  * The look and the Alpine components of every panel, served as one stylesheet and one script that the browser keeps
  * (GET /core/theme.css|js?v=<version>, a year, immutable) instead of ~125 KB inside every page. They are still written
  * in the Blade views core::filament.theme (with core::filament.ui and core::filament.documents.styles),
- * core::filament.design and core::filament.app-filter-script: their <style> and <script> contents are put together once
+ * core::filament.design, core::filament.app-filter-script, core::filament.user-popup-script and
+ * core::filament.row-menu-script: their <style> and <script> contents are put together once
  * per change of those files (the version follows the content).
  */
 final class ThemeAssets
 {
     /** Views rendered into the assets, in order (core::filament.design, the current look, last of the styles). */
-    private const VIEWS = ['core::filament.theme', 'core::filament.design', 'core::filament.app-filter-script'];
+    private const VIEWS = ['core::filament.theme', 'core::filament.design', 'core::filament.app-filter-script', 'core::filament.user-popup-script',
+        'core::filament.row-menu-script'];
 
     /** Views whose changes make new assets (the ones above and what they include). */
     private const SOURCES = [...self::VIEWS, 'core::filament.ui', 'core::filament.documents.styles'];

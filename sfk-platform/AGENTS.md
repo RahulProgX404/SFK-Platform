@@ -22,6 +22,13 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
 - Speed: nothing large goes into every page — panel CSS / JS live in the theme views served as one cached file
   (`ThemeAssets`), big data of a dialog is fetched when it opens (e.g. 絞り込む). Modules are cached
   (`php artisan module:cache`, part of `optimize`); a new conventional folder in a module needs it rebuilt.
+  Lists draw 100+ rows, so nothing per row may be a component of its own (2026-11-09): user names are
+  `UserPopup` buttons carrying their card (one script draws it, `core::filament.user-popup-script`; 従業員カテゴリ /
+  役職 of all users read in two queries per request), the row 「…」 is one button per row with the page's one menu
+  (`AppRecordActions` → `core::filament.tables.row-menu`, `row-menu-script`; the actions stay on the table) and its
+  icons are CSS (`.sfk-i-*`). Pages and Livewire updates are sent without the indentation of their HTML
+  (`Core\Http\HtmlIndentation`, about two thirds smaller). Dialog windows clip with `overflow: clip`, never `hidden`
+  (hidden cut long dialogs off without a scrollbar).
 - Uploaded files go on `Modules\Core\Application\Files\Uploads::disk()` (private; object storage on Laravel Cloud, whose
   servers keep no files) — never `disk('local')`; a tool that needs a file path reads `Uploads::localFile()`. No new
   system programs or extra containers (the host runs only the PHP app, Postgres, Valkey and the queue).

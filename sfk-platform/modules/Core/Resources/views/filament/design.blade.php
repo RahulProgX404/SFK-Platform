@@ -504,10 +504,12 @@
     }
 
     /* ---- dialogs: white throughout, a clear heading, the buttons in a soft footer ---------------------------------- */
+    /* clip (not hidden) for the rounded corners: hidden lets the window shrink to the screen and cuts off a long dialog
+       (e.g. アプリの並び替え) without a scrollbar; clipped, it keeps its height and the dialog scrolls */
     .fi-modal-window {
         border-radius: var(--sfk-radius-xl);
         box-shadow: var(--sfk-ring), 0 24px 48px -12px rgba(16, 24, 40, .25) !important;
-        overflow: hidden;
+        overflow: clip;
     }
 
     .fi-modal-window .fi-modal-header {

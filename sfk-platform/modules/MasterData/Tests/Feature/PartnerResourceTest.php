@@ -21,6 +21,7 @@ use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\DashboardSettings\Resources\AppSettings\Pages\EditFieldPermissions;
 use Modules\Core\Filament\DashboardSettings\Resources\AppSettings\Pages\EditRecordPermissions;
 use Modules\Core\Filament\Support\ThemeAssets;
+use Modules\Core\Filament\Support\UserPopup;
 use Modules\Core\Models\BusinessApp;
 use Modules\Core\Models\RecordComment;
 use Modules\Core\Models\RecordVersion;
@@ -972,16 +973,18 @@ it('opens the ユーザー情報 popup from user names, with the profile link on
     $partner->staff()->attach($staff);
     $this->actingAs($this->admin);
 
+    // each name carries its card (name, lines, profile link); the page's one script draws it (UserPopup)
+    $card = fn (bool $withLink): string => e(json_encode(array_filter(['n' => '佐藤 花子', 'm' => [], 'u' => $withLink ? route(UserPopup::SETTINGS_USER_ROUTE, ['record' => $staff]) : null],
+        fn (mixed $value): bool => $value !== null), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
-        ->assertSee('ユーザー情報（佐藤 花子）')
-        ->assertSee('プロフィールを表示');
+        ->assertSee('data-sfk-user="'.$card(true).'"', false);
 
-    Livewire::test(ListPartners::class)->assertSee('ユーザー情報（佐藤 花子）');
+    Livewire::test(ListPartners::class)->assertSee('data-sfk-user="'.$card(true).'"', false);
 
     $this->actingAs($employee);
     Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
-        ->assertSee('ユーザー情報（佐藤 花子）')
-        ->assertDontSee('プロフィールを表示');
+        ->assertSee('data-sfk-user="'.$card(false).'"', false)
+        ->assertDontSee('settings/users/'.$staff->id);
 });
 
 it('offers インライン編集, コメント, 再利用, 変更履歴 and 一括削除 in その他の設定, like the legacy app template', function () {
@@ -1160,7 +1163,7 @@ it('takes コメント with 宛先 on the record and notifies them, 作成者 an
         ->assertSet('commentData.body', null);
 
     Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
-        ->assertSeeInOrder(['ユーザー情報（管理者）', '@宛先 花子', '納期を確認してください。<br />', '明日まで', '返信する', '削除する'], false);
+        ->assertSeeInOrder(['&quot;n&quot;:&quot;管理者&quot;', '@宛先 花子', '納期を確認してください。<br />', '明日まで', '返信する', '削除する'], false);
 
     $comment = RecordComment::query()->sole();
     expect($comment->user_id)->toBe($this->admin->id)

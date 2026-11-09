@@ -538,3 +538,21 @@ it('requires the whole check before driving, a complete one after it, another co
         ->assertHasErrors(['data.after_vehicle', 'data.after_method', 'data.after_checker_id']);
     expect($saved->fresh()?->after_detected)->toBeNull();
 });
+
+it('ends each list row with one light 「…」 whose menu still runs Filament\'s 編集する / 削除する (speed, 2026-11-09)', function () {
+    $this->actingAs($this->admin);
+    $request = LeaveRequest::query()->create(['request_type' => '休暇申請', 'applicant_id' => $this->employee->id, 'category' => '有給休暇', 'target_on' => '2026-10-22',
+        'reason' => '私用']);
+
+    $list = Livewire::test(ListLeaveRequests::class)
+        ->assertSee('data-sfk-row-menu="'.e(json_encode(['k' => (string) $request->id, 'items' => [
+            ['l' => '編集する', 'u' => LeaveRequestResource::getUrl('edit', ['record' => $request]), 'i' => 'edit'],
+            ['l' => '削除する', 'a' => 'delete', 'i' => 'delete', 'd' => true],
+        ]], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)).'"', false)
+        // no dropdown component and no page-wide ⌘/Ctrl+D per row
+        ->assertDontSee('x-mousetrap.global.mod-d', false);
+    expect(substr_count($list->html(), 'class="fi-dropdown"'))->toBeLessThan(5);
+
+    $list->callTableAction('delete', $request)->callMountedAction();
+    expect(LeaveRequest::query()->whereKey($request->id)->exists())->toBeFalse();
+});

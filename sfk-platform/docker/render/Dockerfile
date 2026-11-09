@@ -26,7 +26,7 @@ RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-in
 
 COPY . .
 # the views live in the modules; view:cache (php artisan optimize) still looks into resources/views
-RUN composer dump-autoload --no-dev --optimize --no-interaction \
+RUN composer dump-autoload --no-dev --classmap-authoritative --no-interaction \
     && mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache resources/views \
     && chown -R www-data:www-data storage bootstrap/cache \
     && chmod +x docker/render/start.sh
