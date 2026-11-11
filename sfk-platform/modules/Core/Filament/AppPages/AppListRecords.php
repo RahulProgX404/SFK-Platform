@@ -459,6 +459,20 @@ abstract class AppListRecords extends ListRecords
     }
 
     /**
+     * The summary cards drawn above the 一覧 tabs: only for users who see everyone's money — 財務分析を表示 with 財務分析の
+     * 範囲 全体 (User::seesOverallFinance(); super admins always) — as the totals of the apps are the company's money
+     * (user, 2026-11-11). Others get none, and nothing is added up for them.
+     *
+     * @return list<array{label: string, value: string, tone?: string, icon?: string}>
+     */
+    public function shownSummaryCards(): array
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && $user->seesOverallFinance() ? $this->summaryCards() : [];
+    }
+
+    /**
      * A card of summaryCards() (Support\SummaryCard::make()).
      *
      * @return array{label: string, value: string, tone: string, icon: string}

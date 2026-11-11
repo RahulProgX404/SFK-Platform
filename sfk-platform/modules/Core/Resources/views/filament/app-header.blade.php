@@ -2,7 +2,7 @@
     Header of an app screen (Modules\Core\Filament\AppPages\Concerns\HasAppChrome; design_ref/app-index.png and
     add-invoice.png): only the app name — on a list after the home link, on a record / form after ← (back to the list) —
     with (i) opening the app's description in a popup. The breadcrumb home › app (› step) stays on every screen.
-    list: エクスポート (帳票出力) and 新規 on the right; the summary cards (summaryCards()); the 一覧 as tabs; the toolbar
+    list: エクスポート (帳票出力) and 新規 on the right; the summary cards (summaryCards(), to users who see everyone's money); the 一覧 as tabs; the toolbar
           of a view without a table (calendar / custom). An app of one screen (AppResource::isSingleScreen): ⚙ in place
           of 新規, no tabs, no 絞り込む, no toolbar.
     view: 編集, 再利用, 「…」 (印刷・削除), エクスポート, ⚙ and ‹ › on the right; the app's legacy buttons under the name.
@@ -143,7 +143,7 @@
     @endif
 
     @if ($kind === 'list')
-        @if (! $page->currentView()->isCalendar() && ($cards = $page->summaryCards()) !== [])
+        @if (! $page->currentView()->isCalendar() && ($cards = $page->shownSummaryCards()) !== [])
             @include('core::filament.app-summary', ['cards' => $cards])
         @endif
 

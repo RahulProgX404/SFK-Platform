@@ -81,7 +81,7 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   only the header row is bold).
 - App screens (Core `app-header`, nothing per app): the breadcrumb home › app name on a list, home › app name ›
   レコードの追加 / レコードの編集 / レコードの詳細 on the record screens, with (i) for the description popup. List: エクスポート (帳票出力; same ボタン名 = sub-menu) and 新規 at the
-  top right, summary cards (`summaryCards()` with `SummaryCard::make()` — never a toolbar render hook of your own), the
+  top right, summary cards (`summaryCards()` with `SummaryCard::make()` — never a toolbar render hook of your own; drawn only for users who see everyone's money, `User::seesOverallFinance()`), the
   一覧 as tabs, then search, 絞り込む, the switch of the legacy buttons (+ ボタンの説明 popup), 並び替え and ⚙ (the
   app's `optionActions()`, 一括削除, アプリの設定) — no 列 chooser, the columns come from the 一覧; rows end with 「…」 (編集する → edit page, 削除する); 表示件数 and the page
   numbers under the table, which fills the screen; cell values stay on one line (full text on hover). Record page:
@@ -103,7 +103,8 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   (`kt-subtable`, `sfk-related-table`, `sfk-data-table`).
 - A record page of another module's app can get tabs and cards from other modules (`Core\Filament\Records\RecordTabs`,
   e.g. 受注 / 請求書 / 売掛明細 on 01. 取引先マスタ, `ViewPartner::TABS`), read through the providing app's `onlyVisible()`;
-  fields shown in such a head respect フィールドのアクセス権.
+  fields shown in such a head respect フィールドのアクセス権. Its summary cards (of the record and of its tabs) are only for
+  users who see everyone's money (`User::seesOverallFinance()`, as the app lists' summary cards).
 - Field order (create, edit and record page — one layout per app, `<App>Layout` rows): related fields in labelled
   groups (string rows = group headings, left out when nothing under them is shown), the most important first (who /
   when / what, then details, amounts, notes and attachments; derived and internal fields last), each row filling the

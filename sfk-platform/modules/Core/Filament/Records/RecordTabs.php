@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Filament\Records;
 
+use App\Models\User;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 
@@ -12,7 +13,9 @@ use Illuminate\Database\Eloquent\Model;
  * the Orders and Sales modules on a 01. 取引先マスタ record, design_ref/customer-*.png), where the owning module
  * cannot depend on them. A module registers them in its service provider for a page key (e.g. 'master-data.partners');
  * the page asks for those that apply to its record. The data is read through the providing app's
- * `Resource::onlyVisible()`, so app and record rights apply.
+ * `Resource::onlyVisible()`, so app and record rights apply. The summary cards — of the record and of its tabs — are the
+ * company's money: only users who see everyone's money get them (User::seesOverallFinance(), as the summary cards of the
+ * app lists; user 2026-11-11).
  */
 final class RecordTabs
 {
@@ -62,7 +65,9 @@ final class RecordTabs
     {
         foreach ($this->tabs[$page] ?? [] as $tab) {
             if ($tab['key'] === $key && ($tab['when'])($record)) {
-                return ['columns' => [], 'numeric' => [], 'rows' => [], 'urls' => [], 'cards' => [], 'tones' => [], ...($tab['data'])($record)];
+                $data = ['columns' => [], 'numeric' => [], 'rows' => [], 'urls' => [], 'cards' => [], 'tones' => [], ...($tab['data'])($record)];
+
+                return self::showsCards() ? $data : [...$data, 'cards' => []];
             }
         }
 
@@ -72,9 +77,21 @@ final class RecordTabs
     /** @return list<array<string, string>> */
     public function cardsFor(string $page, Model $record): array
     {
+        if (! self::showsCards()) {
+            return [];
+        }
+
         $providers = $this->cards[$page] ?? [];
         usort($providers, fn (array $a, array $b): int => $a['sort'] <=> $b['sort']);
 
         return array_merge(...array_map(fn (array $provider): array => ($provider['cards'])($record), $providers ?: [['cards' => fn (): array => []]]));
+    }
+
+    /** The summary cards are for users who see everyone's money (財務分析を表示 + 範囲 全体; super admins always). */
+    private static function showsCards(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && $user->seesOverallFinance();
     }
 }
