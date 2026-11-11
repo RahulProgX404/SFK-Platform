@@ -7,6 +7,7 @@ namespace Modules\Core\Access;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Livewire\Livewire;
+use Modules\Core\Application\Cache\ReferenceCache;
 use Modules\Core\Domain\Apps\FieldAccessLevel;
 use Modules\Core\Filament\AppResource;
 use Modules\Core\Models\AppFieldPermission;
@@ -44,13 +45,16 @@ final class FieldAccess
         $key = $user->id.':'.$app->id;
 
         if (! array_key_exists($key, $cached)) {
-            $categoryIds = $user->employeeCategories()->pluck('employee_categories.id')->map(fn (mixed $id): int => (int) $id)->all();
-            $levels = [];
-            foreach ($app->fieldPermissions()->get()->groupBy('field') as $field => $entries) {
-                $entry = $entries->first(fn (AppFieldPermission $entry): bool => $entry->appliesTo($user, $categoryIds));
-                $levels[(string) $field] = $entry instanceof AppFieldPermission ? $entry->access : FieldAccessLevel::None;
-            }
-            $cached[$key] = $levels;
+            $cached[$key] = array_map(fn (string $level): FieldAccessLevel => FieldAccessLevel::from($level), ReferenceCache::remember('fields:'.$key, function () use ($user, $app): array {
+                $categoryIds = $user->employeeCategories()->pluck('employee_categories.id')->map(fn (mixed $id): int => (int) $id)->all();
+                $levels = [];
+                foreach ($app->fieldPermissions()->get()->groupBy('field') as $field => $entries) {
+                    $entry = $entries->first(fn (AppFieldPermission $entry): bool => $entry->appliesTo($user, $categoryIds));
+                    $levels[(string) $field] = ($entry instanceof AppFieldPermission ? $entry->access : FieldAccessLevel::None)->value;
+                }
+
+                return $levels;
+            }));
             self::$perRequest[$request] = $cached;
         }
 

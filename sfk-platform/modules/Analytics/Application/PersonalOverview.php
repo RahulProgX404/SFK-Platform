@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Modules\Analytics\Application;
 
 use App\Models\User;
+use Closure;
 use DateTimeImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Analytics\Domain\Period;
+use Modules\Core\Application\Cache\DataCache;
 use Modules\HumanResources\Domain\LeaveRequests\LeaveRequestStatus;
 use Modules\HumanResources\Filament\Resources\LeaveRequests\LeaveRequestResource;
 use Modules\HumanResources\Models\LeaveRequest;
@@ -43,30 +45,32 @@ final class PersonalOverview
     /** @return array{hours: float, income: int, reports: int, work_days: int, leave_days: float, paid_leave_days: float} */
     public function for(User $person, Period $period): array
     {
-        $work = $this->reports($person, $period)
-            ->selectRaw('count(*) as reports, count(distinct daily_reports.worked_on) as work_days, '
-                .'coalesce(sum(coalesce(daily_reports.work_hours, 0) + coalesce(daily_reports.overtime_hours, 0)), 0) as hours, '
-                .'coalesce(sum(coalesce(daily_reports.work_hours, 0) * coalesce(daily_reports.work_rate, 0) + coalesce(daily_reports.overtime_hours, 0) * coalesce(daily_reports.overtime_rate, 0)), 0) as income')
-            ->toBase()
-            ->first();
+        return $this->cached('for', [(string) $person->id, $period->start().'~'.$period->after()], function () use ($person, $period): array {
+            $work = $this->reports($person, $period)
+                ->selectRaw('count(*) as reports, count(distinct daily_reports.worked_on) as work_days, '
+                    .'coalesce(sum(coalesce(daily_reports.work_hours, 0) + coalesce(daily_reports.overtime_hours, 0)), 0) as hours, '
+                    .'coalesce(sum(coalesce(daily_reports.work_hours, 0) * coalesce(daily_reports.work_rate, 0) + coalesce(daily_reports.overtime_hours, 0) * coalesce(daily_reports.overtime_rate, 0)), 0) as income')
+                ->toBase()
+                ->first();
 
-        $leave = 0.0;
-        $paid = 0.0;
-        $categories = $this->leaves($person, $period)->pluck('category');
-        foreach ($categories as $category) {
-            [$days, $isPaid] = self::LEAVE_DAYS[(string) $category] ?? [0.0, false];
-            $leave += $days;
-            $paid += $isPaid ? $days : 0.0;
-        }
+            $leave = 0.0;
+            $paid = 0.0;
+            $categories = $this->leaves($person, $period)->pluck('category');
+            foreach ($categories as $category) {
+                [$days, $isPaid] = self::LEAVE_DAYS[(string) $category] ?? [0.0, false];
+                $leave += $days;
+                $paid += $isPaid ? $days : 0.0;
+            }
 
-        return [
-            'hours' => round((float) ($work->hours ?? 0), 2),
-            'income' => (int) floor((float) ($work->income ?? 0)),
-            'reports' => (int) ($work->reports ?? 0),
-            'work_days' => (int) ($work->work_days ?? 0),
-            'leave_days' => $leave,
-            'paid_leave_days' => $paid,
-        ];
+            return [
+                'hours' => round((float) ($work->hours ?? 0), 2),
+                'income' => (int) floor((float) ($work->income ?? 0)),
+                'reports' => (int) ($work->reports ?? 0),
+                'work_days' => (int) ($work->work_days ?? 0),
+                'leave_days' => $leave,
+                'paid_leave_days' => $paid,
+            ];
+        });
     }
 
     /**
@@ -76,24 +80,26 @@ final class PersonalOverview
      */
     public function monthly(User $person, int $year): array
     {
-        $month = MonthBucket::sql('daily_reports.worked_on');
-        $hours = array_fill(1, 12, 0.0);
-        $income = array_fill(1, 12, 0);
-        $rows = $this->reports($person, Period::between(sprintf('%04d-01-01', $year), sprintf('%04d-12-31', $year), new DateTimeImmutable))
-            ->selectRaw("{$month} as month, "
-                .'coalesce(sum(coalesce(daily_reports.work_hours, 0) + coalesce(daily_reports.overtime_hours, 0)), 0) as hours, '
-                .'coalesce(sum(coalesce(daily_reports.work_hours, 0) * coalesce(daily_reports.work_rate, 0) + coalesce(daily_reports.overtime_hours, 0) * coalesce(daily_reports.overtime_rate, 0)), 0) as income')
-            ->groupByRaw($month)
-            ->toBase()
-            ->get();
+        return $this->cached('monthly', [(string) $person->id, (string) $year], function () use ($person, $year): array {
+            $month = MonthBucket::sql('daily_reports.worked_on');
+            $hours = array_fill(1, 12, 0.0);
+            $income = array_fill(1, 12, 0);
+            $rows = $this->reports($person, Period::between(sprintf('%04d-01-01', $year), sprintf('%04d-12-31', $year), new DateTimeImmutable))
+                ->selectRaw("{$month} as month, "
+                    .'coalesce(sum(coalesce(daily_reports.work_hours, 0) + coalesce(daily_reports.overtime_hours, 0)), 0) as hours, '
+                    .'coalesce(sum(coalesce(daily_reports.work_hours, 0) * coalesce(daily_reports.work_rate, 0) + coalesce(daily_reports.overtime_hours, 0) * coalesce(daily_reports.overtime_rate, 0)), 0) as income')
+                ->groupByRaw($month)
+                ->toBase()
+                ->get();
 
-        foreach ($rows as $row) {
-            [, $number] = MonthBucket::parse((string) $row->month);
-            $hours[$number] = round((float) $row->hours, 2);
-            $income[$number] = (int) floor((float) $row->income);
-        }
+            foreach ($rows as $row) {
+                [, $number] = MonthBucket::parse((string) $row->month);
+                $hours[$number] = round((float) $row->hours, 2);
+                $income[$number] = (int) floor((float) $row->income);
+            }
 
-        return ['hours' => $hours, 'income' => $income];
+            return ['hours' => $hours, 'income' => $income];
+        });
     }
 
     /** @return Builder<DailyReport> */
@@ -115,5 +121,20 @@ final class PersonalOverview
                 ->orWhere(fn (Builder $query) => $query->whereNull('worker_id')->where('applicant_id', $person->id)))
             ->where('target_on', '>=', $period->start())
             ->where('target_on', '<', $period->after());
+    }
+
+    /**
+     * A figure from the cache (DataCache — added up afresh after any record changes): per viewer (their rights narrow
+     * what is added up), the person and arguments.
+     *
+     * @template T
+     *
+     * @param  list<string>  $args
+     * @param  Closure(): T  $compute
+     * @return T
+     */
+    private function cached(string $name, array $args, Closure $compute): mixed
+    {
+        return DataCache::remember('personal-overview:'.auth()->id().':'.$name.':'.implode('|', $args), $compute);
     }
 }

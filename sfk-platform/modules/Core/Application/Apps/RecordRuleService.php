@@ -7,6 +7,7 @@ namespace Modules\Core\Application\Apps;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Modules\Core\Application\Cache\ReferenceCache;
 use Modules\Core\Application\Filters\FilterField;
 use Modules\Core\Domain\Apps\AccessSubject;
 use Modules\Core\Domain\Filters\FilterFieldType;
@@ -94,6 +95,7 @@ final class RecordRuleService
                 }
             }
         });
+        ReferenceCache::bump(); // the old rules went in one delete, without model events
     }
 
     /**

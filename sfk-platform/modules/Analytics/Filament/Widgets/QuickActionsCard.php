@@ -10,7 +10,9 @@ use Illuminate\Database\Eloquent\Model;
 use Modules\Analytics\Application\TeamDashboard;
 use Modules\Analytics\Filament\Dashboard\DashboardCard;
 use Modules\Core\Application\Apps\AppUsageLog;
+use Modules\Core\Application\Cache\DataCache;
 use Modules\Core\Filament\AppResource;
+use Modules\Core\Models\AppUsage;
 use Modules\Core\Models\BusinessApp;
 use Modules\HumanResources\Application\HrActionNotAllowed;
 use Modules\Purchasing\Application\PurchasingActionNotAllowed;
@@ -81,8 +83,21 @@ final class QuickActionsCard extends DashboardCard
      */
     public static function recentRecords(User $user, int $limit = 5): array
     {
+        $usages = app(AppUsageLog::class)->recent($user, $limit * 3);
+        // from the cache (DataCache) for these visits: the visits are written without model events, so they are the key
+        $visits = md5((string) json_encode(array_map(fn (AppUsage $usage): array => [$usage->app_code, $usage->record_id, (string) $usage->record_visited_at, (string) $usage->last_visited_at], $usages)));
+
+        return DataCache::remember('recent-records:'.$user->id.':'.$limit.':'.$visits, fn (): array => self::readRecent($usages, $limit));
+    }
+
+    /**
+     * @param  list<AppUsage>  $usages
+     * @return list<array{code: string, app: string, icon: string, record: int|null, title: string|null, url: string, at: string}>
+     */
+    private static function readRecent(array $usages, int $limit): array
+    {
         $list = [];
-        foreach (app(AppUsageLog::class)->recent($user, $limit * 3) as $usage) {
+        foreach ($usages as $usage) {
             $resource = AppResource::forCode($usage->app_code);
             $listUrl = $resource !== null ? self::appUrl($usage->app_code) : null;
             if ($resource === null || $listUrl === null) {

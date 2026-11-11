@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Modules\Analytics\Application;
 
 use App\Models\User;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Modules\Analytics\Domain\FiscalYear;
+use Modules\Core\Application\Cache\DataCache;
 use Modules\Production\Filament\Resources\DailyReports\DailyReportResource;
 use Modules\Production\Models\DailyReport;
 
@@ -28,11 +30,13 @@ final class DailyReportRanking
     /** @return list<int> the business years with reports, oldest first, up to the current one */
     public function years(): array
     {
-        $first = $this->reports()->min('daily_reports.worked_on');
-        $current = FiscalYear::startingYear(now());
-        $from = $first !== null ? FiscalYear::startingYear(new \DateTimeImmutable((string) $first)) : $current;
+        return $this->cached('years', [], function (): array {
+            $first = $this->reports()->min('daily_reports.worked_on');
+            $current = FiscalYear::startingYear(now());
+            $from = $first !== null ? FiscalYear::startingYear(new \DateTimeImmutable((string) $first)) : $current;
 
-        return range(min($from, $current), $current);
+            return range(min($from, $current), $current);
+        });
     }
 
     /**
@@ -41,38 +45,40 @@ final class DailyReportRanking
      */
     public function ranking(int $fiscalYear): array
     {
-        [$from, $after] = FiscalYear::days($fiscalYear);
-        $month = MonthBucket::sql('daily_reports.worked_on');
+        return $this->cached('ranking', [(string) $fiscalYear], function () use ($fiscalYear): array {
+            [$from, $after] = FiscalYear::days($fiscalYear);
+            $month = MonthBucket::sql('daily_reports.worked_on');
 
-        $rows = $this->reports()
-            ->where('daily_reports.worked_on', '>=', $from)->where('daily_reports.worked_on', '<', $after)
-            ->groupBy('daily_reports.user_id', DB::raw($month))
-            ->selectRaw('daily_reports.user_id, '.$month.' as month, sum('.self::FEE.') as total, sum('.self::HOURS.') as hours')
-            ->toBase()
-            ->get();
+            $rows = $this->reports()
+                ->where('daily_reports.worked_on', '>=', $from)->where('daily_reports.worked_on', '<', $after)
+                ->groupBy('daily_reports.user_id', DB::raw($month))
+                ->selectRaw('daily_reports.user_id, '.$month.' as month, sum('.self::FEE.') as total, sum('.self::HOURS.') as hours')
+                ->toBase()
+                ->get();
 
-        $workers = [];
-        foreach ($rows as $row) {
-            [, $calendarMonth] = MonthBucket::parse((string) $row->month);
-            $workers[(int) $row->user_id][$calendarMonth] = [(int) floor((float) $row->total), round((float) $row->hours, 2)];
-        }
-
-        $names = User::query()->whereIn('id', array_keys($workers))->pluck('name', 'id')->all();
-        $list = [];
-        foreach ($workers as $userId => $sums) {
-            $months = array_fill_keys(FiscalYear::MONTHS, 0);
-            $hours = array_fill_keys(FiscalYear::MONTHS, 0.0);
-            foreach ($sums as $calendarMonth => [$amount, $worked]) {
-                $months[$calendarMonth] = $amount;
-                $hours[$calendarMonth] = $worked;
+            $workers = [];
+            foreach ($rows as $row) {
+                [, $calendarMonth] = MonthBucket::parse((string) $row->month);
+                $workers[(int) $row->user_id][$calendarMonth] = [(int) floor((float) $row->total), round((float) $row->hours, 2)];
             }
-            $list[] = [
-                'rank' => 0, 'user_id' => $userId, 'name' => (string) ($names[$userId] ?? ''),
-                'months' => $months, 'hours' => $hours, 'total' => array_sum($months), 'total_hours' => round(array_sum($hours), 2),
-            ];
-        }
 
-        return $this->ranked($list);
+            $names = User::query()->whereIn('id', array_keys($workers))->pluck('name', 'id')->all();
+            $list = [];
+            foreach ($workers as $userId => $sums) {
+                $months = array_fill_keys(FiscalYear::MONTHS, 0);
+                $hours = array_fill_keys(FiscalYear::MONTHS, 0.0);
+                foreach ($sums as $calendarMonth => [$amount, $worked]) {
+                    $months[$calendarMonth] = $amount;
+                    $hours[$calendarMonth] = $worked;
+                }
+                $list[] = [
+                    'rank' => 0, 'user_id' => $userId, 'name' => (string) ($names[$userId] ?? ''),
+                    'months' => $months, 'hours' => $hours, 'total' => array_sum($months), 'total_hours' => round(array_sum($hours), 2),
+                ];
+            }
+
+            return $this->ranked($list);
+        });
     }
 
     /**
@@ -82,20 +88,22 @@ final class DailyReportRanking
      */
     public function top(string $from, string $after, int $limit = 5): array
     {
-        $rows = $this->reports()
-            ->where('daily_reports.worked_on', '>=', $from)->where('daily_reports.worked_on', '<', $after)
-            ->groupBy('daily_reports.user_id')
-            ->selectRaw('daily_reports.user_id, sum('.self::FEE.') as total, sum('.self::HOURS.') as hours, count(*) as reports')
-            ->toBase()
-            ->get();
+        return $this->cached('top', [(string) $from, (string) $after, (string) $limit], function () use ($from, $after, $limit): array {
+            $rows = $this->reports()
+                ->where('daily_reports.worked_on', '>=', $from)->where('daily_reports.worked_on', '<', $after)
+                ->groupBy('daily_reports.user_id')
+                ->selectRaw('daily_reports.user_id, sum('.self::FEE.') as total, sum('.self::HOURS.') as hours, count(*) as reports')
+                ->toBase()
+                ->get();
 
-        $names = User::query()->whereIn('id', $rows->pluck('user_id')->all())->pluck('name', 'id')->all();
-        $list = $rows->map(fn (object $row): array => [
-            'rank' => 0, 'user_id' => (int) $row->user_id, 'name' => (string) ($names[(int) $row->user_id] ?? ''),
-            'total' => (int) floor((float) $row->total), 'total_hours' => round((float) $row->hours, 2), 'reports' => (int) $row->reports,
-        ])->all();
+            $names = User::query()->whereIn('id', $rows->pluck('user_id')->all())->pluck('name', 'id')->all();
+            $list = $rows->map(fn (object $row): array => [
+                'rank' => 0, 'user_id' => (int) $row->user_id, 'name' => (string) ($names[(int) $row->user_id] ?? ''),
+                'total' => (int) floor((float) $row->total), 'total_hours' => round((float) $row->hours, 2), 'reports' => (int) $row->reports,
+            ])->all();
 
-        return array_slice($this->ranked($list), 0, $limit);
+            return array_slice($this->ranked($list), 0, $limit);
+        });
     }
 
     /**
@@ -118,5 +126,20 @@ final class DailyReportRanking
     private function reports(): Builder
     {
         return DailyReportResource::onlyVisible(DailyReport::query());
+    }
+
+    /**
+     * A figure from the cache (DataCache — added up afresh after any record changes): per viewer (their rights narrow
+     * what is added up), the period and arguments.
+     *
+     * @template T
+     *
+     * @param  list<string>  $args
+     * @param  Closure(): T  $compute
+     * @return T
+     */
+    private function cached(string $name, array $args, Closure $compute): mixed
+    {
+        return DataCache::remember('daily-ranking:'.auth()->id().':'.$name.':'.implode('|', $args), $compute);
     }
 }

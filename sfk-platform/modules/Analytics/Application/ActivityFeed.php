@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Modules\Analytics\Application;
 
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Arr;
+use Modules\Core\Application\Cache\DataCache;
 use Modules\Core\Application\Notifications\RecordDirectory;
 use Modules\Core\Filament\AppResource;
 use Modules\Core\Models\RecordComment;
@@ -33,6 +35,18 @@ final class ActivityFeed
      *                                                                                                                             kind: notice | created | updated | comment
      */
     public function for(User $user, int $limit = 8): array
+    {
+        // from the cache (DataCache — notices, 変更履歴 and コメント are records, so any change adds them up afresh)
+        $items = DataCache::remember('activity:'.$user->id.':'.$limit, fn (): array => array_map(
+            fn (array $item): array => [...$item, 'at' => $item['at']->toIso8601String()],
+            $this->read($user, $limit),
+        ));
+
+        return array_map(fn (array $item): array => [...$item, 'at' => CarbonImmutable::parse($item['at'])->setTimezone(config('app.timezone'))], $items);
+    }
+
+    /** @return list<array{kind: string, title: string, body: string|null, at: CarbonInterface, url: string|null, by: string|null}> */
+    private function read(User $user, int $limit): array
     {
         /** @var list<array{kind: string, title: string, body: string|null, at: CarbonInterface, url: string|null, by: string|null}> $items */
         $items = [];

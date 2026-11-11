@@ -40,10 +40,14 @@ services:
         value: warning
       - key: DB_CONNECTION
         value: pgsql
-      # the shared Neon database (the same as DB_URL of sfk-platform/.env): set it in the dashboard → Environment, the
-      # direct connection string (host without -pooler) with ?sslmode=require
+      # the shared Neon database (as DB_URL of sfk-platform/.env): set it in the dashboard → Environment, with
+      # ?sslmode=require; the pooled (-pooler) or the direct string — config/database.php disables named prepared
+      # statements, which a pooler in transaction mode breaks
       - key: DB_URL
         sync: false
+      # keep the database connection between requests (config/database.php): no TLS + login to Neon on every request
+      - key: DB_PERSISTENT
+        value: "true"
       # no Redis on the free plan: sessions, cache and the queue in PostgreSQL
       - key: SESSION_DRIVER
         value: database

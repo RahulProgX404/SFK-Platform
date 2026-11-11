@@ -75,7 +75,7 @@
                             <p class="sfk-qe-error">{{ $message }}</p>
                         @endif
                         <ul class="sfk-qe-options">
-                            @foreach ($this->orderOptions as $option)
+                            @foreach ($open ? $this->orderOptions : [] as $option)
                                 <li wire:key="sfk-qe-order-{{ $option['id'] }}">
                                     <button type="button" wire:click="choose('order_id', '{{ $option['id'] }}')"
                                         @class(['sfk-qe-option', 'is-selected' => (int) ($data['order_id'] ?? 0) === $option['id']])>

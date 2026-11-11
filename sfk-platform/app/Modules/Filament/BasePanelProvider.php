@@ -90,6 +90,11 @@ abstract class BasePanelProvider extends PanelProvider
             ->renderHook(PanelsRenderHook::BODY_START, fn (array $scopes): string => AppSidebarState::script($scopes))
             // no top bar: the screens use the whole height; the sidebar hides completely and a floating button opens it
             // (core::filament.design), the search, the bell and the user menu are in the sidebar
+            // speed (user, 2026-11-11): pages swap in place (wire:navigate, no full reload of CSS / JS) and a link starts
+            // loading when the pointer rests on it; files, the print view and the pages outside the panels load normally
+            ->spa(hasPrefetching: true)
+            ->spaUrlExceptions(['*/documents/*', '*/filament/exports/*', '*/filament/imports/*', '*/portal', '*/portal?*',
+                '*/login', '*/login?*', '*/account/*', '*/production/*', '*/core/*'])
             ->topbar(false)
             ->sidebarFullyCollapsibleOnDesktop()
             ->globalSearch(position: GlobalSearchPosition::Sidebar)

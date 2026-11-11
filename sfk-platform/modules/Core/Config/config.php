@@ -9,6 +9,10 @@ return [
     // Name of the whole system, shown on the single login page (/login) and the account pages.
     'system_name' => env('SYSTEM_NAME', 'SFK システム'),
 
+    // Speed: the registry, access rights, 一覧 and 帳票 read from the cache between requests
+    // (Modules\Core\Application\Cache\ReferenceCache); off in the tests (phpunit*.xml).
+    'reference_cache' => (bool) env('SFK_REFERENCE_CACHE', true),
+
     /*
     |--------------------------------------------------------------------------
     | Document number sequences

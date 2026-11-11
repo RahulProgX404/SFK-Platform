@@ -52,6 +52,9 @@ final class AppLifecycle
 
             $removed = $existing->keys()->diff(array_keys($definitions))->values()->all();
             BusinessApp::query()->whereIn('code', $removed)->delete();
+            if ($removed !== []) {
+                BusinessApp::forgetCached(); // deleted without model events
+            }
 
             return ['added' => $added, 'removed' => array_values(array_map('strval', $removed))];
         });

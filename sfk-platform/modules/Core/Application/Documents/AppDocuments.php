@@ -7,6 +7,7 @@ namespace Modules\Core\Application\Documents;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
+use Modules\Core\Application\Cache\ReferenceCache;
 use Modules\Core\Domain\Documents\OutputPlacement;
 use Modules\Core\Models\BusinessApp;
 use Modules\Core\Models\DocumentOutput;
@@ -58,7 +59,7 @@ final class AppDocuments
         $cached = self::$perRequest[$request] ?? [];
 
         if (! isset($cached[$app->id])) {
-            $cached[$app->id] = $app->documentOutputs()->with('template')->get();
+            $cached[$app->id] = ReferenceCache::rememberModels('documents:'.$app->id, DocumentOutput::class, fn () => $app->documentOutputs()->with('template')->get(), ['template']);
             self::$perRequest[$request] = $cached;
         }
 
@@ -68,5 +69,6 @@ final class AppDocuments
     public static function forgetCached(): void
     {
         self::$perRequest = null;
+        ReferenceCache::bump();
     }
 }

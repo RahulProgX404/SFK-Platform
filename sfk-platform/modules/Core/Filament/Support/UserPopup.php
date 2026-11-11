@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\HtmlString;
 use Modules\Core\Access\DashboardAccess;
+use Modules\Core\Application\Cache\ReferenceCache;
 use WeakMap;
 
 /**
@@ -118,11 +119,18 @@ final class UserPopup
     }
 
     /**
-     * The card lines of every user: two queries for all of them.
+     * The card lines of every user: two queries for all of them, kept in the cache between requests (ReferenceCache —
+     * users, 従業員カテゴリ and 役職 bump it when they change).
      *
      * @return array<int, list<string>>
      */
     private static function cards(): array
+    {
+        return ReferenceCache::remember('user-cards', self::readCards(...));
+    }
+
+    /** @return array<int, list<string>> */
+    private static function readCards(): array
     {
         $categories = [];
         foreach (DB::table('employee_category_user')

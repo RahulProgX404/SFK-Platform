@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\Request;
+use Modules\Core\Application\Cache\ReferenceCache;
 use WeakMap;
 
 /**
@@ -57,7 +58,8 @@ final class Space extends Model
         $key = $user->id.':'.$this->id;
 
         if (! array_key_exists($key, $cached)) {
-            $cached[$key] = $this->permissions()->applyingTo($user, $categoryIds)->get();
+            $cached[$key] = ReferenceCache::rememberModels('space-rows:'.$key.':'.implode(',', $categoryIds), SpacePermission::class,
+                fn () => $this->permissions()->applyingTo($user, $categoryIds)->get());
             self::$permissionRows[$request] = $cached;
         }
 
@@ -72,7 +74,7 @@ final class Space extends Model
         $cached = self::$memberships[$request] ?? [];
 
         if (! array_key_exists($user->id, $cached)) {
-            $ids = $user->spaces()->pluck('spaces.id')->all();
+            $ids = ReferenceCache::remember('space-ids:'.$user->id, fn (): array => $user->spaces()->pluck('spaces.id')->all());
             $cached[$user->id] = array_fill_keys(array_map('intval', $ids), true);
             self::$memberships[$request] = $cached;
         }

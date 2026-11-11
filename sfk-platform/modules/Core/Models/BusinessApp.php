@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Modules\Core\Application\Cache\ReferenceCache;
 use Modules\Core\Domain\Apps\AppStatus;
 use WeakMap;
 
@@ -64,24 +65,35 @@ final class BusinessApp extends Model
      */
     public static function forCode(string $code): ?self
     {
+        return self::registry()[$code] ?? null;
+    }
+
+    /**
+     * The whole registry with the apps' spaces, by code in the registry's order (sort_order, id): read once per request,
+     * from the cache between requests (ReferenceCache — saving an app or a space bumps it).
+     *
+     * @return array<string, self>
+     */
+    public static function registry(): array
+    {
         self::$perRequest ??= new WeakMap;
         $request = request();
-        $cached = self::$perRequest[$request] ?? [];
 
-        if ($cached === []) {
-            // the registry is small: one read serves every app on the page (e.g. the whole sidebar)
-            foreach (self::query()->with('spaces')->get() as $app) {
-                $cached[$app->code] = $app;
+        if (! isset(self::$perRequest[$request])) {
+            $apps = [];
+            foreach (ReferenceCache::rememberModels('registry', self::class, fn () => self::query()->with('spaces')->orderBy('sort_order')->orderBy('id')->get(), ['spaces']) as $app) {
+                $apps[$app->code] = $app;
             }
-            self::$perRequest[$request] = $cached;
+            self::$perRequest[$request] = $apps;
         }
 
-        return $cached[$code] ?? null;
+        return self::$perRequest[$request];
     }
 
     public static function forgetCached(): void
     {
         self::$perRequest = null;
+        ReferenceCache::bump();
     }
 
     protected static function booted(): void

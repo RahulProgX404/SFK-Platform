@@ -22,13 +22,19 @@ use Filament\View\PanelsIconAlias;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
+use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Events\ConnectionEstablished;
+use Illuminate\Database\Events\MigrationsEnded;
+use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Livewire\ComponentHookRegistry;
 use Modules\Core\Access\DashboardAccess;
 use Modules\Core\Application\Apps\AppDiscovery;
+use Modules\Core\Application\Cache\DataCache;
+use Modules\Core\Application\Cache\ReferenceCache;
 use Modules\Core\Application\Comments\RecordComments;
 use Modules\Core\Application\Legacy\LegacyPartners;
 use Modules\Core\Application\Legacy\LegacyUsers;
@@ -52,6 +58,18 @@ use Modules\Core\Http\Portal\DashboardDirectory;
 use Modules\Core\Http\Portal\DashboardEntry;
 use Modules\Core\Http\Responses\LoginPageLogoutResponse;
 use Modules\Core\Livewire\StripsIndentation;
+use Modules\Core\Models\AppFieldPermission;
+use Modules\Core\Models\AppListView;
+use Modules\Core\Models\AppPermission;
+use Modules\Core\Models\AppRecordRule;
+use Modules\Core\Models\AppRecordRuleEntry;
+use Modules\Core\Models\BusinessApp;
+use Modules\Core\Models\DocumentOutput;
+use Modules\Core\Models\DocumentTemplate;
+use Modules\Core\Models\EmployeeCategory;
+use Modules\Core\Models\Position;
+use Modules\Core\Models\Space;
+use Modules\Core\Models\SpacePermission;
 
 final class CoreServiceProvider extends ModuleServiceProvider
 {
@@ -95,6 +113,20 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
     protected function bootModule(): void
     {
+        // a change of the registry, the access rights, 一覧 or 帳票 is read afresh on the next request (ReferenceCache)
+        foreach ([BusinessApp::class, Space::class, AppPermission::class, SpacePermission::class, AppFieldPermission::class,
+            AppRecordRule::class, AppRecordRuleEntry::class, AppListView::class, DocumentOutput::class, DocumentTemplate::class,
+            EmployeeCategory::class, Position::class, User::class] as $model) {
+            $model::saved(fn () => ReferenceCache::bump());
+            $model::deleted(fn () => ReferenceCache::bump());
+        }
+        // new or changed columns (ReferenceCache 'columns:<table>')
+        Event::listen(MigrationsEnded::class, fn () => ReferenceCache::bump());
+        // any record saved or deleted: the dashboard's figures are added up afresh (DataCache), throttled, flushed at the end
+        Event::listen(['eloquent.saved: *', 'eloquent.deleted: *'], fn () => DataCache::changed());
+        Event::listen([JobProcessed::class, JobFailed::class, CommandFinished::class], fn () => DataCache::flush());
+        $this->app->terminating(fn () => DataCache::flush());
+
         // the compared form of the list search (sfk_search_norm) on SQLite connections; PostgreSQL has it from a migration
         Event::listen(ConnectionEstablished::class, fn (ConnectionEstablished $event) => SearchQuery::registerFunction($event->connection));
         foreach (DB::getConnections() as $connection) {

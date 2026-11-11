@@ -24,6 +24,7 @@ use Livewire\Attributes\Url;
 use Modules\Core\Access\AppAccess;
 use Modules\Core\Application\Apps\AppLifecycle;
 use Modules\Core\Application\Apps\AppUsageLog;
+use Modules\Core\Application\Cache\ReferenceCache;
 use Modules\Core\Filament\AppResource;
 use Modules\Core\Filament\DashboardSettings\Resources\Spaces\SpaceResource;
 use Modules\Core\Filament\Support\RichEditorTools;
@@ -403,14 +404,11 @@ final class PortalPage extends Dashboard
         // placed yet. Who sees which stage: AppAccess::listsOnDashboard (unpublished ones are dimmed in the view).
         $builtHere = AppResource::appCodesIn(Filament::getCurrentOrDefaultPanel());
 
-        return BusinessApp::query()
-            ->with('spaces')
-            ->where(fn ($query) => $query
-                ->whereHas('spaces', fn ($query) => $query->where('panel_id', self::panelId()))
-                ->when($user->isSuperAdmin(), fn ($query) => $query->orWhereIn('code', $builtHere)))
-            ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get()
+        // from the cached registry (speed: no query on every visit of the home)
+        return collect(BusinessApp::registry())
+            ->filter(fn (BusinessApp $app): bool => $app->spaces->contains(fn (Space $space): bool => $space->panel_id === self::panelId())
+                || ($user->isSuperAdmin() && in_array($app->code, $builtHere, true)))
+            ->values()
             ->filter(fn (BusinessApp $app): bool => AppAccess::listsOnDashboard($user, $app))
             ->values()
             ->when($personal && ! $user->user_type->isAdministrator() && $user->app_order !== null, function (Collection $apps) use ($user): Collection {
@@ -430,12 +428,13 @@ final class PortalPage extends Dashboard
 
         $all = self::isAdministrator() && ($forFilter || $this->spaceScope === 'all');
 
-        return Space::query()
+        // from the cache between requests (ReferenceCache — spaces and their members bump it)
+        return ReferenceCache::rememberModels('panel-spaces:'.self::panelId().':'.($all ? 'all' : 'user-'.$user->id), Space::class, fn () => Space::query()
             ->where('panel_id', self::panelId())
             ->when(! $all, fn ($query) => $query->whereHas('users', fn ($query) => $query->whereKey($user->id)))
             ->orderBy('sort_order')
             ->orderBy('name')
-            ->get();
+            ->get());
     }
 
     private static function panelId(): string

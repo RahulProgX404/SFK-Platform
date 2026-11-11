@@ -18,6 +18,7 @@ use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\AppResource;
 use Modules\Core\Filament\DashboardSettings\Resources\AppSettings\AppSettingsResource;
 use Modules\Core\Models\BusinessApp;
+use Modules\Core\Models\Space;
 
 /**
  * The frame of every app screen (list, create, edit, record), in place of Filament's page header: blue title bar
@@ -41,7 +42,12 @@ trait HasAppChrome
         }
 
         $record = property_exists($this, 'record') && $this->record instanceof Model ? $this->record : null;
-        app(AppUsageLog::class)->touch($user, $this->appResource()::appCode(), in_array($this->appPageKind(), ['view', 'edit'], true) ? $record : null);
+        $code = $this->appResource()::appCode();
+        $touch = fn () => app(AppUsageLog::class)->touch($user, $code, in_array($this->appPageKind(), ['view', 'edit'], true) ? $record : null);
+
+        // after the page has been sent (speed: no round trip to the database before the user sees it); at once in the
+        // tests, which do not run the callbacks of a finished response
+        app()->runningUnitTests() ? $touch() : defer($touch);
     }
 
     public function getHeader(): View
@@ -184,10 +190,7 @@ trait HasAppChrome
             return null;
         }
 
-        $panel = Filament::getCurrentPanel();
-        if ($panel !== null
-            && in_array(AppSettingsResource::class, $panel->getResources(), true)
-            && AppSettingsResource::getEloquentQuery()->whereKey($app->getKey())->exists()) {
+        if ($this->inDashboardSettings($app)) {
             return AppSettingsResource::getUrl('edit', ['record' => $app]);
         }
 
@@ -204,13 +207,21 @@ trait HasAppChrome
             return null;
         }
 
+        return $this->inDashboardSettings($app) ? AppSettingsResource::getUrl($page, ['record' => $app]) : null;
+    }
+
+    /**
+     * The app is in this dashboard's ダッシュボード設定 → アプリの権限 (AppSettingsResource::getEloquentQuery(): placed in a
+     * space of the dashboard) — read from the app's spaces, which the app permissions have loaded already, instead of a
+     * query on every screen.
+     */
+    private function inDashboardSettings(BusinessApp $app): bool
+    {
         $panel = Filament::getCurrentPanel();
 
         return $panel !== null
             && in_array(AppSettingsResource::class, $panel->getResources(), true)
-            && AppSettingsResource::getEloquentQuery()->whereKey($app->getKey())->exists()
-            ? AppSettingsResource::getUrl($page, ['record' => $app])
-            : null;
+            && $app->spaces->contains(fn (Space $space): bool => $space->panel_id === $panel->getId());
     }
 
     /** The app's administrator: administrators and users with アプリ管理 of this app (AppAccess::manages()). */

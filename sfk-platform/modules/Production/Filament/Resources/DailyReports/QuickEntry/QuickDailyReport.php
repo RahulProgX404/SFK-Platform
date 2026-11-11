@@ -276,7 +276,7 @@ final class QuickDailyReport extends Component
         } else {
             $recent = DailyReport::query()->where('user_id', $this->workerId())->whereNotNull('order_id')->groupBy('order_id')
                 ->orderByRaw('MAX(id) DESC')->limit(4)->pluck('order_id')->map(fn (mixed $id): int => (int) $id)->all();
-            $byId = Order::query()->select($columns)->whereKey($recent)->get()->keyBy('id');
+            $byId = $recent === [] ? collect() : Order::query()->select($columns)->whereKey($recent)->get()->keyBy('id');
             $orders = collect($recent)->map(fn (int $id): ?Order => $byId->get($id))->filter()
                 ->merge(Order::query()->select($columns)->whereNotNull('order_number')->whereKeyNot($recent)->orderByDesc('id')->limit(8 - count($byId))->get());
         }

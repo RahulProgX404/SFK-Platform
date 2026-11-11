@@ -221,9 +221,10 @@ abstract class QuickEntry extends Component
         $resource = static::resource();
         $this->app = $app !== '' ? $app : $resource::appCode();
         $this->data = $this->defaults();
-        $this->screen = $this->steps()[0] ?? self::REVIEW;
 
+        // closed, nothing of the steps is built (their lists read the database); start() picks the first one (speed)
         if ($open && $resource::canCreate()) {
+            $this->screen = $this->steps()[0] ?? self::REVIEW;
             $this->open = true;
             $source = $this->duplicateSource($duplicate);
             if ($source !== null) {

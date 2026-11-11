@@ -6,6 +6,7 @@ namespace Modules\Core\Application\Apps;
 
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Modules\Core\Models\AppUsage;
 
 /**
@@ -15,18 +16,22 @@ use Modules\Core\Models\AppUsage;
  */
 final class AppUsageLog
 {
-    /** One opening of an app screen; with the record of a record / edit page. */
+    /**
+     * One opening of an app screen; with the record of a record / edit page. One statement (insert, or add 1 on the
+     * unique user_id + app_code) — it runs on every app screen, and each query to a remote database is a round trip.
+     */
     public function touch(User $user, string $appCode, ?Model $record = null): void
     {
-        $usage = AppUsage::query()->firstOrNew(['user_id' => $user->id, 'app_code' => $appCode]);
-        $usage->visits = $usage->visits + 1;
-        $usage->last_visited_at = now();
+        $now = now();
+        $values = ['user_id' => $user->id, 'app_code' => $appCode, 'visits' => 1, 'last_visited_at' => $now];
+        $update = ['visits' => DB::raw('app_usages.visits + 1'), 'last_visited_at' => $now];
         if ($record !== null && $record->exists) {
-            $usage->record_type = $record->getMorphClass();
-            $usage->record_id = (int) $record->getKey();
-            $usage->record_visited_at = now();
+            $recordValues = ['record_type' => $record->getMorphClass(), 'record_id' => (int) $record->getKey(), 'record_visited_at' => $now];
+            $values += $recordValues;
+            $update += $recordValues;
         }
-        $usage->save();
+
+        AppUsage::query()->upsert([$values], ['user_id', 'app_code'], $update);
     }
 
     /**

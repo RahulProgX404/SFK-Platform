@@ -22,7 +22,8 @@
             ? []
             : [...document.querySelectorAll('.sfk-app-page-list .fi-ta-content-ctn')].filter((table) => table.querySelector('thead'))
         const element = () => {
-            if (bar === null) {
+            // SPA navigation replaces the body: a bar of an earlier page is gone from the document
+            if (bar === null || ! bar.isConnected) {
                 bar = document.createElement('div')
                 bar.className = 'sfk-loading'
                 bar.setAttribute('role', 'progressbar')

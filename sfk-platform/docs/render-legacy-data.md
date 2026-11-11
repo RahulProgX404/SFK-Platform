@@ -1,7 +1,7 @@
 # Render: seeding the database with the legacy data
 
 > **Since 2026-11-11 local development and Render share one test database on Neon (Singapore).** `DB_URL` in
-> `sfk-platform/.env` and in Render's Environment hold the same direct connection string (`render.yaml`: `sync: false`;
+> `sfk-platform/.env` and in Render's Environment point at the same database (local: the direct string, Render: direct or pooled — named prepared statements are off, see `config/database.php`) (`render.yaml`: `sync: false`;
 > Render's own database is no longer used). The local data was copied there with `pg_dump` / `pg_restore` (every table's
 > row count checked). Consequences: what you change locally is live on Render and the other way round; `migrate:fresh`,
 > `db:wipe` or a legacy import run locally hit the shared data; a deploy migrates it (`docker/render/start.sh`). Tests

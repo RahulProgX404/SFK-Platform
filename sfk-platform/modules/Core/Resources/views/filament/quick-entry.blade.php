@@ -10,11 +10,12 @@
     use Modules\Core\Filament\QuickEntry\QuickEntry;
     use Modules\Core\Filament\QuickEntry\QuickField;
 
-    $steps = $this->steps();
-    $progress = $this->progress();
+    // closed: nothing of the steps is built (their lists read the database) — the panel is drawn when it opens (speed)
+    $steps = $open ? $this->steps() : [];
+    $progress = $open ? $this->progress() : ['percent' => 0, 'at' => 0, 'of' => 0];
     $isStep = in_array($screen, $steps, true);
     $step = $isStep ? $this->stepOf($screen) : null;
-    $fields = $isStep ? $this->fieldsOf($screen) : ($screen === QuickEntry::DETAILS ? $this->details() : []);
+    $fields = ! $open ? [] : ($isStep ? $this->fieldsOf($screen) : ($screen === QuickEntry::DETAILS ? $this->details() : []));
     $first = $steps[0] ?? null;
     $id = 'sfk-qe-'.$app;
     $error = fn (string $field): ?string => $errors->first('data.'.$field) ?: $errors->first('data.'.$field.'.*') ?: null;
@@ -39,11 +40,15 @@
             </button>
         </header>
 
+        @if ($open)
         <div class="sfk-qe-progress" aria-hidden="true">
             <div class="sfk-qe-bar"><span style="width: {{ $progress['percent'] }}%"></span></div>
             <span class="sfk-qe-count">{{ $isStep ? $progress['at'].' / '.$progress['of'] : $this->screenTitle() }}</span>
         </div>
 
+        @endif
+
+        @if ($open)
         <form class="sfk-qe-form" wire:submit="submit" novalidate>
             <div class="sfk-qe-body">
                 <div @class(['sfk-qe-step', 'is-back' => $direction === 'back']) wire:key="{{ $id }}-{{ $screen }}"
@@ -329,5 +334,6 @@
                 @endif
             </footer>
         </form>
+        @endif
     </div>
 </div>

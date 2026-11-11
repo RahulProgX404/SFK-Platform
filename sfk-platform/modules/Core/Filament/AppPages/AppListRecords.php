@@ -36,6 +36,7 @@ use Livewire\Attributes\Session;
 use Livewire\Attributes\Url;
 use Livewire\Livewire;
 use Modules\Core\Access\FieldAccess;
+use Modules\Core\Application\Cache\ReferenceCache;
 use Modules\Core\Application\Documents\AppDocuments;
 use Modules\Core\Application\Documents\PrintJobs;
 use Modules\Core\Application\Filters\FilterField;
@@ -1484,7 +1485,10 @@ abstract class AppListRecords extends ListRecords
             return [];
         }
 
-        return $columns[$model->getTable()] ??= DatabaseSchema::getColumnListing($model->getTable());
+        $table = $model->getTable();
+
+        // from the cache between requests (each schema lookup is a round trip; migrations bump it)
+        return $columns[$table] ??= ReferenceCache::remember('columns:'.$table, fn (): array => DatabaseSchema::getColumnListing($table));
     }
 
     /** @return array<string, FilterField> */

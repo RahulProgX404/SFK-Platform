@@ -88,7 +88,8 @@ final class PartnersTable
         $names = $livewire instanceof AppListRecords ? $livewire->viewColumns() : self::LIST_COLUMNS;
 
         return $table
-            ->modifyQueryUsing(fn (Builder $query) => $query->with(['staff.employeeCategories', 'staff.position']))
+            // the names only: the popups' 従業員カテゴリ / 役職 come from UserPopup's cache (speed)
+            ->modifyQueryUsing(fn (Builder $query) => $query->with('staff'))
             ->columns([
                 ...array_map(fn (string $name): AppTextColumn => self::column($name), $names),
             ])

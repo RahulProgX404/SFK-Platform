@@ -8,6 +8,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Panel;
 use Illuminate\Http\Request;
+use Modules\Core\Application\Cache\ReferenceCache;
 use WeakMap;
 
 /**
@@ -59,7 +60,7 @@ final class DashboardAccess
         $cached = self::$perRequest[$request] ?? [];
 
         if (! array_key_exists($user->id, $cached)) {
-            $cached[$user->id] = $user->grantedDashboards();
+            $cached[$user->id] = ReferenceCache::remember('dashboards:'.$user->id, fn (): array => $user->grantedDashboards());
             self::$perRequest[$request] = $cached;
         }
 

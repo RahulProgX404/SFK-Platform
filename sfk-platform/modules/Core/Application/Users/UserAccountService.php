@@ -10,6 +10,7 @@ use InvalidArgumentException;
 use Modules\Core\Access\DashboardAccess;
 use Modules\Core\Access\UserType;
 use Modules\Core\Application\Apps\SpaceMembership;
+use Modules\Core\Application\Cache\ReferenceCache;
 use Modules\Core\Models\EmployeeCategory;
 
 /**
@@ -48,6 +49,7 @@ final class UserAccountService
         $user->forceFill(['user_type' => $type, 'must_change_password' => true, 'managed_by_env' => false])->save();
         if ($categoryIds !== null) {
             $user->employeeCategories()->sync($categoryIds);
+            ReferenceCache::bump(); // their dashboards and access follow the categories
         }
         $this->syncSpaces($user, $spaceIds);
 
@@ -74,6 +76,7 @@ final class UserAccountService
         $user->save();
         if ($categoryIds !== null) {
             $user->employeeCategories()->sync($categoryIds);
+            ReferenceCache::bump(); // their dashboards and access follow the categories
         }
         $this->syncSpaces($user, $spaceIds);
 

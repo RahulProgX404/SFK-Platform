@@ -7,6 +7,7 @@ namespace Modules\Core\Access;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
+use Modules\Core\Application\Cache\ReferenceCache;
 use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\PermissionSubject;
 use Modules\Core\Models\AppPermission;
@@ -65,8 +66,11 @@ final class AppAccess
         $key = $user->id.':'.$appCode;
 
         if (! array_key_exists($key, $cached)) {
-            $app = BusinessApp::forCode($appCode);
-            $cached[$key] = self::abilitiesFor($user, $app);
+            // from the cache between requests (ReferenceCache): the screens ask for every app of the sidebar
+            $cached[$key] = array_map(fn (string $ability): AppAbility => AppAbility::from($ability), ReferenceCache::remember(
+                'abilities:'.$key,
+                fn (): array => array_map(fn (AppAbility $ability): string => $ability->value, self::abilitiesFor($user, BusinessApp::forCode($appCode))),
+            ));
             self::$perRequest[$request] = $cached;
         }
 

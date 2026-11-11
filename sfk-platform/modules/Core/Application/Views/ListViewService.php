@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Application\Views;
 
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Application\Cache\ReferenceCache;
 use Modules\Core\Domain\Filters\RecordFilter;
 use Modules\Core\Domain\Views\ListViewType;
 use Modules\Core\Models\AppListView;
@@ -75,7 +76,7 @@ final class ListViewService
             $app->refresh();
         }
 
-        return $app->listViews()->get()->all();
+        return array_values(ReferenceCache::rememberModels('list-views:'.$app->id, AppListView::class, fn () => $app->listViews()->get())->all());
     }
 
     /**

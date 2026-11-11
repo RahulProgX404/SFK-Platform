@@ -36,6 +36,8 @@
         <env name="DB_CONNECTION" value="pgsql" force="true"/>
         <env name="DB_DATABASE" value="sfk_test" force="true"/>
         <env name="DB_URL" value="" force="true"/>
+        <env name="DB_PERSISTENT" value="false" force="true"/>
+        <env name="SFK_REFERENCE_CACHE" value="false" force="true"/>
         <env name="MAIL_MAILER" value="array" force="true"/>
         <env name="QUEUE_CONNECTION" value="sync" force="true"/>
         <env name="SESSION_DRIVER" value="array" force="true"/>
@@ -51,6 +53,8 @@
         <server name="DB_CONNECTION" value="pgsql" force="true"/>
         <server name="DB_DATABASE" value="sfk_test" force="true"/>
         <server name="DB_URL" value="" force="true"/>
+        <server name="DB_PERSISTENT" value="false" force="true"/>
+        <server name="SFK_REFERENCE_CACHE" value="false" force="true"/>
         <server name="MAIL_MAILER" value="array" force="true"/>
         <server name="QUEUE_CONNECTION" value="sync" force="true"/>
         <server name="SESSION_DRIVER" value="array" force="true"/>

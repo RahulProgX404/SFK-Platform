@@ -19,6 +19,16 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
 - Records of an app shown on another screen (related lists, 履歴 sections, searches) are read through
   `<Resource>::onlyVisible(<Model>::query())`, so app permissions and レコードのアクセス権 apply — never a bare
   `Model::query()` for what the user sees.
+- Speed first (user, 2026-11-11 — pages must never feel like loading; check it on every change): each query is a round
+  trip to the database (~80 ms from Japan to Neon), so count the queries of the pages you touch before and after. No new
+  query on every request: setup and access data (registry, spaces, アクセス権, 一覧, 帳票, field / record rules, user
+  cards, table columns) is read through `Core\Application\Cache\ReferenceCache` (model events bump it; call `bump()` after
+  pivot syncs and bulk deletes), figures that add up business data through `DataCache` (plain values only — the cache
+  unserializes no objects); both versions are in the table `cache_versions` (shared by local development and Render).
+  Panels and dialogs build nothing while closed (QuickEntry steps, 絞り込む); writes the page does not show go after the
+  response (`defer()`); no per-row queries. Pages swap in place (Filament SPA mode with hover prefetch): inline scripts
+  must survive running again, and elements appended to the body must check `isConnected`. A new cache gets a test with
+  `config(['core.reference_cache' => true])` that changes are seen (`ReferenceCacheTest`).
 - Speed: nothing large goes into every page — panel CSS / JS live in the theme views served as one cached file
   (`ThemeAssets`), big data of a dialog is fetched when it opens (e.g. 絞り込む). Modules are cached
   (`php artisan module:cache`, part of `optimize`); a new conventional folder in a module needs it rebuilt.

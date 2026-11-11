@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Str;
 use Pdo\Mysql;
+use Pdo\Pgsql;
 
 return [
 
@@ -95,8 +96,20 @@ return [
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
-            'search_path' => 'public',
+            // no search_path: the database's default ("$user", public) is public here, and setting it cost a round trip
+            // to the database on every connect (2026-11-11)
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            'options' => extension_loaded('pdo_pgsql') ? [
+                // No named server-side prepared statements (the queries still go with typed parameters): a connection
+                // pooler in transaction mode — PgBouncer, Neon's "-pooler" URLs — hands each transaction to another
+                // server connection, where those statements are missing and the transaction aborts (2026-11-11, the
+                // Render deploy failed in core:apps-sync on the pooled Neon URL).
+                Pgsql::ATTR_DISABLE_PREPARES => true,
+                // DB_PERSISTENT: PHP keeps the connection between requests — a remote database (Neon) costs about
+                // 0.6 s to connect from Japan (TLS + login) on every page and Livewire request otherwise. An open
+                // transaction is rolled back when the request ends. Off in the tests (phpunit*.xml).
+                PDO::ATTR_PERSISTENT => (bool) env('DB_PERSISTENT', false),
+            ] : [],
         ],
 
         'sqlsrv' => [

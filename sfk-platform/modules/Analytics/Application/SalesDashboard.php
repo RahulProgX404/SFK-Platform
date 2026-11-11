@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Analytics\Application;
 
 use App\Models\User;
+use Closure;
 use DateTimeImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\JoinClause;
@@ -13,6 +14,7 @@ use Modules\Analytics\Domain\Period;
 use Modules\Analytics\Filament\Resources\SalesPlans\SalesPlanResource;
 use Modules\Analytics\Models\SalesForecast;
 use Modules\Analytics\Models\SalesPlan;
+use Modules\Core\Application\Cache\DataCache;
 use Modules\Core\Domain\Billing\CollectionMonth;
 use Modules\Purchasing\Filament\Resources\Payments\PaymentResource;
 use Modules\Purchasing\Models\Payment;
@@ -60,46 +62,55 @@ final class SalesDashboard
      */
     public function overview(Period $period, DateTimeImmutable $today, int $parts = 7): array
     {
-        $settled = 'select coalesce(sum(receipts.settled_amount), 0) from receipts where receipts.invoice_id = sales.invoice_id';
-        $billed = 'select coalesce(sum(receipts.billed_amount), 0) from receipts where receipts.invoice_id = sales.invoice_id';
-        $rows = $this->sales($period)
-            ->leftJoin('invoices', 'invoices.id', '=', 'sales.invoice_id')
-            ->leftJoin('partners', 'partners.id', '=', 'sales.customer_id')
-            ->selectRaw("sales.amount, sales.sold_on, sales.invoice_id, invoices.invoiced_on, partners.collection_month, partners.collection_day, ({$settled}) as settled, ({$billed}) as billed")
-            ->toBase()
-            ->get();
+        return $this->cached('overview', [$period->start().'~'.$period->after(), $today->format('Y-m-d'), (string) $parts], function () use ($period, $today, $parts): array {
+            $settled = 'select coalesce(sum(receipts.settled_amount), 0) from receipts where receipts.invoice_id = sales.invoice_id';
+            $billed = 'select coalesce(sum(receipts.billed_amount), 0) from receipts where receipts.invoice_id = sales.invoice_id';
+            $rows = $this->sales($period)
+                ->leftJoin('invoices', 'invoices.id', '=', 'sales.invoice_id')
+                ->leftJoin('partners', 'partners.id', '=', 'sales.customer_id')
+                ->selectRaw("sales.amount, sales.sold_on, sales.invoice_id, invoices.invoiced_on, partners.collection_month, partners.collection_day, ({$settled}) as settled, ({$billed}) as billed")
+                ->toBase()
+                ->get();
 
-        $statuses = array_fill_keys(array_keys(self::STATUSES), ['count' => 0, 'amount' => 0]);
-        $bounds = $period->parts($parts);
-        $counts = array_fill(0, count($bounds), 0);
-        foreach ($rows as $row) {
-            $status = $this->status($row, $today);
-            $statuses[$status]['count']++;
-            $statuses[$status]['amount'] += (int) $row->amount;
+            $statuses = array_fill_keys(array_keys(self::STATUSES), ['count' => 0, 'amount' => 0]);
+            $bounds = $period->parts($parts);
+            $counts = array_fill(0, count($bounds), 0);
+            foreach ($rows as $row) {
+                $status = $this->status($row, $today);
+                $statuses[$status]['count']++;
+                $statuses[$status]['amount'] += (int) $row->amount;
 
-            $day = substr((string) $row->sold_on, 0, 10);
-            foreach ($bounds as $index => [$from, $after]) {
-                if ($day >= $from && $day < $after) {
-                    $counts[$index]++;
-                    break;
+                $day = substr((string) $row->sold_on, 0, 10);
+                foreach ($bounds as $index => [$from, $after]) {
+                    if ($day >= $from && $day < $after) {
+                        $counts[$index]++;
+                        break;
+                    }
                 }
             }
-        }
 
-        return [
-            'amount' => (int) $rows->sum('amount'),
-            'count' => $rows->count(),
-            'statuses' => $statuses,
-            'parts' => $counts,
-        ];
+            return [
+                'amount' => (int) $rows->sum('amount'),
+                'count' => $rows->count(),
+                'statuses' => $statuses,
+                'parts' => $counts,
+            ];
+        });
     }
 
-    /** @return array{amount: int, count: int} */
+    /**
+     * 売上金額 and the number of sales of the period (売上合計 and 売上概要 both compare with the period before: the second
+     * comes from the cache).
+     *
+     * @return array{amount: int, count: int}
+     */
     public function totals(Period $period): array
     {
-        $row = $this->sales($period)->selectRaw('coalesce(sum(sales.amount), 0) as amount, count(*) as count')->toBase()->first();
+        return $this->cached('totals', [$period->start().'~'.$period->after()], function () use ($period): array {
+            $row = $this->sales($period)->selectRaw('coalesce(sum(sales.amount), 0) as amount, count(*) as count')->toBase()->first();
 
-        return ['amount' => (int) ($row->amount ?? 0), 'count' => (int) ($row->count ?? 0)];
+            return ['amount' => (int) ($row->amount ?? 0), 'count' => (int) ($row->count ?? 0)];
+        });
     }
 
     /**
@@ -108,22 +119,24 @@ final class SalesDashboard
      */
     public function target(Period $period): ?int
     {
-        if ($this->staffId !== null) {
-            return $this->forecast($period, $this->staffId);
-        }
-
-        $total = null;
-        foreach ($period->months() as [$year, $month]) {
-            [$from, $after] = FiscalYear::days(FiscalYear::ofMonth($year, $month));
-            $sum = SalesPlanResource::onlyVisible(SalesPlan::query())
-                ->where('planned_on', '>=', $from)->where('planned_on', '<', $after)
-                ->sum('plan_'.FiscalYear::column($month));
-            if ((int) $sum !== 0) {
-                $total = ($total ?? 0) + (int) $sum;
+        return $this->cached('target', [$period->start().'~'.$period->after()], function () use ($period): ?int {
+            if ($this->staffId !== null) {
+                return $this->forecast($period, $this->staffId);
             }
-        }
 
-        return $total;
+            $total = null;
+            foreach ($period->months() as [$year, $month]) {
+                [$from, $after] = FiscalYear::days(FiscalYear::ofMonth($year, $month));
+                $sum = SalesPlanResource::onlyVisible(SalesPlan::query())
+                    ->where('planned_on', '>=', $from)->where('planned_on', '<', $after)
+                    ->sum('plan_'.FiscalYear::column($month));
+                if ((int) $sum !== 0) {
+                    $total = ($total ?? 0) + (int) $sum;
+                }
+            }
+
+            return $total;
+        });
     }
 
     /**
@@ -134,21 +147,23 @@ final class SalesDashboard
      */
     public function cashFlow(Period $period): array
     {
-        $inflow = (int) ReceiptResource::onlyVisible(Receipt::query())
-            ->join('receipt_lines', 'receipt_lines.receipt_id', '=', 'receipts.id')
-            ->where('receipt_lines.received_on', '>=', $period->start())->where('receipt_lines.received_on', '<', $period->after())
-            ->when($this->staffId !== null, fn (Builder $query) => $query->whereExists(fn ($exists) => $exists
-                ->from('receipt_user')->whereColumn('receipt_user.receipt_id', 'receipts.id')->where('receipt_user.user_id', $this->staffId)))
-            ->sum('receipt_lines.amount');
-        if ($this->staffId !== null) {
-            return ['inflow' => $inflow, 'outflow' => 0, 'net' => $inflow];
-        }
+        return $this->cached('cashFlow', [$period->start().'~'.$period->after()], function () use ($period): array {
+            $inflow = (int) ReceiptResource::onlyVisible(Receipt::query())
+                ->join('receipt_lines', 'receipt_lines.receipt_id', '=', 'receipts.id')
+                ->where('receipt_lines.received_on', '>=', $period->start())->where('receipt_lines.received_on', '<', $period->after())
+                ->when($this->staffId !== null, fn (Builder $query) => $query->whereExists(fn ($exists) => $exists
+                    ->from('receipt_user')->whereColumn('receipt_user.receipt_id', 'receipts.id')->where('receipt_user.user_id', $this->staffId)))
+                ->sum('receipt_lines.amount');
+            if ($this->staffId !== null) {
+                return ['inflow' => $inflow, 'outflow' => 0, 'net' => $inflow];
+            }
 
-        $outflow = (int) PaymentResource::onlyVisible(Payment::query())
-            ->where('payments.paid_on', '>=', $period->start())->where('payments.paid_on', '<', $period->after())
-            ->sum('payments.total');
+            $outflow = (int) PaymentResource::onlyVisible(Payment::query())
+                ->where('payments.paid_on', '>=', $period->start())->where('payments.paid_on', '<', $period->after())
+                ->sum('payments.total');
 
-        return ['inflow' => $inflow, 'outflow' => $outflow, 'net' => $inflow - $outflow];
+            return ['inflow' => $inflow, 'outflow' => $outflow, 'net' => $inflow - $outflow];
+        });
     }
 
     /**
@@ -158,52 +173,58 @@ final class SalesDashboard
      */
     public function monthly(int $year): array
     {
-        $month = MonthBucket::sql('sales.sold_on');
-        $amounts = array_fill(1, 12, 0);
-        $rows = $this->sales(Period::between(sprintf('%04d-01-01', $year), sprintf('%04d-12-31', $year), new DateTimeImmutable))
-            ->selectRaw("{$month} as month, coalesce(sum(sales.amount), 0) as amount")
-            ->groupByRaw($month)
-            ->toBase()
-            ->get();
+        return $this->cached('monthly', [(string) $year], function () use ($year): array {
+            $month = MonthBucket::sql('sales.sold_on');
+            $amounts = array_fill(1, 12, 0);
+            $rows = $this->sales(Period::between(sprintf('%04d-01-01', $year), sprintf('%04d-12-31', $year), new DateTimeImmutable))
+                ->selectRaw("{$month} as month, coalesce(sum(sales.amount), 0) as amount")
+                ->groupByRaw($month)
+                ->toBase()
+                ->get();
 
-        foreach ($rows as $row) {
-            [, $number] = MonthBucket::parse((string) $row->month);
-            $amounts[$number] = (int) $row->amount;
-        }
+            foreach ($rows as $row) {
+                [, $number] = MonthBucket::parse((string) $row->month);
+                $amounts[$number] = (int) $row->amount;
+            }
 
-        return $amounts;
+            return $amounts;
+        });
     }
 
     /** @return list<array{id: int, name: string, code: string|null, count: int, amount: int}> by 売上金額 */
     public function topCustomers(Period $period, int $limit = 5): array
     {
-        return $this->sales($period)
-            ->join('partners', 'partners.id', '=', 'sales.customer_id')
-            ->groupBy('partners.id', 'partners.name', 'partners.code')
-            ->selectRaw('partners.id, partners.name, partners.code, count(*) as count, sum(sales.amount) as amount')
-            ->orderByDesc('amount')->orderBy('partners.name')
-            ->limit($limit)
-            ->toBase()->get()
-            ->map(fn (object $row): array => ['id' => (int) $row->id, 'name' => (string) $row->name, 'code' => $row->code, 'count' => (int) $row->count, 'amount' => (int) $row->amount])
-            ->all();
+        return $this->cached('topCustomers', [$period->start().'~'.$period->after(), (string) $limit], function () use ($period, $limit): array {
+            return $this->sales($period)
+                ->join('partners', 'partners.id', '=', 'sales.customer_id')
+                ->groupBy('partners.id', 'partners.name', 'partners.code')
+                ->selectRaw('partners.id, partners.name, partners.code, count(*) as count, sum(sales.amount) as amount')
+                ->orderByDesc('amount')->orderBy('partners.name')
+                ->limit($limit)
+                ->toBase()->get()
+                ->map(fn (object $row): array => ['id' => (int) $row->id, 'name' => (string) $row->name, 'code' => $row->code, 'count' => (int) $row->count, 'amount' => (int) $row->amount])
+                ->all();
+        });
     }
 
     /** @return list<array{id: int, name: string, count: int, amount: int}> 担当者 (the first of a sale, as 売上分析) by 売上金額 */
     public function topStaff(Period $period, int $limit = 5): array
     {
-        $rows = $this->sales($period)
-            ->join('sale_user as first_staff', function (JoinClause $join): void {
-                $join->on('first_staff.sale_id', '=', 'sales.id')
-                    ->whereRaw('first_staff.id = (select min(staff.id) from sale_user as staff where staff.sale_id = sales.id)');
-            })
-            ->groupBy('first_staff.user_id')
-            ->selectRaw('first_staff.user_id, count(*) as count, sum(sales.amount) as amount')
-            ->orderByDesc('amount')
-            ->limit($limit)
-            ->toBase()->get();
-        $names = User::query()->whereIn('id', $rows->pluck('user_id')->all())->pluck('name', 'id')->all();
+        return $this->cached('topStaff', [$period->start().'~'.$period->after(), (string) $limit], function () use ($period, $limit): array {
+            $rows = $this->sales($period)
+                ->join('sale_user as first_staff', function (JoinClause $join): void {
+                    $join->on('first_staff.sale_id', '=', 'sales.id')
+                        ->whereRaw('first_staff.id = (select min(staff.id) from sale_user as staff where staff.sale_id = sales.id)');
+                })
+                ->groupBy('first_staff.user_id')
+                ->selectRaw('first_staff.user_id, count(*) as count, sum(sales.amount) as amount')
+                ->orderByDesc('amount')
+                ->limit($limit)
+                ->toBase()->get();
+            $names = User::query()->whereIn('id', $rows->pluck('user_id')->all())->pluck('name', 'id')->all();
 
-        return $rows->map(fn (object $row): array => ['id' => (int) $row->user_id, 'name' => (string) ($names[(int) $row->user_id] ?? ''), 'count' => (int) $row->count, 'amount' => (int) $row->amount])->all();
+            return $rows->map(fn (object $row): array => ['id' => (int) $row->user_id, 'name' => (string) ($names[(int) $row->user_id] ?? ''), 'count' => (int) $row->count, 'amount' => (int) $row->amount])->all();
+        });
     }
 
     /**
@@ -213,35 +234,39 @@ final class SalesDashboard
      */
     public function latestSales(Period $period, int $limit = 5): array
     {
-        return $this->sales($period)
-            ->with('customer:id,name')
-            ->orderByDesc('sales.sold_on')->orderByDesc('sales.id')
-            ->limit($limit)
-            ->select('sales.*')
-            ->get()
-            ->map(fn (Sale $sale): array => [
-                'id' => $sale->id,
-                'sold_on' => $sale->sold_on->format('Y/m/d'),
-                'customer' => (string) ($sale->customer->name ?? ''),
-                'product' => $sale->product_name,
-                'amount' => (int) $sale->amount,
-                'url' => SaleResource::canView($sale) ? SaleResource::getUrl('view', ['record' => $sale]) : null,
-            ])
-            ->all();
+        return $this->cached('latestSales', [$period->start().'~'.$period->after(), (string) $limit], function () use ($period, $limit): array {
+            return $this->sales($period)
+                ->with('customer:id,name')
+                ->orderByDesc('sales.sold_on')->orderByDesc('sales.id')
+                ->limit($limit)
+                ->select('sales.*')
+                ->get()
+                ->map(fn (Sale $sale): array => [
+                    'id' => $sale->id,
+                    'sold_on' => $sale->sold_on->format('Y/m/d'),
+                    'customer' => (string) ($sale->customer->name ?? ''),
+                    'product' => $sale->product_name,
+                    'amount' => (int) $sale->amount,
+                    'url' => SaleResource::canView($sale) ? SaleResource::getUrl('view', ['record' => $sale]) : null,
+                ])
+                ->all();
+        });
     }
 
     /** @return list<array{name: string, count: int, amount: int}> 品名 by 売上金額 */
     public function topProducts(Period $period, int $limit = 3): array
     {
-        return $this->sales($period)
-            ->whereNotNull('sales.product_name')->where('sales.product_name', '!=', '')
-            ->groupBy('sales.product_name')
-            ->selectRaw('sales.product_name as name, count(*) as count, sum(sales.amount) as amount')
-            ->orderByDesc('amount')->orderBy('sales.product_name')
-            ->limit($limit)
-            ->toBase()->get()
-            ->map(fn (object $row): array => ['name' => (string) $row->name, 'count' => (int) $row->count, 'amount' => (int) $row->amount])
-            ->all();
+        return $this->cached('topProducts', [$period->start().'~'.$period->after(), (string) $limit], function () use ($period, $limit): array {
+            return $this->sales($period)
+                ->whereNotNull('sales.product_name')->where('sales.product_name', '!=', '')
+                ->groupBy('sales.product_name')
+                ->selectRaw('sales.product_name as name, count(*) as count, sum(sales.amount) as amount')
+                ->orderByDesc('amount')->orderBy('sales.product_name')
+                ->limit($limit)
+                ->toBase()->get()
+                ->map(fn (object $row): array => ['name' => (string) $row->name, 'count' => (int) $row->count, 'amount' => (int) $row->amount])
+                ->all();
+        });
     }
 
     /** The day a customer pays an invoice: 請求日 + 回収予定区分 months, on the 回収予定日 (「末日」, 「25日」 …; else the last day). */
@@ -301,5 +326,20 @@ final class SalesDashboard
                 ->whereColumn('mine.sale_id', 'sales.id')
                 ->where('mine.user_id', $this->staffId)
                 ->whereRaw('mine.id = (select min(staff.id) from sale_user as staff where staff.sale_id = sales.id)')));
+    }
+
+    /**
+     * A figure from the cache (DataCache — added up afresh after any record changes): per viewer (their rights narrow
+     * what is added up), the 担当者 and arguments.
+     *
+     * @template T
+     *
+     * @param  list<string>  $args
+     * @param  Closure(): T  $compute
+     * @return T
+     */
+    private function cached(string $name, array $args, Closure $compute): mixed
+    {
+        return DataCache::remember('sales-dashboard:'.auth()->id().':'.($this->staffId ?? '-').':'.$name.':'.implode('|', $args), $compute);
     }
 }

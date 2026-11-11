@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Application\Cache\ReferenceCache;
 use Modules\Core\Application\Filters\FilterField;
 use Modules\Core\Application\Filters\RecordFilterQuery;
 use Modules\Core\Domain\Apps\AccessSubject;
@@ -174,7 +175,7 @@ final class RecordAccess
         $cached = self::$rules[$request] ?? [];
 
         if (! array_key_exists($app->id, $cached)) {
-            $cached[$app->id] = array_values($app->recordRules()->with('entries')->get()->all());
+            $cached[$app->id] = array_values(ReferenceCache::rememberModels('record-rules:'.$app->id, AppRecordRule::class, fn () => $app->recordRules()->with('entries')->get(), ['entries'])->all());
             self::$rules[$request] = $cached;
         }
 
@@ -226,7 +227,8 @@ final class RecordAccess
     private static function creatorColumn(Model $model): ?string
     {
         $table = $model->getTable();
-        self::$creatorColumns[$table] ??= Schema::hasColumn($table, 'created_by');
+        // the columns from the cache between requests (each schema lookup is a round trip; migrations bump it)
+        self::$creatorColumns[$table] ??= in_array('created_by', ReferenceCache::remember('columns:'.$table, fn (): array => Schema::getColumnListing($table)), true);
 
         return self::$creatorColumns[$table] ? $model->qualifyColumn('created_by') : null;
     }

@@ -7,6 +7,7 @@ namespace Modules\Core\Application\Apps;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Modules\Core\Application\Cache\ReferenceCache;
 use Modules\Core\Domain\Apps\AccessSubject;
 use Modules\Core\Domain\Apps\FieldAccessLevel;
 use Modules\Core\Models\AppFieldPermission;
@@ -81,5 +82,6 @@ final class FieldPermissionService
                 }
             }
         });
+        ReferenceCache::bump(); // the old entries went in one delete, without model events
     }
 }

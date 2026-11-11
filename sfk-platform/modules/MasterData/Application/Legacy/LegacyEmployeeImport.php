@@ -7,6 +7,7 @@ namespace Modules\MasterData\Application\Legacy;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Application\Apps\SpaceMembership;
+use Modules\Core\Application\Cache\ReferenceCache;
 use Modules\Core\Application\Legacy\LegacyExport;
 use Modules\Core\Application\Legacy\LegacyImporter;
 use Modules\Core\Application\Legacy\LegacyImportLog;
@@ -88,8 +89,9 @@ final class LegacyEmployeeImport implements LegacyImporter
                         ? $user->employeeCategories()->sync([$categories[$category]])
                         : $log->warn("{$label}: 従業員カテゴリ「{$category}」はありません");
                 }
-                // the スペース of their 従業員カテゴリ
+                // the スペース of their 従業員カテゴリ; their dashboards and access follow the categories
                 $this->spaces->syncUser($user);
+                ReferenceCache::bump();
             }
         });
 
