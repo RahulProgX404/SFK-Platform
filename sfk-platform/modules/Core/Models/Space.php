@@ -15,7 +15,8 @@ use WeakMap;
 /**
  * スペース: a group inside one dashboard (`panel_id`) holding member users and apps. A user may belong to
  * several spaces, and so may an app (of this dashboard or others). Employees use an app as members of one of its
- * spaces.
+ * spaces. Members are added by name (`space_user.direct`) or by 従業員カテゴリ (`employeeCategories()`: every employee
+ * of the category, now and later — SpaceMembership keeps `users()` the list of all of them).
  *
  * Every space has one permission setting (スペースの権限, `permissions()`: rows for 全員 / 従業員カテゴリ / 個人, none
  * when it is created): its members get those abilities in every app of the space, added to the apps' own
@@ -104,10 +105,16 @@ final class Space extends Model
         ];
     }
 
-    /** @return BelongsToMany<User, $this> */
+    /** @return BelongsToMany<User, $this> every member; pivot `direct`: added by name (not only through a 従業員カテゴリ) */
     public function users(): BelongsToMany
     {
-        return $this->belongsToMany(User::class)->withTimestamps();
+        return $this->belongsToMany(User::class)->withPivot('direct')->withTimestamps();
+    }
+
+    /** @return BelongsToMany<EmployeeCategory, $this> the 従業員カテゴリ whose employees are members */
+    public function employeeCategories(): BelongsToMany
+    {
+        return $this->belongsToMany(EmployeeCategory::class)->withTimestamps()->orderBy('employee_categories.sort_order')->orderBy('employee_categories.id');
     }
 
     /** @return HasMany<SpacePermission, $this> スペースの権限 (rows in the order 個人, 従業員カテゴリ, 全員) */

@@ -50,8 +50,10 @@ final class EditUser extends EditRecord
     protected function mutateFormDataBeforeFill(array $data): array
     {
         $data['employee_category_ids'] = $this->record->employeeCategories()->pluck('employee_categories.id')->all();
-        // the spaces the form offers (those of the dashboards the user opens); others are kept on save
+        // the spaces the form offers (those of the dashboards the user opens) the user was added to by name; others are
+        // kept on save, those of their 従業員カテゴリ follow the categories
         $data['space_ids'] = $this->record->spaces()
+            ->wherePivot('direct', true)
             ->whereIn('spaces.panel_id', $this->record->grantedDashboards())
             ->pluck('spaces.id')
             ->all();

@@ -258,10 +258,10 @@ final class PortalPage extends Dashboard
             'mostUsed' => $user === null ? collect() : collect(app(AppUsageLog::class)->mostUsedOrPopular($user, $usable->keys()->all()))
                 ->map(fn (string $code): ?BusinessApp => $usable->get($code))->filter()->values(),
             'spaces' => $spaces,
-            // ⚙ of each space (administrators): its settings (the edit dialog of スペース)
+            // ⚙ of each space (administrators): its settings (the スペース wizard, SpaceWizard)
             'spaceSettingsUrls' => self::isAdministrator()
                 ? $spaces->mapWithKeys(fn (Space $space): array => [
-                    $space->id => SpaceResource::getUrl('index', ['tableAction' => 'edit', 'tableActionRecord' => $space->id]),
+                    $space->id => SpaceResource::getUrl('index', ['space' => $space->id]),
                 ])->all()
                 : [],
             'filterSpaces' => $this->spaces(forFilter: true),

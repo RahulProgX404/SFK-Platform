@@ -131,8 +131,8 @@ it('links every space to its settings for administrators', function () {
     Livewire::test(PortalPage::class)
         ->assertSee('スペースの設定（営業スペース）')
         ->assertSee('スペースの設定（製造スペース）')
-        ->assertSee('tableAction=edit&amp;tableActionRecord='.$this->sales->id, escape: false)
-        ->assertSee('tableActionRecord='.$this->factory->id, escape: false);
+        ->assertSee('dashboard-settings/spaces?space='.$this->sales->id, escape: false)
+        ->assertSee('dashboard-settings/spaces?space='.$this->factory->id, escape: false);
 
     $this->actingAs($this->employee);
     Livewire::test(PortalPage::class)->assertDontSee('スペースの設定');

@@ -11,12 +11,15 @@ use Livewire\Livewire;
 use Modules\Core\Access\AppAccess;
 use Modules\Core\Application\Apps\AppActionNotAllowed;
 use Modules\Core\Application\Apps\SpaceService;
+use Modules\Core\Application\Users\UserAccountService;
 use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\AppStatus;
 use Modules\Core\Domain\Apps\PermissionSubject;
 use Modules\Core\Filament\DashboardSettings\Resources\AppSettings\Pages\EditAppSettings;
 use Modules\Core\Filament\DashboardSettings\Resources\AppSettings\Pages\ListAppSettings;
 use Modules\Core\Filament\DashboardSettings\Resources\Spaces\Pages\ManageSpaces;
+use Modules\Core\Filament\DashboardSettings\Resources\Spaces\SpaceResource;
+use Modules\Core\Filament\DashboardSettings\Resources\Spaces\SpaceWizard;
 use Modules\Core\Models\BusinessApp;
 use Modules\Core\Models\EmployeeCategory;
 use Modules\Core\Models\Space;
@@ -54,23 +57,146 @@ it('does not list ダッシュボード設定 in the sidebar of employees', func
     $this->actingAs($this->employee)->get('/erp')->assertOk()->assertDontSee('ダッシュボード設定');
 });
 
-it('creates a space with member employees and apps', function () {
+it('creates a space with member employees and apps in the quick-entry wizard (user 2026-11-11)', function () {
     $this->actingAs($this->admin);
     $partners = placed_app('partner-master', AppStatus::Developing);
     $orders = placed_app('order-entry', AppStatus::Developing);
 
     Livewire::test(ManageSpaces::class)
-        ->callAction('create', data: [
-            'name' => '営業スペース',
-            'user_ids' => [$this->employee->id],
-            'app_ids' => [$partners->id, $orders->id],
-        ])
-        ->assertHasNoActionErrors();
+        ->callAction('create')
+        ->assertDispatched(SpaceWizard::OPEN_EVENT);
+
+    Livewire::test(SpaceWizard::class)
+        ->call('start')
+        ->assertSet('open', true)
+        ->assertSet('screen', 'name')
+        ->call('next')
+        ->assertHasErrors('name')
+        ->assertSee('スペース名は必須です。')
+        ->assertSet('screen', 'name')
+        ->set('name', '営業スペース')
+        ->call('next')
+        ->assertSet('screen', 'members')
+        ->assertSee(['山田 花子', '0名'])
+        ->call('toggleUser', $this->employee->id)
+        ->assertSee('1名')
+        ->call('next')
+        ->assertSet('screen', 'apps')
+        ->call('toggleApp', $partners->id)
+        ->call('toggleApp', $orders->id)
+        ->call('next')
+        ->assertSet('screen', SpaceWizard::REVIEW)
+        ->assertSee(['営業スペース', '1名：山田 花子', '2件', 'この内容で作成'])
+        ->call('submit')
+        ->assertHasNoErrors()
+        ->assertSet('open', false)
+        ->assertDispatched(SpaceWizard::SAVED_EVENT)
+        ->assertNotified('スペースを作成しました');
 
     $space = Space::query()->where('name', '営業スペース')->firstOrFail();
     expect($space->panel_id)->toBe('erp')
         ->and($space->users()->pluck('users.id')->all())->toBe([$this->employee->id])
         ->and($space->apps()->pluck('code')->sort()->values()->all())->toBe(['order-entry', 'partner-master']);
+
+    // the name is unique in the dashboard
+    Livewire::test(SpaceWizard::class)->call('start')->set('name', '営業スペース')->call('next')
+        ->assertHasErrors('name')
+        ->assertSet('screen', 'name');
+});
+
+it('opens a space in the wizard on its check: from ✎, and from ⚙ of the dashboard (?space=)', function () {
+    $this->actingAs($this->admin);
+    $space = Space::query()->create(['panel_id' => 'erp', 'name' => '営業']);
+    $space->users()->attach($this->employee);
+    $app = placed_app('partner-master', space: $space);
+
+    Livewire::test(ManageSpaces::class)
+        ->callTableAction('edit', $space)
+        ->assertDispatched(SpaceWizard::OPEN_EVENT, space: $space->id);
+
+    $this->get(SpaceResource::getUrl('index', ['space' => $space->id]))->assertOk()->assertSee(['スペースを編集', '1名：山田 花子', 'この内容で保存']);
+
+    $other = placed_app('order-entry');
+    Livewire::test(SpaceWizard::class, ['space' => $space->id])
+        ->assertSet('open', true)
+        ->assertSet('screen', SpaceWizard::REVIEW)
+        ->assertSet('users', [$this->employee->id])
+        ->assertSet('apps', [$app->id])
+        // a row of the check goes to its step, 次へ back to the check
+        ->call('goTo', 'apps')
+        ->assertSet('screen', 'apps')
+        ->assertSee('確認へ')
+        ->call('toggleApp', $other->id)
+        ->call('next')
+        ->assertSet('screen', SpaceWizard::REVIEW)
+        ->call('submit')
+        ->assertNotified('スペースを保存しました');
+
+    expect($space->apps()->pluck('code')->sort()->values()->all())->toBe(['order-entry', 'partner-master'])
+        ->and($space->users()->pluck('users.id')->all())->toBe([$this->employee->id]);
+
+    // a space of another dashboard is not opened
+    $sns = Space::query()->create(['panel_id' => 'sns', 'name' => 'SNS']);
+    Livewire::test(SpaceWizard::class, ['space' => $sns->id])->assertSet('open', false);
+});
+
+it('moves through the step bar to the steps reached before, checking the open one going forward', function () {
+    $this->actingAs($this->admin);
+
+    $wizard = Livewire::test(SpaceWizard::class)
+        ->call('start')
+        ->call('jump', 'members')
+        ->assertSet('screen', 'name')
+        ->set('name', 'S')
+        ->call('next')
+        ->call('next')
+        ->assertSet('screen', 'apps')
+        ->call('jump', 'name')
+        ->assertSet('screen', 'name')
+        ->set('name', '')
+        ->call('jump', 'apps')
+        ->assertSet('screen', 'name')
+        ->assertHasErrors('name')
+        ->set('name', 'S')
+        ->call('jump', 'apps')
+        ->assertSet('screen', 'apps')
+        ->call('jump', SpaceWizard::REVIEW)
+        ->assertSet('screen', 'apps');
+
+    expect(array_column($wizard->instance()->stepBar(), 'enabled', 'key'))->toBe(['name' => true, 'members' => true, 'apps' => false, 'review' => false]);
+});
+
+it('lets only administrators use the wizard', function () {
+    $this->actingAs($this->employee);
+
+    Livewire::test(SpaceWizard::class)->call('start')->assertForbidden();
+    Livewire::test(SpaceWizard::class)->call('save')->assertForbidden();
+});
+
+it('selects or clears every employee and app the search shows', function () {
+    $this->actingAs($this->admin);
+    $other = grantDashboards(User::factory()->create(['name' => '佐藤 次郎']), 'erp');
+    $partners = placed_app('partner-master');
+    $orders = placed_app('order-entry');
+
+    $wizard = Livewire::test(SpaceWizard::class)
+        ->call('start')
+        ->set('name', 'S')
+        ->call('next')
+        ->set('search', '山田')
+        ->assertSee('山田 花子')
+        ->assertDontSee('佐藤 次郎')
+        ->call('selectListed', 'users', true)
+        ->assertSet('users', [$this->employee->id])
+        ->set('search', '')
+        ->call('selectListed', 'users', true)
+        ->assertSet('users', [$this->employee->id, $other->id])
+        ->call('selectListed', 'users', false)
+        ->assertSet('users', [])
+        ->call('next')
+        ->call('selectListed', 'apps', true);
+
+    expect($wizard->get('apps'))->toEqualCanonicalizing([$partners->id, $orders->id]);
 });
 
 it('places an app in several spaces and keeps the others when one of them is deleted', function () {
@@ -82,9 +208,11 @@ it('places an app in several spaces and keeps the others when one of them is del
     $app->permissions()->create(['subject_type' => 'everyone', 'can_view' => true]);
 
     // the app placed in 営業 is offered for 製造 too and joins it
-    Livewire::test(ManageSpaces::class)
-        ->callTableAction('edit', $factory, data: ['name' => '製造', 'user_ids' => [$factoryWorker->id], 'app_ids' => [$app->id]])
-        ->assertHasNoTableActionErrors();
+    Livewire::test(SpaceWizard::class, ['space' => $factory->id])
+        ->call('toggleUser', $factoryWorker->id)
+        ->call('toggleApp', $app->id)
+        ->call('save')
+        ->assertHasNoErrors();
     expect(SpaceService::placeableApps($factory))->toHaveKey($app->id)
         ->and($app->fresh()->spaces->pluck('name')->all())->toBe(['営業', '製造'])
         ->and(AppAccess::abilitiesFor($factoryWorker, $app->fresh()))->toBe([AppAbility::View]);
@@ -98,9 +226,84 @@ it('places an app in several spaces and keeps the others when one of them is del
 it('accepts only employees as space members', function () {
     $this->actingAs($this->admin);
 
-    Livewire::test(ManageSpaces::class)
-        ->callAction('create', data: ['name' => 'X', 'user_ids' => [$this->admin->id]])
-        ->assertHasActionErrors(['user_ids']);
+    Livewire::test(SpaceWizard::class)
+        ->call('start')
+        ->set('name', 'X')
+        ->call('toggleUser', $this->admin->id)
+        ->assertSet('users', [])
+        ->set('users', [$this->admin->id])
+        ->call('save')
+        ->assertHasErrors(['users'])
+        ->assertSet('screen', 'members');
+    expect(Space::query()->where('name', 'X')->exists())->toBeFalse();
+
+    // SpaceService keeps employees only
+    $space = app(SpaceService::class)->save(null, 'erp', ['name' => 'Y', 'user_ids' => [$this->admin->id, $this->employee->id]], $this->admin);
+    expect($space->users()->pluck('users.id')->all())->toBe([$this->employee->id]);
+});
+
+it('adds the employees of a 従業員カテゴリ to a space — also those who get it later — and drops them when it goes (user 2026-11-11)', function () {
+    $this->actingAs($this->admin);
+    $sales = EmployeeCategory::query()->where('name', '営業')->firstOrFail();
+    $plant = EmployeeCategory::query()->where('name', '製造')->firstOrFail();
+    $seller = grantDashboards(User::factory()->create(['name' => '営業 一郎']), 'erp');
+    $seller->employeeCategories()->attach($sales);
+    $this->admin->employeeCategories()->attach($sales); // not an employee: never a member
+    $app = placed_app('partner-master');
+
+    $wizard = Livewire::test(SpaceWizard::class)
+        ->call('start')
+        ->set('name', '営業スペース')
+        ->call('next')
+        ->call('toggleCategory', $sales->id)
+        ->assertSet('categories', [$sales->id])
+        ->assertSee('1名');
+    expect(array_keys($wizard->instance()->coveredUsers()))->toBe([$seller->id]);
+    // a member through the category stays ticked
+    $wizard->call('toggleUser', $seller->id)->assertSet('users', [])
+        ->call('toggleUser', $this->employee->id)
+        ->call('next')
+        ->call('toggleApp', $app->id)
+        ->call('next')
+        ->assertSee(['2名：営業、山田 花子'])
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    $space = Space::query()->where('name', '営業スペース')->firstOrFail();
+    $members = fn (): array => $space->users()->orderBy('users.id')->get()->mapWithKeys(fn (User $user): array => [$user->id => (bool) $user->pivot->direct])->all();
+    expect($space->employeeCategories()->pluck('employee_categories.id')->all())->toBe([$sales->id])
+        ->and($members())->toBe([$this->employee->id => true, $seller->id => false]);
+    Livewire::test(ManageSpaces::class)->assertTableColumnStateSet('employeeCategories.name', ['営業'], $space);
+
+    // someone who gets 営業 later joins; with it taken off they leave, with their 個人 row of the アクセス権
+    $accounts = app(UserAccountService::class);
+    $newcomer = $accounts->create(['name' => '営業 新人', 'email' => 'newcomer@example.com', 'employee_category_ids' => [$sales->id]])->user;
+    expect($space->hasMember($newcomer))->toBeTrue()
+        ->and(AppAccess::abilitiesFor($newcomer->fresh(), $app->fresh()))->toBe([]);
+    $space->permissions()->create(['subject_type' => 'user', 'user_id' => $newcomer->id, 'can_view' => true]);
+    $accounts->update($newcomer, ['employee_category_ids' => [$plant->id]]);
+    expect(array_keys($members()))->toBe([$this->employee->id, $seller->id])
+        ->and($space->permissions()->where('user_id', $newcomer->id)->exists())->toBeFalse();
+
+    // added by name and through 営業: stays when the category goes; leaves the space when no longer an employee
+    $accounts->update($this->employee, ['employee_category_ids' => [$sales->id]]);
+    expect($members()[$this->employee->id])->toBeTrue();
+    // ユーザー管理 sets the spaces by name; those of the categories stay
+    $accounts->update($seller, ['space_ids' => []]);
+    expect($members())->toHaveKey($seller->id);
+    $accounts->update($seller, ['user_type' => 'admin']);
+    expect($members())->not->toHaveKey($seller->id);
+
+    // the category taken off the space: only those added by name stay
+    Livewire::test(SpaceWizard::class, ['space' => $space->id])
+        ->assertSet('categories', [$sales->id])
+        ->assertSet('users', [$this->employee->id])
+        ->call('goTo', 'members')
+        ->call('toggleCategory', $sales->id)
+        ->call('next')
+        ->call('submit');
+    expect($members())->toBe([$this->employee->id => true])
+        ->and($space->employeeCategories()->count())->toBe(0);
 });
 
 it('lists only the apps placed in this dashboard and edits their permissions', function () {
@@ -171,20 +374,24 @@ it('creates every space with a permission setting for 全員 / 従業員カテ�
     $salesPerson->employeeCategories()->attach($sales);
     $boss = grantDashboards(User::factory()->create(['name' => '佐藤 課長']), 'erp');
 
+    // a space created in the wizard has no rows; アクセス権 sets them
+    $space = app(SpaceService::class)->save(null, 'erp', [
+        'name' => '営業スペース',
+        'user_ids' => [$this->employee->id, $salesPerson->id, $boss->id],
+        'app_ids' => [$partners->id, $orders->id],
+    ], $this->admin);
+    expect($space->permissions()->count())->toBe(0);
+
     Livewire::test(ManageSpaces::class)
-        ->callAction('create', data: [
-            'name' => '営業スペース',
-            'user_ids' => [$this->employee->id, $salesPerson->id, $boss->id],
-            'app_ids' => [$partners->id, $orders->id],
+        ->callTableAction('permissions', $space, data: [
             'permissions' => [
                 ['subject_type' => 'everyone', 'can_view' => true],
                 ['subject_type' => 'category', 'employee_category_id' => $sales->id, 'can_view' => true, 'can_create' => true],
                 ['subject_type' => 'user', 'user_id' => $boss->id, 'can_view' => true, 'can_update' => true, 'can_delete' => true],
             ],
         ])
-        ->assertHasNoActionErrors();
+        ->assertHasNoTableActionErrors();
 
-    $space = Space::query()->where('name', '営業スペース')->firstOrFail();
     expect($space->permissions()->count())->toBe(3);
 
     foreach ([$partners, $orders] as $app) {
@@ -194,13 +401,15 @@ it('creates every space with a permission setting for 全員 / 従業員カテ�
     }
 
     Livewire::test(ManageSpaces::class)
-        ->assertTableColumnStateSet('rights', ['個人：佐藤 課長：閲覧・編集・削除', '従業員カテゴリ：営業：閲覧・追加', '全員：閲覧'], $space);
+        ->assertTableColumnStateSet('rights', ['個人：佐藤 課長：閲覧・編集・削除', '従業員カテゴリ：営業：閲覧・追加', '全員：閲覧'], $space)
+        // the dialog shows the rows it has
+        ->mountTableAction('permissions', $space)
+        ->assertTableActionDataSet(function (array $data) use ($boss, $sales): array {
+            expect(array_map(fn (array $row): array => [$row['subject_type'], $row['employee_category_id'], $row['user_id'], $row['can_update']], array_values($data['permissions'])))
+                ->toEqual([['user', null, $boss->id, true], ['category', $sales->id, null, false], ['everyone', null, null, false]]);
 
-    // a space created without rows gives nothing
-    Livewire::test(ManageSpaces::class)
-        ->callAction('create', data: ['name' => '空のスペース'])
-        ->assertHasNoActionErrors();
-    expect(Space::query()->where('name', '空のスペース')->firstOrFail()->permissions()->count())->toBe(0);
+            return [];
+        });
 });
 
 it('edits the rows of a space and drops the 個人 row of a member who leaves', function () {
@@ -213,10 +422,7 @@ it('edits the rows of a space and drops the 個人 row of a member who leaves', 
     $space->permissions()->create(['subject_type' => 'user', 'user_id' => $this->employee->id, 'can_view' => true, 'can_update' => true]);
 
     Livewire::test(ManageSpaces::class)
-        ->callTableAction('edit', $space, data: [
-            'name' => '営業',
-            'user_ids' => [$this->employee->id],
-            'app_ids' => [$app->id],
+        ->callTableAction('permissions', $space, data: [
             'permissions' => [
                 ['subject_type' => 'everyone', 'can_view' => true, 'can_export' => true],
             ],
@@ -237,28 +443,33 @@ it('rejects a 個人 row for someone who is not a member, a second 全員 row an
     $outsider = grantDashboards(User::factory()->create(), 'erp');
     $sales = EmployeeCategory::query()->where('name', '営業')->firstOrFail();
 
+    $space = Space::query()->create(['panel_id' => 'erp', 'name' => 'X']);
+    $space->users()->attach($this->employee);
+
+    // 個人 offers the members only
     Livewire::test(ManageSpaces::class)
-        ->callAction('create', data: [
-            'name' => 'X',
-            'user_ids' => [$this->employee->id],
+        ->callTableAction('permissions', $space, data: [
             'permissions' => [['subject_type' => 'user', 'user_id' => $outsider->id, 'can_view' => true]],
-        ]);
+        ])
+        ->assertHasTableActionErrors();
     Livewire::test(ManageSpaces::class)
-        ->callAction('create', data: [
-            'name' => 'Y',
+        ->callTableAction('permissions', $space, data: [
             'permissions' => [['subject_type' => 'everyone', 'can_view' => true], ['subject_type' => 'everyone', 'can_view' => true]],
-        ]);
+        ])
+        ->assertHasTableActionErrors(['permissions']);
     Livewire::test(ManageSpaces::class)
-        ->callAction('create', data: [
-            'name' => 'Z',
+        ->callTableAction('permissions', $space, data: [
             'permissions' => [
                 ['subject_type' => 'category', 'employee_category_id' => $sales->id, 'can_view' => true],
                 ['subject_type' => 'category', 'employee_category_id' => $sales->id, 'can_view' => true],
             ],
-        ]);
+        ])
+        ->assertHasTableActionErrors();
 
-    expect(Space::query()->whereIn('name', ['X', 'Y', 'Z'])->count())->toBe(0);
+    expect($space->permissions()->count())->toBe(0);
 
+    expect(fn () => app(SpaceService::class)->savePermissions($space, [['subject_type' => 'user', 'user_id' => $outsider->id, 'can_view' => true]], $this->admin))
+        ->toThrow(AppActionNotAllowed::class, '個人の権限はこのスペースのメンバーにのみ設定できます。');
     expect(fn () => app(SpaceService::class)->save(null, 'erp', [
         'name' => 'W',
         'user_ids' => [$this->employee->id],

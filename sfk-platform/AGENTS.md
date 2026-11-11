@@ -230,6 +230,10 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   they opened any, those everyone opens most — always only apps they may open) and the apps. Administrators' drag
   changes the default order (the registry); everyone else's drag only their own (`users.app_order`, 既定の並びに戻す);
   without one they see the default. No アプリショートカット any more.
+- スペース (ダッシュボード設定, docs/permissions.md): created and edited in a computer-first wizard window (`SpaceWizard`: step bar スペース名 → メンバー →
+  アプリ → check; ⚙ of a space in the アプリ panel opens it with `?space=<id>`), アクセス権 in its own dialog. Members are
+  employees by name and the employees of the space's 従業員カテゴリ, now and later (`SpaceMembership` — call `syncUser()`
+  after changing a user's categories or type outside `UserAccountService`).
 - Never write the word for the old product anywhere; call it 旧システム in the UI and "legacy system" in English.
 - Cite the SYSTEM_BRAIN rule id in tests/docblocks when implementing a rule.
 

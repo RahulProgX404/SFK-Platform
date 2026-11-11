@@ -6,24 +6,18 @@ namespace Modules\Core\Filament\DashboardSettings\Resources\Spaces;
 
 use App\Models\User;
 use BackedEnum;
-use Closure;
+use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
-use Filament\Actions\EditAction;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Fieldset;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Schema;
 use Filament\Support\Exceptions\Halt;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Unique;
+use Livewire\Component;
 use Modules\Core\Access\UserType;
 use Modules\Core\Application\Apps\AppActionNotAllowed;
 use Modules\Core\Application\Apps\SpaceService;
@@ -36,10 +30,11 @@ use Modules\Core\Models\SpacePermission;
 use UnitEnum;
 
 /**
- * スペース of the current dashboard (permission.md "Space"): name, member employees, apps and the space's
- * アクセス権 (rows for 全員 / 従業員カテゴリ / 個人: what its members get in all its apps, added to the apps' own
- * permissions — AppAccess).
- * Administrators only.
+ * スペース of the current dashboard (permission.md "Space"): name, members (employees by name and by 従業員カテゴリ —
+ * SpaceMembership), apps and the space's アクセス権 (rows for 全員 / 従業員カテゴリ / 個人: what its members get in all
+ * its apps, added to the apps' own permissions — AppAccess).
+ * スペースを作成 and ✎ open SpaceWizard (user, 2026-11-11: a quick entry — スペース名, メンバー, アプリ, check); アクセス権 has
+ * its own dialog. Administrators only.
  */
 final class SpaceResource extends Resource
 {
@@ -66,53 +61,10 @@ final class SpaceResource extends Resource
         return parent::getEloquentQuery()->where('panel_id', DashboardSettingsPlugin::currentPanelId());
     }
 
-    public static function form(Schema $schema): Schema
-    {
-        return $schema
-            ->columns(1)
-            ->components([
-                TextInput::make('name')
-                    ->label('スペース名')
-                    ->placeholder('例：営業スペース')
-                    ->required()
-                    ->maxLength(64)
-                    ->rule(fn (?Space $record): Unique => Rule::unique('spaces', 'name')
-                        ->where('panel_id', DashboardSettingsPlugin::currentPanelId())
-                        ->ignore($record?->id))
-                    ->validationAttribute('スペース名'),
-                Select::make('user_ids')
-                    ->label('メンバー（従業員）')
-                    ->multiple()
-                    ->searchable()
-                    ->options(fn (): array => self::employeeOptions())
-                    ->live()
-                    ->rule(fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
-                        $ids = array_map('intval', (array) $value);
-                        if (User::query()->whereIn('id', $ids)->where('user_type', UserType::Employee->value)->count() !== count(array_unique($ids))) {
-                            $fail('従業員以外のユーザーは選択できません。');
-                        }
-                    }),
-                Select::make('app_ids')
-                    ->label('アプリ')
-                    ->multiple()
-                    ->searchable()
-                    ->options(fn (?Space $record): array => SpaceService::placeableApps($record)),
-                // スペースの権限: what the members get in every app of the space (個人 rows: members only)
-                Fieldset::make('アクセス権')
-                    ->columns(1)
-                    ->schema([
-                        AccessEntryFields::permissionRows(fn (Get $get): array => array_intersect_key(
-                            AccessEntryFields::employees(),
-                            array_flip(array_map('intval', (array) $get('../../user_ids'))),
-                        )),
-                    ]),
-            ]);
-    }
-
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $query) => $query->withCount('users')->with(['apps', 'permissions.user', 'permissions.employeeCategory']))
+            ->modifyQueryUsing(fn (Builder $query) => $query->withCount('users')->with(['apps', 'employeeCategories', 'permissions.user', 'permissions.employeeCategory']))
             ->columns([
                 TextColumn::make('name')
                     ->label('スペース名')
@@ -122,6 +74,11 @@ final class SpaceResource extends Resource
                     ->numeric()
                     ->suffix(' 名')
                     ->alignEnd(),
+                TextColumn::make('employeeCategories.name')
+                    ->label('従業員カテゴリ')
+                    ->badge()
+                    ->color('gray')
+                    ->placeholder('なし'),
                 TextColumn::make('apps.name')
                     ->label('アプリ')
                     ->badge()
@@ -139,21 +96,31 @@ final class SpaceResource extends Resource
             ->paginated(false)
             ->striped()
             ->recordActions([
-                EditAction::make()
-                    ->mutateRecordDataUsing(fn (array $data, Space $record): array => [
-                        ...$data,
-                        'user_ids' => $record->users()->pluck('users.id')->all(),
-                        'app_ids' => $record->apps()->pluck('business_apps.id')->all(),
-                        'permissions' => $record->permissions()->get()
-                            ->map(fn (SpacePermission $row): array => [
-                                'subject_type' => $row->subject_type->value,
-                                'employee_category_id' => $row->employee_category_id,
-                                'user_id' => $row->user_id,
-                                ...$row->only(AppAbility::columns()),
-                            ])
-                            ->all(),
+                // name, members and apps: the quick entry over the screen
+                Action::make('edit')
+                    ->label('編集')
+                    ->icon(Heroicon::OutlinedPencilSquare)
+                    ->action(fn (Space $record, Component $livewire) => $livewire->dispatch(SpaceWizard::OPEN_EVENT, space: $record->id)),
+                Action::make('permissions')
+                    ->label('アクセス権')
+                    ->icon(Heroicon::OutlinedKey)
+                    ->modalHeading(fn (Space $record): string => $record->name.'：アクセス権')
+                    ->modalSubmitActionLabel('保存')
+                    ->fillForm(fn (Space $record): array => ['permissions' => $record->permissions()->get()
+                        ->map(fn (SpacePermission $row): array => [
+                            'subject_type' => $row->subject_type->value,
+                            'employee_category_id' => $row->employee_category_id,
+                            'user_id' => $row->user_id,
+                            ...$row->only(AppAbility::columns()),
+                        ])
+                        ->all()])
+                    // スペースの権限: what the members get in every app of the space (個人 rows: members only)
+                    ->schema(fn (Space $record): array => [
+                        Fieldset::make('アクセス権')
+                            ->columns(1)
+                            ->schema([AccessEntryFields::permissionRows(fn (): array => self::memberOptions($record))]),
                     ])
-                    ->using(fn (Space $record, array $data): Space => self::save($record, $data)),
+                    ->action(fn (Space $record, array $data) => self::savePermissions($record, $data)),
                 DeleteAction::make()
                     ->using(function (Space $record): bool {
                         app(SpaceService::class)->delete($record, self::actorOrFail());
@@ -166,15 +133,10 @@ final class SpaceResource extends Resource
     }
 
     /** @param  array<string, mixed>  $data */
-    public static function save(?Space $space, array $data): Space
+    public static function savePermissions(Space $space, array $data): void
     {
         try {
-            return app(SpaceService::class)->save($space, DashboardSettingsPlugin::currentPanelId(), [
-                'name' => (string) $data['name'],
-                'user_ids' => array_values((array) ($data['user_ids'] ?? [])),
-                'app_ids' => array_values((array) ($data['app_ids'] ?? [])),
-                'permissions' => array_values(array_filter((array) ($data['permissions'] ?? []), 'is_array')),
-            ], self::actorOrFail());
+            app(SpaceService::class)->savePermissions($space, array_values(array_filter((array) ($data['permissions'] ?? []), 'is_array')), self::actorOrFail());
         } catch (AppActionNotAllowed $exception) {
             Notification::make()->danger()->title($exception->getMessage())->send();
 
@@ -197,19 +159,14 @@ final class SpaceResource extends Resource
             ->all();
     }
 
-    /** @return array<int, string> */
-    private static function employeeOptions(): array
+    /** @return array<int, string> the members of the space (個人 rows), by name */
+    private static function memberOptions(Space $space): array
     {
-        return User::query()
-            ->with('employeeCategories')
+        return $space->users()
             ->where('user_type', UserType::Employee->value)
             ->orderBy('name')
-            ->get()
-            ->mapWithKeys(fn (User $user): array => [
-                $user->id => $user->name.($user->employeeCategories->isNotEmpty()
-                    ? '（'.$user->employeeCategories->pluck('name')->implode('・').'）'
-                    : ''),
-            ])
+            ->get(['users.id', 'users.name'])
+            ->mapWithKeys(fn (User $user): array => [$user->id => $user->name])
             ->all();
     }
 

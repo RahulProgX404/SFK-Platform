@@ -15,20 +15,21 @@ use Modules\Core\Models\Space;
 use Modules\Core\Models\SpacePermission;
 
 /**
- * Spaces of one dashboard, maintained by administrators in that dashboard's ダッシュボード設定: name, members,
- * apps and the space's permission setting (スペースの権限: rows for 全員 / 従業員カテゴリ / 個人 with the abilities the
+ * Spaces of one dashboard, maintained by administrators in that dashboard's ダッシュボード設定: name, members (by name
+ * and by 従業員カテゴリ — SpaceMembership), apps and the space's permission setting (スペースの権限: rows for 全員 / 従業員カテゴリ / 個人 with the abilities the
  * space's members get in its apps, AppAccess). An app may be placed in several spaces (of this dashboard and
  * others), so every app can be added.
  */
 final class SpaceService
 {
     /**
-     * `permissions` replaces the space's permission rows (left out: kept; a new space has none). Each row:
-     * `subject_type` (PermissionSubject), `employee_category_id` / `user_id` for 従業員カテゴリ / 個人 and the `can_*`
-     * abilities (AppAbility::columns(); without 閲覧 nothing). One 全員 row, each 従業員カテゴリ and member once, and a
-     * 個人 row only for a member of the space.
+     * `user_ids` are the members added by name, `category_ids` the 従業員カテゴリ whose employees are members (left out:
+     * kept; a new space has none). `permissions` replaces the space's permission rows (left out: kept; a new space has
+     * none). Each row: `subject_type` (PermissionSubject), `employee_category_id` / `user_id` for 従業員カテゴリ / 個人 and
+     * the `can_*` abilities (AppAbility::columns(); without 閲覧 nothing). One 全員 row, each 従業員カテゴリ and member
+     * once, and a 個人 row only for a member of the space.
      *
-     * @param  array{name: string, user_ids?: list<int|string>, app_ids?: list<int|string>, permissions?: list<array<string, mixed>>}  $data
+     * @param  array{name: string, user_ids?: list<int|string>, category_ids?: list<int|string>, app_ids?: list<int|string>, permissions?: list<array<string, mixed>>}  $data
      */
     public function save(?Space $space, string $panelId, array $data, User $actor): Space
     {
@@ -37,13 +38,15 @@ final class SpaceService
         }
 
         $userIds = array_values(array_unique(array_map('intval', $data['user_ids'] ?? [])));
-        $rows = array_key_exists('permissions', $data) ? $this->permissionRows($data['permissions'], $userIds) : null;
+        $categoryIds = array_key_exists('category_ids', $data) ? $this->categoryIds($data['category_ids']) : null;
+        $memberIds = SpaceMembership::membersOf($userIds, $categoryIds ?? ($space !== null ? $space->employeeCategories()->pluck('employee_categories.id')->map(fn (mixed $id): int => (int) $id)->all() : []));
+        $rows = array_key_exists('permissions', $data) ? $this->permissionRows($data['permissions'], $memberIds) : null;
 
-        return DB::transaction(function () use ($space, $panelId, $data, $userIds, $rows): Space {
+        return DB::transaction(function () use ($space, $panelId, $data, $userIds, $categoryIds, $rows): Space {
             $space ??= new Space(['panel_id' => $panelId, 'sort_order' => ((int) Space::query()->where('panel_id', $panelId)->max('sort_order')) + 1]);
             $space->fill(['name' => $data['name']])->save();
 
-            $space->users()->sync($userIds);
+            app(SpaceMembership::class)->syncSpace($space, $userIds, $categoryIds);
             $this->syncApps($space, array_map('intval', $data['app_ids'] ?? []));
 
             if ($rows !== null) {
@@ -133,6 +136,43 @@ final class SpaceService
         }
 
         return $normalized;
+    }
+
+    /**
+     * Replaces the rows of the space's アクセス権 (the rules of save()).
+     *
+     * @param  list<array<string, mixed>>  $rows
+     */
+    public function savePermissions(Space $space, array $rows, User $actor): void
+    {
+        if (! $actor->user_type->isAdministrator()) {
+            throw new AppActionNotAllowed('スペースを管理できるのは管理者のみです。');
+        }
+
+        $normalized = $this->permissionRows($rows, $space->users()->pluck('users.id')->map(fn (mixed $id): int => (int) $id)->all());
+
+        DB::transaction(function () use ($space, $normalized): void {
+            $space->permissions()->delete();
+            foreach ($normalized as $row) {
+                $space->permissions()->create($row);
+            }
+            Space::forgetCached();
+        });
+    }
+
+    /**
+     * @param  list<int|string>  $requested
+     * @return list<int> the 従業員カテゴリ among them
+     */
+    private function categoryIds(array $requested): array
+    {
+        $requested = array_values(array_unique(array_map('intval', $requested)));
+        $known = $requested === [] ? [] : EmployeeCategory::query()->whereIn('id', $requested)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
+        if (count($known) !== count($requested)) {
+            throw new AppActionNotAllowed('従業員カテゴリを選択してください。');
+        }
+
+        return $known;
     }
 
     public function delete(Space $space, User $actor): void

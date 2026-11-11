@@ -46,4 +46,10 @@ final class EmployeeCategory extends Model
     {
         return $this->belongsToMany(User::class)->withTimestamps();
     }
+
+    /** @return BelongsToMany<Space, $this> the スペース whose members include the category's employees */
+    public function spaces(): BelongsToMany
+    {
+        return $this->belongsToMany(Space::class)->withTimestamps();
+    }
 }

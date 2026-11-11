@@ -9,9 +9,8 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\Core\Access\DashboardAccess;
 use Modules\Core\Access\UserType;
-use Modules\Core\Application\Apps\SpaceService;
+use Modules\Core\Application\Apps\SpaceMembership;
 use Modules\Core\Models\EmployeeCategory;
-use Modules\Core\Models\Space;
 
 /**
  * Account lifecycle used by user management.
@@ -25,10 +24,10 @@ use Modules\Core\Models\Space;
  * here (SuperAdminProvisioner only). A null `$actor` is a trusted system call (console, seeders).
  * Dashboards: `dashboards` grants extra dashboards to the user on top of their 従業員カテゴリ; administrator-only
  * dashboards (共通管理) are always dropped from it because they follow ユーザー種別 (DashboardAccess).
- * Spaces: `space_ids` sets the employee's スペース among the spaces of the dashboards they can open (own +
- * 従業員カテゴリ, after this save); memberships in spaces of other dashboards are kept. Only employees are space
- * members (as on スペース), so a user who stops being an employee leaves all spaces. Leaving a space drops their 個人
- * row of its アクセス権.
+ * Spaces: `space_ids` sets the spaces the employee is a member of by name, among the spaces of the dashboards they
+ * can open (own + 従業員カテゴリ, after this save); memberships in spaces of other dashboards are kept. The spaces of
+ * their 従業員カテゴリ follow the categories (SpaceMembership). Only employees are space members (as on スペース), so
+ * a user who stops being an employee leaves all spaces. Leaving a space drops their 個人 row of its アクセス権.
  */
 final class UserAccountService
 {
@@ -181,34 +180,15 @@ final class UserAccountService
     }
 
     /**
-     * Sets the user's spaces among those of the dashboards they can open now (requested ids of other dashboards
-     * are ignored, memberships there kept). A user who is not an employee leaves every space.
+     * Sets the spaces the user is a member of by name among those of the dashboards they can open now (requested ids
+     * of other dashboards are ignored, memberships there kept) and those of their 従業員カテゴリ. A user who is not an
+     * employee leaves every space.
      *
      * @param  list<int>|null  $spaceIds
      */
     private function syncSpaces(User $user, ?array $spaceIds): void
     {
-        if ($user->user_type !== UserType::Employee) {
-            if ($user->spaces()->exists()) {
-                $user->spaces()->detach();
-                SpaceService::dropRowsOfFormerMembers(userId: $user->id);
-                Space::forgetCached();
-            }
-
-            return;
-        }
-
-        if ($spaceIds === null) {
-            return;
-        }
-
-        $panelIds = $user->grantedDashboards();
-        $offered = Space::query()->whereIn('panel_id', $panelIds)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
-        $kept = $user->spaces()->whereNotIn('spaces.panel_id', $panelIds)->pluck('spaces.id')->map(fn (mixed $id): int => (int) $id)->all();
-
-        $user->spaces()->sync([...$kept, ...array_values(array_intersect($spaceIds, $offered))]);
-        SpaceService::dropRowsOfFormerMembers(userId: $user->id);
-        Space::forgetCached();
+        app(SpaceMembership::class)->syncUser($user, $spaceIds, $spaceIds !== null ? $user->grantedDashboards() : []);
     }
 
     /**

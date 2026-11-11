@@ -10,7 +10,7 @@ permissions").
 | Concept                | the legacy system            | Here                                                                                                                              | Maintained by                                                           |
 | ---------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | Dashboard (department) | —                  | A Filament panel (白石封筒 `erp`, future products). 共通管理 (`settings`) is administrator-only                                   | code                                                                    |
-| Space (group)          | スペース           | `spaces` (per dashboard) + members `space_user` (employees only). A user may be in several spaces. Each space has one permission setting (アクセス権, `space_permissions`: 全員 / 従業員カテゴリ / 個人 rows) for its members in all its apps | administrators, in the dashboard's **ダッシュボード設定 → スペース**; members also in **ユーザー管理** (スペース, after 利用可能なダッシュボード) |
+| Space (group)          | スペース           | `spaces` (per dashboard) + members `space_user` (employees only; by name, `direct`, or through the space's 従業員カテゴリ, `employee_category_space`). A user may be in several spaces. Each space has one permission setting (アクセス権, `space_permissions`: 全員 / 従業員カテゴリ / 個人 rows) for its members in all its apps | administrators, in the dashboard's **ダッシュボード設定 → スペース**; members also in **ユーザー管理** (スペース, after 利用可能なダッシュボード) |
 | App (feature)          | アプリ             | `business_apps` registry: `code`, name, status; placed in spaces via `business_app_space` (several, of any dashboards)          | the code (AppResource screens); s共通管理 **共通管理 → アプリ設定** |
 | App permission         | アプリのアクセス権 | `app_permissions`: rows for 全員 / one 従業員カテゴリ / one employee × 閲覧・追加・編集・削除・ファイル読み込み・ファイル書き出し | administrators, in **ダッシュボード設定 → アプリの権限**                |
 | Record permission      | レコードのアクセス権 | `app_record_rules` (condition = a 絞り込む filter, in order) + `app_record_rule_entries`: 作成者 / 個人 / 従業員カテゴリ / 全員 × 閲覧・編集・削除 | administrators, **アプリの権限 → レコード** (or アプリの設定 → 設定 → アクセス権) |
@@ -19,8 +19,18 @@ permissions").
 ## Space members from ユーザー管理
 
 The user form shows, after 利用可能なダッシュボード, the スペース of the dashboards the user will open (those ticked plus
-those of their 従業員カテゴリ; employees only). Saving sets the user's spaces among them; memberships in spaces of
-other dashboards are kept. A user who stops being an employee leaves every space (`UserAccountService`).
+those of their 従業員カテゴリ; employees only). Saving sets the spaces the user is a member of by name among them;
+memberships in spaces of other dashboards are kept. A user who stops being an employee leaves every space
+(`UserAccountService`).
+
+## Space members by 従業員カテゴリ (user, 2026-11-11)
+
+スペースを作成 / ✎ open a wizard window made for the computer (`SpaceWizard`): a step bar スペース名 → メンバー → アプリ → 確認, choices in columns, what is chosen in a side panel.
+メンバー are tapped on and off: 従業員カテゴリ and employees by name (表示中をすべて選択 / 選択を解除 act on what the search
+shows). A chosen category makes every employee of it a member — also those who get it later in ユーザー管理 or the legacy
+import — and they leave when the category is taken off them or off the space, unless they were added by name too
+(`SpaceMembership`; `space_user` keeps all members, `direct` marks those by name). The space's アクセス権 have their own
+dialog (アクセス権 on the list).
 
 ## Who may open a dashboard (`Modules\Core\Access\DashboardAccess`)
 

@@ -6,6 +6,7 @@ namespace Modules\MasterData\Application\Legacy;
 
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Application\Apps\SpaceMembership;
 use Modules\Core\Application\Legacy\LegacyExport;
 use Modules\Core\Application\Legacy\LegacyImporter;
 use Modules\Core\Application\Legacy\LegacyImportLog;
@@ -32,6 +33,7 @@ final class LegacyEmployeeImport implements LegacyImporter
     public function __construct(
         private readonly UserAccountService $accounts,
         private readonly LegacyUsers $users,
+        private readonly SpaceMembership $spaces,
     ) {}
 
     public function legacyAppId(): string
@@ -86,6 +88,8 @@ final class LegacyEmployeeImport implements LegacyImporter
                         ? $user->employeeCategories()->sync([$categories[$category]])
                         : $log->warn("{$label}: 従業員カテゴリ「{$category}」はありません");
                 }
+                // the スペース of their 従業員カテゴリ
+                $this->spaces->syncUser($user);
             }
         });
 
