@@ -33,6 +33,12 @@ abstract class DashboardCard extends Widget implements FollowsDashboardFilters
     /** drawn with the page: the cards of a dashboard are few and quick */
     protected static bool $isLazy = false;
 
+    /** The period of the card for its head (the dashboard's date button), e.g. 2026/10/13〜11/11. */
+    public function periodCaption(): string
+    {
+        return $this->period()->shortLabel();
+    }
+
     protected function period(): Period
     {
         return Period::between($this->pageFilters['from'] ?? null, $this->pageFilters['to'] ?? null, $this->today());

@@ -116,6 +116,38 @@ final readonly class Period
     }
 
     /** 「2026/10/07 〜 2026/11/05」 */
+    /**
+     * The calendar months the period touches, each with the part of it inside the period (days in the period / days
+     * of the month): a monthly 売上目標 or 予想 counts only for the days the period covers (2026-11-11 — the whole
+     * month of every touched month made 10/13〜11/11 compare 30 days of sales with two months of target).
+     *
+     * @return list<array{0: int, 1: int, 2: float}> [year, month, share 0…1]
+     */
+    public function monthShares(): array
+    {
+        $shares = [];
+        foreach ($this->months() as [$year, $month]) {
+            $first = new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month));
+            $last = $first->modify('last day of this month');
+            $from = max($first, $this->from);
+            $to = min($last, $this->to);
+            $days = (int) $from->diff($to)->days + 1;
+            $shares[] = [$year, $month, $days / ((int) $last->format('j'))];
+        }
+
+        return $shares;
+    }
+
+    /** The period in a card's head: 2026/10/13〜11/11 (the year once when both days are in it), 2026/10/13 for one day. */
+    public function shortLabel(): string
+    {
+        if ($this->from == $this->to) {
+            return $this->from->format('Y/m/d');
+        }
+
+        return $this->from->format('Y/m/d').'〜'.$this->to->format($this->from->format('Y') === $this->to->format('Y') ? 'm/d' : 'Y/m/d');
+    }
+
     public function label(): string
     {
         return $this->from->format('Y/m/d').' 〜 '.$this->to->format('Y/m/d');

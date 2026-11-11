@@ -49,7 +49,8 @@ final class SalesTrendCard extends DashboardCard
             'change' => self::change($total, $sameMonths),
             'chart' => TrendChart::build([
                 ['key' => 'current', 'label' => "{$year}年", 'color' => self::COLORS['current'], 'values' => $current],
-                ['key' => 'previous', 'label' => ($year - 1).'年', 'color' => self::COLORS['previous'], 'values' => $previous],
+                // the year before is the comparison: dashed, without the area
+                ['key' => 'previous', 'label' => ($year - 1).'年', 'color' => self::COLORS['previous'], 'values' => $previous, 'dashed' => true],
             ], TrendChart::yenAxis(...), fn (int|float $amount): string => AppFormat::yen((int) $amount)),
         ];
     }

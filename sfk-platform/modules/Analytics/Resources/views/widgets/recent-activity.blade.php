@@ -22,7 +22,8 @@
         .sfk-activity-text { flex: 1; min-width: 0; padding-top: 4px; }
         .sfk-activity-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sfk-space-3); }
         .sfk-activity-head strong { min-width: 0; color: var(--sfk-ink); font-size: var(--sfk-fs-label); font-weight: var(--sfk-fw-semibold); overflow-wrap: anywhere; }
-        .sfk-activity-head time { flex: none; color: var(--sfk-muted); font-size: var(--sfk-fs-badge); white-space: nowrap; }
+        .sfk-activity-head time { display: flex; flex: none; flex-direction: column; align-items: flex-end; color: var(--sfk-text); font-size: var(--sfk-fs-badge); line-height: 1.35; white-space: nowrap; }
+        .sfk-activity-head time small { color: var(--sfk-muted); font-size: var(--sfk-fs-badge); font-variant-numeric: tabular-nums; }
         .sfk-activity-body { display: block; margin-top: 2px; color: var(--sfk-text); font-size: var(--sfk-fs-small); overflow-wrap: anywhere; }
         a.sfk-activity-text { color: inherit; text-decoration: none; }
         a.sfk-activity-text:hover strong { color: var(--sfk-primary); }
@@ -52,7 +53,7 @@
                                 @endif
                                     <span class="sfk-activity-head">
                                         <strong>{{ $item['title'] }}</strong>
-                                        <time datetime="{{ $item['at']->toIso8601String() }}" title="{{ $item['at']->format('Y/m/d H:i') }}">{{ $item['at']->locale('ja')->diffForHumans() }}</time>
+                                        <time datetime="{{ $item['at']->toIso8601String() }}" title="{{ $item['at']->format('Y/m/d H:i') }}">{{ $item['at']->locale('ja')->diffForHumans() }}<small>{{ $item['at']->format('n/j H:i') }}</small></time>
                                     </span>
                                     @if (filled($item['body']))
                                         <span class="sfk-activity-body">{{ $item['body'] }}</span>

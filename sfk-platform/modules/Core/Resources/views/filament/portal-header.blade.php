@@ -11,7 +11,7 @@
     use Modules\Core\Filament\AppResource;
 
     $label = Carbon::parse($from)->format('Y/m/d').' 〜 '.Carbon::parse($to)->format('Y/m/d');
-    $presets = ['today' => '今日', '7d' => '過去7日間', '30d' => '過去30日間', 'month' => '今月', 'lastMonth' => '先月', 'year' => '今年'];
+    $presets = ['today' => '今日', '7d' => '過去7日間', '30d' => '過去30日間', 'month' => '今月', 'lastMonth' => '先月', 'year' => '今年', 'fiscalYear' => '今年度'];
 @endphp
 
 <header class="sfk-dash-header">

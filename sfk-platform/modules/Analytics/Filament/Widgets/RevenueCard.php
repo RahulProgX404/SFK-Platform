@@ -33,6 +33,10 @@ final class RevenueCard extends DashboardCard
 
         return [
             'amount' => $now['amount'],
+            'count' => $now['count'],
+            // 前期間比: the same number of days just before (Period::previous); none without sales then
+            'before' => $before['amount'],
+            'previousLabel' => $period->previous()->shortLabel(),
             'change' => self::change($now['amount'], $before['amount']),
             'target' => $target,
             // 個人: the 担当者's own 予想 (売上分析) takes the place of the 売上目標

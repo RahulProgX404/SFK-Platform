@@ -22,10 +22,10 @@ final class TrendChart
     public const MONTHS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
 
     /**
-     * @param  list<array{key: string, label: string, color: string, values: array<int, int|float|null>}>  $series  values by month 1–12
+     * @param  list<array{key: string, label: string, color: string, values: array<int, int|float|null>, dashed?: bool}>  $series  values by month 1–12
      * @param  Closure(int|float): string  $axisLabel  short value for the y axis (e.g. 「120万」)
      * @param  Closure(int|float): string  $valueLabel  full value for the tooltip and the table (e.g. 「¥1,200,000」)
-     * @return array{ticks: list<array{label: string, top: float}>, series: list<array{key: string, label: string, color: string, line: string, area: string, points: list<array{left: float, top: float}|null>, values: list<string|null>}>, months: list<string>, lefts: list<float>, empty: bool}
+     * @return array{ticks: list<array{label: string, top: float}>, series: list<array{key: string, label: string, color: string, dashed: bool, line: string, area: string, points: list<array{left: float, top: float}|null>, values: list<string|null>}>, months: list<string>, lefts: list<float>, empty: bool}
      */
     public static function build(array $series, Closure $axisLabel, Closure $valueLabel): array
     {
@@ -63,6 +63,8 @@ final class TrendChart
                 'key' => $line['key'],
                 'label' => $line['label'],
                 'color' => $line['color'],
+                // a line for comparison (e.g. the year before): dashed, without the area under it
+                'dashed' => (bool) ($line['dashed'] ?? false),
                 'line' => $path,
                 'area' => $drawn === [] ? '' : $path.sprintf(' L %.1f %d L %.1f %d Z', end($drawn)['x'], self::HEIGHT, $drawn[0]['x'], self::HEIGHT),
                 'points' => array_map(fn (?array $point): ?array => $point === null ? null : [

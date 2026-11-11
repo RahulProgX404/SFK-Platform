@@ -1,5 +1,5 @@
 {{-- 売上の推移 (Modules\Analytics\Filament\Widgets\SalesTrendCard; personal-growth.png): the sales per month of the chosen
-     year against the year before (個人: the user's own) --}}
+     calendar year (solid, with the area) against the year before (dashed), exact amounts on hover (個人: the user's own) --}}
 @php
     use Modules\Core\Filament\Support\AppFormat;
 @endphp
@@ -9,11 +9,15 @@
 
     <section class="sfk-dash-card" aria-labelledby="sfk-sales-trend-title">
         <header class="sfk-dash-card-head">
-            <h2 class="sfk-dash-card-title" id="sfk-sales-trend-title">売上の推移</h2>
+            <div class="sfk-dash-card-titles">
+                <h2 class="sfk-dash-card-title" id="sfk-sales-trend-title">売上の推移</h2>
+                {{-- the months of a calendar year: the business year (May – April) is in 売上分析 --}}
+                <span class="sfk-dash-caption">暦年（1月〜12月）・月別</span>
+            </div>
             <div class="sfk-growth-tools">
                 <ul class="sfk-growth-legend">
                     @foreach ($chart['series'] as $line)
-                        <li><i style="background: {{ $line['color'] }}" aria-hidden="true"></i>{{ $line['label'] }}</li>
+                        <li><i @class(['is-dashed' => $line['dashed']]) style="--sfk-legend: {{ $line['color'] }}" aria-hidden="true"></i>{{ $line['label'] }}</li>
                     @endforeach
                 </ul>
                 <label class="sfk-growth-year">

@@ -4,7 +4,8 @@
     .sfk-growth-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sfk-space-4); }
     .sfk-growth-legend { display: flex; flex-wrap: wrap; gap: var(--sfk-space-3); margin: 0; padding: 0; list-style: none; color: var(--sfk-text); font-size: var(--sfk-fs-small); }
     .sfk-growth-legend li { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-    .sfk-growth-legend i { width: 8px; height: 8px; border-radius: 9999px; }
+    .sfk-growth-legend i { width: 16px; height: 3px; border-radius: 9999px; background: var(--sfk-legend); }
+    .sfk-growth-legend i.is-dashed { background: repeating-linear-gradient(90deg, var(--sfk-legend) 0 5px, transparent 5px 8px); }
     .sfk-growth-year { display: inline-flex; align-items: center; gap: 6px; height: var(--sfk-control); padding: 0 var(--sfk-space-2) 0 var(--sfk-space-3); border: 1px solid var(--sfk-line); border-radius: var(--sfk-radius); background: var(--sfk-surface); color: var(--sfk-ink); }
     .sfk-growth-year:focus-within { border-color: var(--sfk-primary); box-shadow: 0 0 0 3px var(--sfk-primary-soft); }
     .sfk-growth-year .fi-icon { width: 16px; height: 16px; flex: none; color: var(--sfk-muted); }

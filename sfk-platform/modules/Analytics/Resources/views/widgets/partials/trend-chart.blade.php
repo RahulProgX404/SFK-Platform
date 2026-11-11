@@ -37,13 +37,13 @@
                 @endforeach
             </defs>
             @foreach ($chart['series'] as $line)
-                @if ($line['area'] !== '')
+                @if ($line['area'] !== '' && ! $line['dashed'])
                     <path d="{{ $line['area'] }}" fill="url(#{{ $chartId }}-{{ $line['key'] }}-fill)" stroke="none" />
                 @endif
             @endforeach
             @foreach ($chart['series'] as $line)
                 @if ($line['line'] !== '')
-                    <path d="{{ $line['line'] }}" fill="none" stroke="{{ $line['color'] }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
+                    <path d="{{ $line['line'] }}" fill="none" stroke="{{ $line['color'] }}" stroke-width="{{ $line['dashed'] ? '1.75' : '2.5' }}" @if ($line['dashed']) stroke-dasharray="5 4" @endif stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
                 @endif
             @endforeach
         </svg>

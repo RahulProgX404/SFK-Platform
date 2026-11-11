@@ -124,18 +124,19 @@ final class SalesDashboard
                 return $this->forecast($period, $this->staffId);
             }
 
+            // each month's plan for the days of it the period covers (Period::monthShares)
             $total = null;
-            foreach ($period->months() as [$year, $month]) {
+            foreach ($period->monthShares() as [$year, $month, $share]) {
                 [$from, $after] = FiscalYear::days(FiscalYear::ofMonth($year, $month));
                 $sum = SalesPlanResource::onlyVisible(SalesPlan::query())
                     ->where('planned_on', '>=', $from)->where('planned_on', '<', $after)
                     ->sum('plan_'.FiscalYear::column($month));
                 if ((int) $sum !== 0) {
-                    $total = ($total ?? 0) + (int) $sum;
+                    $total = ($total ?? 0) + $sum * $share;
                 }
             }
 
-            return $total;
+            return $total === null ? null : (int) round($total);
         });
     }
 
@@ -301,18 +302,19 @@ final class SalesDashboard
     /** 予想 of 売上分析 (sales_forecasts) of one 担当者 for the months the period touches; null without any. */
     private function forecast(Period $period, int $userId): ?int
     {
+        // each month's 予想 for the days of it the period covers (Period::monthShares)
         $total = null;
         $years = [];
-        foreach ($period->months() as [$year, $month]) {
+        foreach ($period->monthShares() as [$year, $month, $share]) {
             $fiscalYear = FiscalYear::ofMonth($year, $month);
             $years[$fiscalYear] ??= SalesForecast::query()->where('user_id', $userId)->where('fiscal_year', $fiscalYear)->first()?->months('forecast') ?? [];
             $amount = (int) ($years[$fiscalYear][$month] ?? 0);
             if ($amount !== 0) {
-                $total = ($total ?? 0) + $amount;
+                $total = ($total ?? 0) + $amount * $share;
             }
         }
 
-        return $total;
+        return $total === null ? null : (int) round($total);
     }
 
     /** @return Builder<Sale> the visible sales of the period (個人: those whose first 担当者 is the user) */

@@ -110,7 +110,10 @@ final class PortalPage extends Dashboard
         ]);
     }
 
-    /** The period of a preset of the date button: today, 7d, 30d, month (this month), lastMonth, year (this year). */
+    /**
+     * The period of a preset of the date button: today, 7d, 30d, month (this month), lastMonth, year (this calendar year)
+     * and fiscalYear (今年度: the business year from May — May to April, SYSTEM_BRAIN APP_22 / 25, as Analytics FiscalYear).
+     */
     public function setPeriod(string $preset): void
     {
         $today = Carbon::today();
@@ -120,6 +123,7 @@ final class PortalPage extends Dashboard
             'month' => [$today->copy()->startOfMonth(), $today],
             'lastMonth' => [$today->copy()->subMonthNoOverflow()->startOfMonth(), $today->copy()->subMonthNoOverflow()->endOfMonth()],
             'year' => [$today->copy()->startOfYear(), $today],
+            'fiscalYear' => [Carbon::create($today->month >= 5 ? $today->year : $today->year - 1, 5, 1), $today],
             default => [$today->copy()->subDays(29), $today],
         };
         $this->filters = ['from' => $from->toDateString(), 'to' => $to->toDateString(), 'scope' => $this->allowedScope($this->filters['scope'] ?? null)];

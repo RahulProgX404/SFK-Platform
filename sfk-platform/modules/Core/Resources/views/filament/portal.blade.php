@@ -199,11 +199,14 @@
             padding: var(--sfk-space-5) var(--sfk-gutter) var(--sfk-space-8);
         }
 
+        /* tablets: two columns; wide cards take the row, the small ones fill the gaps beside each other */
         @media (min-width: 768px) {
             .sfk-dash {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
+                grid-auto-flow: row dense;
             }
 
+            .sfk-dash-span-5,
             .sfk-dash-span-6,
             .sfk-dash-span-8,
             .sfk-dash-span-12 {
@@ -216,6 +219,7 @@
         @media (min-width: 1280px) {
             .sfk-dash {
                 grid-template-columns: repeat(60, minmax(0, 1fr));
+                grid-auto-flow: row;
                 column-gap: 0;
                 padding-inline: calc(var(--sfk-gutter) - var(--sfk-space-5) / 2);
             }
@@ -547,6 +551,148 @@
             font-size: var(--sfk-fs-label);
             font-weight: var(--sfk-fw-bold);
             font-variant-numeric: tabular-nums;
+        }
+
+        /* the title of a card with its period (the dashboard's date button) under it */
+        .sfk-dash-card-titles {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+
+        .sfk-dash-caption {
+            color: var(--sfk-muted);
+            font-size: var(--sfk-fs-badge);
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        /* a comparison chip: what it is compared with is part of its text (前期間比, 前年同期比 …) */
+        .sfk-dash-trend.is-flat {
+            background: var(--sfk-hover);
+            color: var(--sfk-text);
+        }
+
+        /* a ranking: the place, the name and a line under it, the amount on the right and a bar against the first */
+        .sfk-dash-ranking {
+            display: flex;
+            flex-direction: column;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .sfk-dash-ranking>li {
+            display: grid;
+            grid-template-columns: 24px minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 6px var(--sfk-space-3);
+            padding: 10px 0;
+        }
+
+        .sfk-dash-ranking>li+li {
+            border-top: 1px solid var(--sfk-line-soft);
+        }
+
+        .sfk-dash-ranking>li:first-child {
+            padding-top: 2px;
+        }
+
+        .sfk-dash-rankno {
+            display: grid;
+            grid-row: span 2;
+            place-items: center;
+            width: 24px;
+            height: 24px;
+            border-radius: var(--sfk-radius);
+            background: var(--sfk-hover-strong);
+            color: var(--sfk-text);
+            font-size: var(--sfk-fs-badge);
+            font-weight: var(--sfk-fw-bold);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .sfk-dash-rankno.is-1 {
+            background: var(--sfk-primary);
+            color: #fff;
+        }
+
+        .sfk-dash-rankno.is-2,
+        .sfk-dash-rankno.is-3 {
+            background: var(--sfk-primary-soft);
+            color: var(--sfk-primary);
+        }
+
+        .sfk-dash-ranking-name {
+            min-width: 0;
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .sfk-dash-ranking-name strong {
+            display: block;
+            overflow: hidden;
+            color: var(--sfk-ink);
+            font-size: var(--sfk-fs-body);
+            font-weight: var(--sfk-fw-semibold);
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        a.sfk-dash-ranking-name:hover strong {
+            color: var(--sfk-primary);
+        }
+
+        .sfk-dash-ranking-name small,
+        .sfk-dash-ranking-figure small {
+            display: block;
+            overflow: hidden;
+            color: var(--sfk-muted);
+            font-size: var(--sfk-fs-badge);
+            font-variant-numeric: tabular-nums;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .sfk-dash-ranking-figure {
+            text-align: right;
+        }
+
+        .sfk-dash-ranking-figure strong {
+            color: var(--sfk-ink);
+            font-size: var(--sfk-fs-label);
+            font-weight: var(--sfk-fw-bold);
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        .sfk-dash-meter {
+            grid-column: 2 / -1;
+            height: 4px;
+            overflow: hidden;
+            border-radius: 9999px;
+            background: var(--sfk-line-soft);
+        }
+
+        .sfk-dash-meter i {
+            display: block;
+            height: 100%;
+            border-radius: 9999px;
+            background: var(--sfk-primary);
+        }
+
+        .sfk-dash-ranking>li:not(:first-child) .sfk-dash-meter i {
+            background: color-mix(in srgb, var(--sfk-primary) 55%, white);
+        }
+
+        /* the signed-in user's own row (the ranking of workers) */
+        .sfk-dash-ranking>li.is-me {
+            margin: 0 calc(-1 * var(--sfk-space-2));
+            padding-right: var(--sfk-space-2);
+            padding-left: var(--sfk-space-2);
+            border-radius: var(--sfk-radius-lg);
+            background: var(--sfk-primary-soft);
         }
 
         /* ---- アプリ: the panel over the whole screen ------------------------------------------------------------- */

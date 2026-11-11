@@ -133,7 +133,7 @@ it('shows the money cards with 財務分析を表示 only, the team cards to eve
     Livewire::withQueryParams(['filters' => ['from' => '2026-10-01', 'to' => '2026-10-31']])->test(PortalPage::class)
         ->assertOk()
         ->assertSee(['ダッシュボード', '2026/10/01 〜 2026/10/31', '新規作成', '受注入力', '売上入力', '日報入力'])
-        ->assertSee(['売上合計', '¥200,000', '¥400,000', '50% 達成', '売上概要', '入金済', '入金待ち', '期限超過', '未請求', '入出金', '¥11万', '上位の売上先',
+        ->assertSee(['売上合計', '¥200,000', '¥400,000', '50% 達成', '売上概要', '入金済', '入金待ち', '期限超過', '未請求', '入出金', '+¥110,000', '−¥40,000', '¥70,000', '上位の売上先',
             '株式会社アルファ', '担当者別売上', '営業 一郎', '売れ筋 TOP3', '長3封筒'])
         ->assertSee(['作業者ランキング', '休暇・勤怠予定', 'クイックアクション', '最近のアクティビティ']);
 
@@ -388,7 +388,7 @@ it('ranks the 作業者 with their share of the period, and writes the 品名 of
     Livewire::test(TopWorkersCard::class, ['pageFilters' => $filters])
         ->assertSeeInOrder(['営業 一郎', '67%', '¥2,000', '営業 二郎', '33%', '¥1,000']);
     Livewire::test(TopProductsCard::class, ['pageFilters' => $filters])
-        ->assertSeeInOrder(['sfk-products-name', '長3封筒', '¥13万', 'sfk-products-name', '角2封筒'], escape: false)
+        ->assertSeeInOrder(['sfk-products-name', '長3封筒', '¥130,000', 'sfk-products-name', '角2封筒'], escape: false)
         ->assertDontSee('writing-mode', escape: false);
 });
 
@@ -526,7 +526,7 @@ it('lays out 個人 the same for 個人のみ and for 全体 switched to 個人,
         TopProductsCard::class, StaffSalesCard::class, TopWorkersCard::class, QuickActionsCard::class, AbsencesCard::class, RecentActivityCard::class])
         ->and($cards('personal'))->toBe($layout);
     $overall = [...$period, 'scope' => 'overall'];
-    Livewire::test(SalesOverviewCard::class, ['pageFilters' => $overall])->assertSee('sfk-dash-span-6');
+    Livewire::test(SalesOverviewCard::class, ['pageFilters' => $overall])->assertSee('sfk-dash-span-5');
     Livewire::test(SalesTrendCard::class, ['pageFilters' => $overall])->assertSee('sfk-dash-span-6');
     Livewire::test(TopCustomersCard::class, ['pageFilters' => $overall])->assertSee('sfk-dash-span-30p');
     Livewire::test(TopProductsCard::class, ['pageFilters' => $overall])->assertSee('sfk-dash-span-20p');
@@ -652,4 +652,41 @@ it('builds a 12-month chart on one axis with a round top, smooth lines that stay
         ->and(max(array_map('floatval', $ys)))->toBeLessThanOrEqual((float) TrendChart::HEIGHT);
     // the line ends at October (x = 9/11 of the width)
     expect($chart['series'][0]['line'])->toEndWith(sprintf('%.1f %.1f', 9 / 11 * TrendChart::WIDTH, (float) TrendChart::HEIGHT));
+});
+
+it('counts a monthly 売上目標 only for the days of the month the period covers (2026-11-11)', function () {
+    $this->actingAs($this->admin);
+    $today = new DateTimeImmutable('2026-11-15');
+    $service = app(SalesDashboard::class);
+
+    // the plan of October (¥400,000): the whole month, or 15 of its 31 days — not two months' worth for 30 days
+    expect($service->target(Period::between('2026-10-01', '2026-10-31', $today)))->toBe(400000)
+        ->and($service->target(Period::between('2026-10-17', '2026-11-15', $today)))->toBe((int) round(400000 * 15 / 31))
+        ->and(Period::between('2026-10-17', '2026-11-15', $today)->monthShares())->toBe([[2026, 10, 15 / 31], [2026, 11, 15 / 30]]);
+});
+
+it('labels each comparison with its baseline and shows the period of each card (2026-11-11)', function () {
+    $this->actingAs($this->admin);
+    $filters = ['from' => '2026-10-01', 'to' => '2026-10-31'];
+
+    // 前期間: the same number of days just before; 前年同期 for the amount of 売上概要
+    Livewire::test(RevenueCard::class, ['pageFilters' => $filters])
+        ->assertSee(['2026/10/01〜10/31', '前期間比', '前期間 ¥80,000（2026/08/31〜09/30）', '50% 達成', '残り ¥200,000']);
+    Livewire::test(SalesOverviewCard::class, ['pageFilters' => $filters])->assertSee(['前年同期比', '前期間比', '2026/10/01〜10/31']);
+    foreach ([CashFlowCard::class, TopCustomersCard::class, TopProductsCard::class, StaffSalesCard::class, TopWorkersCard::class] as $card) {
+        Livewire::test($card, ['pageFilters' => $filters])->assertSee('2026/10/01〜10/31');
+    }
+    Livewire::test(SalesTrendCard::class)->assertSee('暦年（1月〜12月）');
+});
+
+it('offers 今年度 (May to today) next to 今年 on the date button', function () {
+    $this->actingAs($this->admin);
+
+    $this->travelTo(new DateTimeImmutable('2027-02-10 09:00'));
+    Livewire::test(PortalPage::class)->assertSee('今年度')->call('setPeriod', 'fiscalYear')
+        ->assertSet('filters.from', '2026-05-01')->assertSet('filters.to', '2027-02-10');
+    $this->travelTo(new DateTimeImmutable('2026-11-11 09:00'));
+    Livewire::test(PortalPage::class)->call('setPeriod', 'fiscalYear')->assertSet('filters.from', '2026-05-01');
+    Livewire::test(PortalPage::class)->call('setPeriod', 'year')->assertSet('filters.from', '2026-01-01');
+    $this->travelBack();
 });
