@@ -1,0 +1,23 @@
+{
+    "version": "0.2",
+    "language": "en",
+    "ignorePaths": ["vendor/**", "node_modules/**", "storage/**", "bootstrap/cache/**", "public/build/**", "public/fonts/**"],
+    "words": [
+        "endforeach",
+        "endforelse",
+        "endphp",
+        "endunless",
+        "forelse",
+        "heroicon",
+        "heroicons",
+        "isset",
+        "labelledby",
+        "livewire",
+        "minmax",
+        "nowrap",
+        "nums",
+        "rgba",
+        "strtolower",
+        "uturn"
+    ]
+}
