@@ -1,10 +1,10 @@
-{{-- 売上の推移 (Modules\Analytics\Filament\Widgets\SalesTrendCard; personal-growth.png): the user's own sales per month
-     of the chosen year against the year before --}}
+{{-- 売上の推移 (Modules\Analytics\Filament\Widgets\SalesTrendCard; personal-growth.png): the sales per month of the chosen
+     year against the year before (個人: the user's own) --}}
 @php
     use Modules\Core\Filament\Support\AppFormat;
 @endphp
 
-<div class="sfk-dash-cell sfk-dash-span-8">
+<div class="sfk-dash-cell sfk-dash-span-{{ $span }}">
     @include('analytics::widgets.partials.trend-style')
 
     <section class="sfk-dash-card" aria-labelledby="sfk-sales-trend-title">

@@ -219,7 +219,10 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   through Core `FollowsDashboardFilters`): 売上合計 · 売上概要 (span 4 + 8, no 入出金); 売上の推移 · 最近表示した項目 (8 + 4;
   `SalesTrendCard`: their own sales per month of a chosen year against the year before, personal-growth.png; 12-month
   charts are drawn by `Dashboard\TrendChart` + `widgets.partials.trend-chart`); 休暇・勤怠予定 · 最近のアクティビティ (6 + 6,
-  the activity in one column). Rows 3–4 are for everyone (休暇・勤怠予定 and クイックアクション, half
+  the activity in one column). 全体 (bug.md 2026-11-11, `DashboardCard::inOverallLayout()`): 売上合計 · 売上概要 · 入出金;
+  売上の推移 (everyone's) · 上位の売上先 · 売れ筋 TOP3 (50 / 30 / 20 %, `sfk-dash-span-6` / `-30p` / `-20p` — the grid has
+  60 tracks at ≥ 1280 px, the space between cards is their padding); 担当者別売上 · 作業者ランキング · 最近表示した項目 (a third
+  each); 休暇・勤怠予定 · 最近のアクティビティ (half each, one column). Rows 3–4 are for everyone (休暇・勤怠予定 and クイックアクション, half
   the row each without 作業者ランキング, クイックアクション first without 財務分析を表示; 作業者ランキング frames the user's own
   row; クイックアクション is called 最近表示した項目 while it lists recent apps). The
   top bar has アプリ in place of the search box (the search is in the sidebar): one panel over the whole screen with a

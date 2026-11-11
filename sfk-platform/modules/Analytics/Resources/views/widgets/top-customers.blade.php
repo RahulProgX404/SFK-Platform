@@ -4,7 +4,7 @@
     use Modules\Core\Filament\Support\AppFormat;
 @endphp
 
-<div class="sfk-dash-cell sfk-dash-span-4">
+<div class="sfk-dash-cell sfk-dash-span-30p">
     <section class="sfk-dash-card" aria-labelledby="sfk-top-customers-title">
         <header class="sfk-dash-card-head">
             <h2 class="sfk-dash-card-title" id="sfk-top-customers-title">上位の売上先</h2>

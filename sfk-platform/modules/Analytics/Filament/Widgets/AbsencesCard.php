@@ -9,12 +9,13 @@ use Modules\Analytics\Filament\Dashboard\DashboardCard;
 use Modules\HumanResources\Filament\Resources\LeaveRequests\LeaveRequestResource;
 
 /**
- * 休暇・勤怠予定 (row 3, every user; design_ref Recent Transactions): who is off — or late / leaving early — today and
- * tomorrow, from 16. 申請管理 (申請中 and 承認済), as far as the user may see the requests.
+ * 休暇・勤怠予定 (row 3, every user — in 全体 row 4, next to 最近のアクティビティ; design_ref Recent Transactions): who is
+ * off — or late / leaving early — today and tomorrow, from 16. 申請管理 (申請中 and 承認済), as far as the user may see the
+ * requests.
  */
 final class AbsencesCard extends DashboardCard
 {
-    protected static ?int $sort = 8;
+    protected static ?int $sort = 10;
 
     protected string $view = 'analytics::widgets.absences';
 
@@ -27,7 +28,8 @@ final class AbsencesCard extends DashboardCard
             'days' => app(TeamDashboard::class)->absences($today),
             'dates' => ['today' => $today, 'tomorrow' => $today->modify('+1 day')],
             'requestsUrl' => self::appUrl(LeaveRequestResource::appCode()),
-            'span' => $this->teamCardSpan(),
+            // 全体: row 4 with 最近のアクティビティ, half each
+            'span' => $this->inOverallLayout() ? 6 : $this->teamCardSpan(),
         ];
     }
 }

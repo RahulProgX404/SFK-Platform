@@ -7,7 +7,7 @@ namespace Modules\Analytics\Filament\Widgets;
 use Modules\Analytics\Domain\ShortYen;
 use Modules\Analytics\Filament\Dashboard\DashboardCard;
 
-/** 売れ筋 TOP3 (row 2; design_ref top-3-products.png): the three 品名 with the most sales in the period, as bars. */
+/** 売れ筋 TOP3 (row 2, 20%, bug.md 2026-11-11; design_ref top-3-products.png): the three 品名 with the most sales in the period, as bars. */
 final class TopProductsCard extends DashboardCard
 {
     protected static ?int $sort = 6;

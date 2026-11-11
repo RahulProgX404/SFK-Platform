@@ -1,6 +1,7 @@
 {{--
     The dashboard (Modules\Core\Filament\Portal\PortalPage; design_ref/Dashboard.png): the cards the business modules give
-    the panel (widgets, each drawn in `sfk-dash-span-<n>` of a 12-column grid; 2 columns on tablets, 1 on phones), and
+    the panel (widgets, each drawn in `sfk-dash-span-<n>` of a 12-column grid, or `-30p` / `-20p` of the row; 2 columns
+    on tablets, 1 on phones), and
     アプリ — the panel over the whole screen opened from the top bar (event `sfk-open-apps`): search, スペース,
     よく使うアプリ and the apps in the user's own order. The card frame (sfk-dash-card …) is shared by the widgets.
 --}}
@@ -210,33 +211,49 @@
             }
         }
 
+        /* 12 columns of 5 tracks each, so a card may also take 30% / 20% of a row (sfk-dash-span-30p / -20p); the space
+           between the cards is their own padding (a gap between 60 tracks would eat the row) */
         @media (min-width: 1280px) {
             .sfk-dash {
-                grid-template-columns: repeat(12, minmax(0, 1fr));
+                grid-template-columns: repeat(60, minmax(0, 1fr));
+                column-gap: 0;
+                padding-inline: calc(var(--sfk-gutter) - var(--sfk-space-5) / 2);
+            }
+
+            .sfk-dash>* {
+                padding-inline: calc(var(--sfk-space-5) / 2);
             }
 
             .sfk-dash-span-2 {
-                grid-column: span 2;
+                grid-column: span 10;
             }
 
             .sfk-dash-span-3 {
-                grid-column: span 3;
+                grid-column: span 15;
             }
 
             .sfk-dash-span-4 {
-                grid-column: span 4;
+                grid-column: span 20;
             }
 
             .sfk-dash-span-5 {
-                grid-column: span 5;
+                grid-column: span 25;
             }
 
             .sfk-dash-span-6 {
-                grid-column: span 6;
+                grid-column: span 30;
             }
 
             .sfk-dash-span-8 {
-                grid-column: span 8;
+                grid-column: span 40;
+            }
+
+            .sfk-dash-span-30p {
+                grid-column: span 18;
+            }
+
+            .sfk-dash-span-20p {
+                grid-column: span 12;
             }
 
             .sfk-dash-span-12 {

@@ -6,10 +6,10 @@ namespace Modules\Analytics\Filament\Widgets;
 
 use Modules\Analytics\Filament\Dashboard\DashboardCard;
 
-/** 上位の売上先 (row 2; design_ref top-customers.png): the five customers with the most sales in the period. */
+/** 上位の売上先 (row 2, 30%, bug.md 2026-11-11; design_ref top-customers.png): the five customers with the most sales in the period. */
 final class TopCustomersCard extends DashboardCard
 {
-    protected static ?int $sort = 4;
+    protected static ?int $sort = 5;
 
     protected string $view = 'analytics::widgets.top-customers';
 

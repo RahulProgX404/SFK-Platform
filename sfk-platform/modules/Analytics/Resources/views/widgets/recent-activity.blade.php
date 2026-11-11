@@ -6,7 +6,7 @@
         'updated' => ['tone' => 'purple', 'icon' => 'heroicon-o-pencil-square'],
         'comment' => ['tone' => 'amber', 'icon' => 'heroicon-o-chat-bubble-left-ellipsis'],
     ];
-    // two columns over the whole width; one when the card has half the row (個人)
+    // two columns over the whole width; one when the card has half the row (個人, 全体 with 財務分析を表示)
     $columns = $half ? [$items] : array_chunk($items, max(1, (int) ceil(count($items) / 2)));
 @endphp
 

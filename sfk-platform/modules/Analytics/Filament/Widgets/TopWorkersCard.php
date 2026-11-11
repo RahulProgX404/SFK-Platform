@@ -15,7 +15,7 @@ use Modules\Analytics\Filament\Pages\DailyReportAnalysis;
  */
 final class TopWorkersCard extends DashboardCard
 {
-    protected static ?int $sort = 7;
+    protected static ?int $sort = 8;
 
     protected string $view = 'analytics::widgets.top-workers';
 

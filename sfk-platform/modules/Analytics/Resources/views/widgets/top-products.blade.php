@@ -5,7 +5,7 @@
     use Modules\Core\Filament\Support\AppFormat;
 @endphp
 
-<div class="sfk-dash-cell sfk-dash-span-4">
+<div class="sfk-dash-cell sfk-dash-span-20p">
     <style>
         /* the labels of the tallest bar stand in the space above the grid (padding-top) */
         .sfk-products {

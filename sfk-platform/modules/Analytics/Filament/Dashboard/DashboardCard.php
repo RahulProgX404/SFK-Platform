@@ -23,7 +23,7 @@ use Modules\Sales\Filament\Resources\Sales\SaleResource;
  *
  * 個人 has its own layout (bug.md 2026-11-09), the same for 個人のみ and for 全体 switched to 個人 — only the figures are
  * the user's: 売上合計 · 売上概要 (the rest of the row); 売上の推移 (about 70%) · 最近表示した項目 (クイックアクション);
- * 休暇・勤怠予定 · 最近のアクティビティ (half each). A card says whether it is in it (shownInLayout()) and where
+ * 休暇・勤怠予定 · 最近のアクティビティ (half each). 全体 has its own too (inOverallLayout()). A card says whether it is in it (shownInLayout()) and where
  * (sortInLayout()); PortalPage asks through FollowsDashboardFilters.
  */
 abstract class DashboardCard extends Widget implements FollowsDashboardFilters
@@ -127,6 +127,16 @@ abstract class DashboardCard extends Widget implements FollowsDashboardFilters
     protected static function seesEveryonesMoney(): bool
     {
         return static::actor()?->seesOverallFinance() ?? false;
+    }
+
+    /**
+     * The 全体 layout (bug.md 2026-11-11): a user who sees everyone's money with 全体 chosen — 売上合計 · 売上概要 · 入出金;
+     * 売上の推移 (50%) · 上位の売上先 (30%) · 売れ筋 TOP3 (20%); 担当者別売上 · 作業者ランキング · 最近表示した項目 (a third
+     * each); 休暇・勤怠予定 · 最近のアクティビティ (half each, the activity in one column).
+     */
+    protected function inOverallLayout(): bool
+    {
+        return static::showsMoney() && static::seesEveryonesMoney() && ! $this->inPersonalLayout();
     }
 
     /**

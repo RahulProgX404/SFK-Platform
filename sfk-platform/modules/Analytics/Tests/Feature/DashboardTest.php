@@ -450,9 +450,7 @@ it('puts クイックアクション first in row 3 for users without 財務分�
     ));
 
     $this->actingAs($this->admin);
-    expect($row3())->toBe([TopWorkersCard::class, AbsencesCard::class, QuickActionsCard::class]);
-
-    Livewire::test(AbsencesCard::class)->assertSee('sfk-dash-span-4');
+    expect($row3())->toBe([TopWorkersCard::class, QuickActionsCard::class, AbsencesCard::class]);
 
     $this->actingAs($this->employee);
     expect($row3())->toBe([QuickActionsCard::class, AbsencesCard::class])
@@ -469,7 +467,7 @@ it('shows 作業者ランキング, 上位の売上先, 担当者別売上 and �
     $app->forceFill(['status' => AppStatus::Published])->save();
     $app->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true]);
     $app->spaces()->attach($space);
-    $overallOnly = [TopCustomersCard::class, StaffSalesCard::class, TopProductsCard::class, TopWorkersCard::class];
+    $overallOnly = [TopCustomersCard::class, TopProductsCard::class, StaffSalesCard::class, TopWorkersCard::class];
     $visible = fn (): array => array_values(array_intersect(
         (new PortalPage)->dashboardWidgets(),
         [...$overallOnly, SalesTrendCard::class, WorkTrendCard::class, PersonalOverviewCard::class],
@@ -477,10 +475,10 @@ it('shows 作業者ランキング, 上位の売上先, 担当者別売上 and �
 
     // 全体 (super admins always; and an employee ticked 全体)
     $this->actingAs($this->admin);
-    expect($visible())->toBe($overallOnly);
+    expect($visible())->toBe([SalesTrendCard::class, ...$overallOnly]);
     grantDashboards($this->staff, 'erp')->forceFill(['show_financial_analysis' => true, 'financial_scope' => User::FINANCE_OVERALL])->save();
     $this->actingAs($this->staff);
-    expect($visible())->toBe($overallOnly);
+    expect($visible())->toBe([SalesTrendCard::class, ...$overallOnly]);
 
     // 個人のみ: their sales over the year instead
     $this->staff->forceFill(['financial_scope' => User::FINANCE_PERSONAL])->save();
@@ -522,12 +520,21 @@ it('lays out 個人 the same for 個人のみ and for 全体 switched to 個人,
     grantDashboards($this->staff, 'erp')->forceFill(['show_financial_analysis' => true, 'financial_scope' => User::FINANCE_OVERALL])->save();
     $this->staff->notifyNow(new SystemNotification(['title' => '06. 売上入力: 長3封筒', 'body' => '更新しました', 'format' => 'filament', 'actions' => []]), ['database']);
     $this->actingAs($this->staff);
-    expect($cards('overall'))->toBe([RevenueCard::class, SalesOverviewCard::class, CashFlowCard::class, TopCustomersCard::class, StaffSalesCard::class,
-        TopProductsCard::class, TopWorkersCard::class, AbsencesCard::class, QuickActionsCard::class, RecentActivityCard::class])
+    // 全体 (bug.md 2026-11-11): 売上合計 · 売上概要 · 入出金 | 売上の推移 50% · 上位の売上先 30% · 売れ筋 TOP3 20% |
+    // 担当者別売上 · 作業者ランキング · 最近表示した項目 (a third each) | 休暇・勤怠予定 · 最近のアクティビティ (half each)
+    expect($cards('overall'))->toBe([RevenueCard::class, SalesOverviewCard::class, CashFlowCard::class, SalesTrendCard::class, TopCustomersCard::class,
+        TopProductsCard::class, StaffSalesCard::class, TopWorkersCard::class, QuickActionsCard::class, AbsencesCard::class, RecentActivityCard::class])
         ->and($cards('personal'))->toBe($layout);
-    Livewire::test(SalesOverviewCard::class, ['pageFilters' => [...$period, 'scope' => 'overall']])->assertSee('sfk-dash-span-6');
-    Livewire::test(RecentActivityCard::class, ['pageFilters' => [...$period, 'scope' => 'overall']])->assertSee('sfk-dash-span-12')->assertDontSee('class="sfk-activity is-single"', escape: false);
-    Livewire::test(AbsencesCard::class, ['pageFilters' => [...$period, 'scope' => 'overall']])->assertSee('sfk-dash-span-4');
+    $overall = [...$period, 'scope' => 'overall'];
+    Livewire::test(SalesOverviewCard::class, ['pageFilters' => $overall])->assertSee('sfk-dash-span-6');
+    Livewire::test(SalesTrendCard::class, ['pageFilters' => $overall])->assertSee('sfk-dash-span-6');
+    Livewire::test(TopCustomersCard::class, ['pageFilters' => $overall])->assertSee('sfk-dash-span-30p');
+    Livewire::test(TopProductsCard::class, ['pageFilters' => $overall])->assertSee('sfk-dash-span-20p');
+    foreach ([StaffSalesCard::class, TopWorkersCard::class, QuickActionsCard::class] as $third) {
+        Livewire::test($third, ['pageFilters' => $overall])->assertSee('sfk-dash-span-4');
+    }
+    Livewire::test(AbsencesCard::class, ['pageFilters' => $overall])->assertSee('sfk-dash-span-6');
+    Livewire::test(RecentActivityCard::class, ['pageFilters' => $overall])->assertSee(['sfk-dash-span-6', 'class="sfk-activity is-single"'], escape: false);
     $spans([...$period, 'scope' => 'personal']);
     Livewire::withQueryParams(['filters' => $period])->test(PortalPage::class)
         ->assertSee(['¥200,000', '上位の売上先', '入出金'])
