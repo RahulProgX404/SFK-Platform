@@ -14,6 +14,7 @@ use Modules\Core\Domain\Apps\PermissionSubject;
  * A permission row for 全員, one 従業員カテゴリ or one user with the legacy abilities (`can_*`, AppAbility) — the rows
  * of an app (AppPermission) and of a space (SpacePermission). Like the legacy system, nothing but 閲覧 makes sense
  * without 閲覧: removing 閲覧 removes everything else; only the id matching the subject is kept; one 全員 row per owner.
+ * アプリ管理 (AppAbility::Manage) ticks every other ability.
  *
  * @property PermissionSubject $subject_type
  * @property int|null $employee_category_id
@@ -32,6 +33,13 @@ trait GrantsAppAbilities
             }
             if ($permission->subject_type !== PermissionSubject::User) {
                 $permission->user_id = null;
+            }
+
+            // アプリ管理 includes every other ability
+            if ($permission->getAttribute(AppAbility::Manage->column())) {
+                foreach (AppAbility::columns() as $column) {
+                    $permission->setAttribute($column, true);
+                }
             }
 
             if (! $permission->getAttribute('can_view')) {
@@ -56,7 +64,7 @@ trait GrantsAppAbilities
 
     public function allows(AppAbility $ability): bool
     {
-        return (bool) $this->getAttribute($ability->column());
+        return (bool) $this->getAttribute($ability->column()) || (bool) $this->getAttribute(AppAbility::Manage->column());
     }
 
     /** @return list<AppAbility> */

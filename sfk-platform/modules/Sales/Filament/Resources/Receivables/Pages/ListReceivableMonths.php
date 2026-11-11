@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Sales\Filament\Resources\Receivables\Pages;
 
-use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
@@ -102,7 +101,7 @@ abstract class ListReceivableMonths extends AppListRecords
             Action::make('refreshReceivables')
                 ->label('一括更新')
                 ->icon(Heroicon::OutlinedArrowPath)
-                ->visible(fn (): bool => self::isAdministrator())
+                ->visible(fn (): bool => $this->isAppAdministrator())
                 ->mountUsing(function (): void {
                     if ($this->basis() === ReceivableBasis::Cycle && $this->currentView()->name === '売掛一覧') {
                         Notification::make()->warning()->title('売掛一覧はレコード数が多いため一覧条件を変更の上実行してください。')->send();
@@ -150,7 +149,7 @@ abstract class ListReceivableMonths extends AppListRecords
         return Action::make($name)
             ->label($label)
             ->icon(str_starts_with($name, 'createCurrent') ? Heroicon::OutlinedCalendar : Heroicon::OutlinedBackward)
-            ->visible(fn (): bool => self::isAdministrator())
+            ->visible(fn (): bool => $this->isAppAdministrator())
             ->modalHeading($month->label().' の売掛レコード未作成分を作成しますか？')
             ->modalSubmitActionLabel('作成する')
             ->modalCancelActionLabel('キャンセル')
@@ -183,12 +182,5 @@ abstract class ListReceivableMonths extends AppListRecords
         $resource = static::getResource();
 
         return $resource::basis();
-    }
-
-    private static function isAdministrator(): bool
-    {
-        $user = auth()->user();
-
-        return $user instanceof User && $user->user_type->isAdministrator();
     }
 }

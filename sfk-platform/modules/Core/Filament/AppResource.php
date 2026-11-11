@@ -246,9 +246,9 @@ abstract class AppResource extends Resource
     {
         $query = parent::getEloquentQuery();
         $user = auth()->user();
-        $app = $user instanceof User && RecordAccess::restricts($user) ? static::app() : null;
+        $app = $user instanceof User ? static::app() : null;
 
-        return $app === null ? $query : RecordAccess::scope($query, $user, $app, static::filterFieldMap());
+        return $app === null || ! RecordAccess::restricts($user, $app) ? $query : RecordAccess::scope($query, $user, $app, static::filterFieldMap());
     }
 
     /**
@@ -277,9 +277,9 @@ abstract class AppResource extends Resource
     public static function recordAllows(Model $record, string $right): bool
     {
         $user = auth()->user();
-        $app = $user instanceof User && RecordAccess::restricts($user) ? static::app() : null;
+        $app = $user instanceof User ? static::app() : null;
 
-        return $app === null || RecordAccess::allows($user, $app, $record, static::filterFieldMap(), $right);
+        return $app === null || ! RecordAccess::restricts($user, $app) || RecordAccess::allows($user, $app, $record, static::filterFieldMap(), $right);
     }
 
     /**

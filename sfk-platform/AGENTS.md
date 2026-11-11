@@ -49,6 +49,12 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   `RecordSections::gate()` and AppListRecords). Keep them working: overrides of `getEloquentQuery()` call the parent,
   forms and record pages build their fields through `RecordSections::rows()` (or call `RecordSections::gate()`), list
   column names are the form's attribute names, and records that have a 作成者 store it in `created_by`.
+- アプリ管理 (`AppAbility::Manage`, user 2026-11-11): a row of an app's or space's アクセス権 can make its users that app's
+  administrators (it ticks every other ability). Anything inside an app that is "for administrators" — アプリの設定,
+  admin-only legacy buttons / workflow steps, 管理者のみ 帳票, bypassing レコード / フィールドのアクセス権 — asks
+  `AppAccess::manages($user, $appCode)` (pages: `$this->isAppAdministrator()`), never `user_type->isAdministrator()`.
+  Everything outside the app (ダッシュボード設定 incl. アプリの権限, 共通管理, ユーザー管理, pay rates) keeps
+  `user_type->isAdministrator()`.
 - Look (since 2026-11, `../design_ref/*.png`, `core::filament.design` over `core::filament.theme`): white surfaces with
   hairline borders and small rounded corners (`--sfk-radius` 6px, cards `--sfk-radius-lg` 10px), the brand blue
   (`BasePanelProvider::BRAND_BLUE`, #05467E) as primary — through the `--sfk-primary` / `--kt-blue` tokens, never a

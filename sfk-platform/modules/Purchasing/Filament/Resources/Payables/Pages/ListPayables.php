@@ -13,6 +13,7 @@ use Filament\Schemas\Components\Grid;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Modules\Core\Access\AppAccess;
 use Modules\Core\Domain\Calendar\YearMonth;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Purchasing\Application\Payables\PayableLedger;
@@ -180,11 +181,12 @@ final class ListPayables extends AppListRecords
             ->modalCancelActionLabel('OK');
     }
 
+    /** The app's administrators: administrators and アプリ管理 of this app (AppAccess::manages()). */
     private static function isAdministrator(): bool
     {
         $user = auth()->user();
 
-        return $user instanceof User && $user->user_type->isAdministrator();
+        return $user instanceof User && AppAccess::manages($user, PayableResource::appCode());
     }
 
     /** 当月 / 前月未作成一括作成: the missing records of the month, for every supplier with a ledger. */
@@ -193,7 +195,7 @@ final class ListPayables extends AppListRecords
         return Action::make($name)
             ->label($label)
             ->icon(str_starts_with($name, 'createCurrent') ? Heroicon::OutlinedCalendar : Heroicon::OutlinedBackward)
-            ->visible(fn (): bool => auth()->user() instanceof User && auth()->user()->user_type->isAdministrator())
+            ->visible(fn (): bool => self::isAdministrator())
             ->requiresConfirmation()
             ->modalHeading($month->label().' の買掛レコード未作成分を一括作成しますか？')
             ->modalSubmitActionLabel('作成する')

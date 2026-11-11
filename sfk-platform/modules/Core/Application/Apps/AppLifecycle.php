@@ -6,6 +6,7 @@ namespace Modules\Core\Application\Apps;
 
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Access\AppAccess;
 use Modules\Core\Domain\Apps\AppStatus;
 use Modules\Core\Models\BusinessApp;
 
@@ -63,7 +64,8 @@ final class AppLifecycle
      */
     public function rename(BusinessApp $app, ?string $name, string $codeName, User $actor): BusinessApp
     {
-        if (! $actor->user_type->isAdministrator()) {
+        // アプリの設定 → 設定: the app's administrators (administrators and アプリ管理 of this app)
+        if (! AppAccess::manages($actor, $app->code)) {
             throw new AppActionNotAllowed('アプリ名を変更する権限がありません。');
         }
 

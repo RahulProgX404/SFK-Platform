@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Purchasing\Filament\Resources\Payables\Pages;
 
-use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
@@ -46,7 +45,7 @@ final class ViewPayable extends AppViewRecord
         return Action::make('recalculate')
             ->label('再集計')
             ->icon(Heroicon::OutlinedCalculator)
-            ->visible(fn (): bool => PayableResource::canEdit($this->record) && auth()->user() instanceof User && auth()->user()->user_type->isAdministrator())
+            ->visible(fn (): bool => PayableResource::canEdit($this->record) && $this->isAppAdministrator())
             ->action(function (): void {
                 app(PayableLedger::class)->refresh($this->record->supplier_id);
                 Notification::make()->success()->title('再集計しました')->send();

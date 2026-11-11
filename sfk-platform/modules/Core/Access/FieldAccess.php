@@ -33,7 +33,8 @@ final class FieldAccess
      */
     public static function levels(User $user, BusinessApp $app): array
     {
-        if ($user->user_type->isAdministrator()) {
+        // administrators and the app's アプリ管理 are not limited
+        if (AppAccess::manages($user, $app->code)) {
             return [];
         }
 

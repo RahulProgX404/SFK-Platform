@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Sales\Filament\Resources\Receivables\Pages;
 
-use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
@@ -68,7 +67,7 @@ abstract class ViewReceivableMonth extends AppViewRecord
             ->label('請求書更新')
             ->icon(Heroicon::OutlinedDocumentCurrencyYen)
             ->visible(fn (): bool => $this->record->basis === ReceivableBasis::Cycle
-                && auth()->user() instanceof User && auth()->user()->user_type->isAdministrator())
+                && $this->isAppAdministrator())
             ->modalHeading('請求書を更新しますか？')
             ->modalSubmitActionLabel('更新する')
             ->modalCancelActionLabel('キャンセル')

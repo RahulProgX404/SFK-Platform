@@ -8,6 +8,7 @@ use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
+use Modules\Core\Access\AppAccess;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Purchasing\Application\Imports\PurchaseCsvImport;
 use Modules\Purchasing\Application\Purchases\PurchaseLinks;
@@ -109,10 +110,11 @@ final class ListPurchases extends AppListRecords
         ] : [];
     }
 
+    /** The app's administrators: administrators and アプリ管理 of this app (AppAccess::manages()). */
     private static function isAdministrator(): bool
     {
         $user = auth()->user();
 
-        return $user instanceof User && $user->user_type->isAdministrator();
+        return $user instanceof User && AppAccess::manages($user, PurchaseResource::appCode());
     }
 }

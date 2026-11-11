@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Route;
 use Livewire\Livewire;
 use LogicException;
+use Modules\Core\Access\AppAccess;
 use Modules\Core\Application\Apps\AppUsageLog;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\AppResource;
@@ -179,7 +180,7 @@ trait HasAppChrome
     /** アクセス権 of the app (administrators): its permissions in this dashboard, else アプリ設定. */
     public function appPermissionsUrl(BusinessApp $app): ?string
     {
-        if (! $this->isAppAdministrator() || ! $app->exists) {
+        if (! $this->isDashboardAdministrator() || ! $app->exists) {
             return null;
         }
 
@@ -199,7 +200,7 @@ trait HasAppChrome
      */
     public function appAccessUrl(BusinessApp $app, string $page): ?string
     {
-        if (! $this->isAppAdministrator() || ! $app->exists) {
+        if (! $this->isDashboardAdministrator() || ! $app->exists) {
             return null;
         }
 
@@ -212,7 +213,16 @@ trait HasAppChrome
             : null;
     }
 
-    private function isAppAdministrator(): bool
+    /** The app's administrator: administrators and users with アプリ管理 of this app (AppAccess::manages()). */
+    protected function isAppAdministrator(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && AppAccess::manages($user, $this->appResource()::appCode());
+    }
+
+    /** ダッシュボード設定 (アプリの権限, レコード / フィールドのアクセス権): administrators only — never アプリ管理. */
+    private function isDashboardAdministrator(): bool
     {
         $user = auth()->user();
 

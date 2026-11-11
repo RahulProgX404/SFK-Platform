@@ -18,6 +18,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
+use Modules\Core\Access\AppAccess;
 use Modules\Core\Domain\Billing\ClosingDay;
 use Modules\Core\Domain\Money\RoundingMode;
 use Modules\Core\Domain\Money\Yen;
@@ -29,6 +30,7 @@ use Modules\Orders\Models\Order;
 use Modules\Sales\Application\Sales\SaleOrderTotals;
 use Modules\Sales\Domain\Sales\SaleChoices;
 use Modules\Sales\Filament\Resources\Sales\SaleLayout;
+use Modules\Sales\Filament\Resources\Sales\SaleResource;
 use Modules\Sales\Filament\SalesFormat;
 use Modules\Sales\Models\Sale;
 use Modules\Sales\Models\SaleAllocation;
@@ -58,9 +60,10 @@ final class SaleForm
             ->components(SaleLayout::components(self::input(...), withFooter: false, withDeveloperFields: self::actor()?->isSuperAdmin() ?? false));
     }
 
+    /** The app's administrators: administrators and アプリ管理 of 06. 売上入力 (AppAccess::manages()). */
     public static function isAdministrator(): bool
     {
-        return self::actor()?->user_type->isAdministrator() ?? false;
+        return AppAccess::manages(self::actor(), SaleResource::appCode());
     }
 
     private static function input(string $name): ?Component

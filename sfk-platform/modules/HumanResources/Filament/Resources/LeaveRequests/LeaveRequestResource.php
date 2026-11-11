@@ -50,7 +50,7 @@ final class LeaveRequestResource extends AppResource
 
     public static function appCode(): string
     {
-        return 'leave-request';
+        return LeaveRequest::APP_CODE;
     }
 
     public static function appName(): string

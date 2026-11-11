@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Analytics\Filament\Resources\SalesPlans\Pages;
 
-use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
@@ -50,7 +49,7 @@ final class ListSalesPlans extends AppListRecords
             Action::make('fillActuals')
                 ->label('売上実績を反映')
                 ->icon(Heroicon::OutlinedArrowPath)
-                ->visible(fn (): bool => auth()->user() instanceof User && auth()->user()->user_type->isAdministrator() && SalesPlanResource::canCreate())
+                ->visible(fn (): bool => $this->isAppAdministrator() && SalesPlanResource::canCreate())
                 ->requiresConfirmation()
                 ->modalHeading('一覧の売上計画に売上入力の実績を反映しますか？')
                 ->modalSubmitActionLabel('反映する')

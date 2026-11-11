@@ -38,6 +38,9 @@ use Modules\Purchasing\Domain\ConsumableOrders\ConsumableOrderStatus;
  */
 final class ConsumableOrder extends Model implements HasRecordComments, HasRecordHistory
 {
+    /** The app's code (ConsumableOrderResource::appCode()). */
+    public const APP_CODE = 'consumable-order';
+
     use RecordsComments, TracksAuthors {
         TracksAuthors::commentRecipients insteadof RecordsComments;
     }

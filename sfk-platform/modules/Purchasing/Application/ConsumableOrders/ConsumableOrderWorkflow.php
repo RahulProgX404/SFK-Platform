@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Purchasing\Application\ConsumableOrders;
 
 use App\Models\User;
+use Modules\Core\Access\AppAccess;
 use Modules\Core\Application\Notifications\Notice;
 use Modules\Core\Application\Notifications\Notifier;
 use Modules\Purchasing\Application\PurchasingActionNotAllowed;
@@ -26,9 +27,12 @@ final class ConsumableOrderWorkflow
 
     public function canAdvance(ConsumableOrder $order, User $user): bool
     {
+        // the app's administrators: administrators and アプリ管理 of 20. 消耗品発注
+        $administers = AppAccess::manages($user, ConsumableOrder::APP_CODE);
+
         return match ($order->status) {
-            ConsumableOrderStatus::Unprocessed => $user->user_type->isAdministrator() || $order->created_by === $user->id,
-            ConsumableOrderStatus::Checking => $user->user_type->isAdministrator(),
+            ConsumableOrderStatus::Unprocessed => $administers || $order->created_by === $user->id,
+            ConsumableOrderStatus::Checking => $administers,
             ConsumableOrderStatus::Approved => false,
         };
     }

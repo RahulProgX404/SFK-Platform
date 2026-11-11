@@ -1455,12 +1455,10 @@ abstract class AppListRecords extends ListRecords
         return parent::applySortingToTableQuery($query);
     }
 
-    /** Managing 一覧 is app management, which is for administrators (Modules\Core\Domain\Apps\AppAbility). */
+    /** Managing 一覧 is app management: administrators and アプリ管理 of the app (AppAccess::manages()). */
     protected function canSaveListViews(): bool
     {
-        $user = auth()->user();
-
-        return $user instanceof User && $user->user_type->isAdministrator() && $this->filterFields() !== [];
+        return $this->isAppAdministrator() && $this->filterFields() !== [];
     }
 
     /** @return list<string> */

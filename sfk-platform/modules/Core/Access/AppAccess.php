@@ -31,6 +31,8 @@ use WeakMap;
  *      app rows or any of their spaces holding the app give (space A 閲覧 + space B 閲覧・編集 ⇒ 閲覧・編集). App rows
  *      cannot take away what a space gives, nor one space what another gives.
  *    - メンテナンス中 keeps only the read-only abilities (閲覧, ファイル書き出し).
+ *    - アプリ管理 (AppAbility::Manage, a row's can_manage) gives every ability and makes the user the app's
+ *      administrator (manages()).
  *
  * Results are memoized per user and app for the current request: screens ask many times per page.
  */
@@ -42,6 +44,16 @@ final class AppAccess
     public static function can(?User $user, string $appCode, AppAbility $ability): bool
     {
         return $user !== null && in_array($ability, self::abilities($user, $appCode), true);
+    }
+
+    /**
+     * The user administers this app (アプリの設定, the buttons and steps for administrators, no レコード / フィールドの
+     * アクセス権 limits): administrators always, others with アプリ管理 (AppAbility::Manage) — in this app only. What is
+     * outside the apps (ダッシュボード設定, 共通管理, ユーザー管理 …) asks for ユーザー種別 instead.
+     */
+    public static function manages(?User $user, string $appCode): bool
+    {
+        return $user !== null && ($user->user_type->isAdministrator() || self::can($user, $appCode, AppAbility::Manage));
     }
 
     /** @return list<AppAbility> */

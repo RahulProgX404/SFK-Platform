@@ -12,7 +12,7 @@ permissions").
 | Dashboard (department) | —                  | A Filament panel (白石封筒 `erp`, future products). 共通管理 (`settings`) is administrator-only                                   | code                                                                    |
 | Space (group)          | スペース           | `spaces` (per dashboard) + members `space_user` (employees only; by name, `direct`, or through the space's 従業員カテゴリ, `employee_category_space`). A user may be in several spaces. Each space has one permission setting (アクセス権, `space_permissions`: 全員 / 従業員カテゴリ / 個人 rows) for its members in all its apps | administrators, in the dashboard's **ダッシュボード設定 → スペース**; members also in **ユーザー管理** (スペース, after 利用可能なダッシュボード) |
 | App (feature)          | アプリ             | `business_apps` registry: `code`, name, status; placed in spaces via `business_app_space` (several, of any dashboards)          | the code (AppResource screens); s共通管理 **共通管理 → アプリ設定** |
-| App permission         | アプリのアクセス権 | `app_permissions`: rows for 全員 / one 従業員カテゴリ / one employee × 閲覧・追加・編集・削除・ファイル読み込み・ファイル書き出し | administrators, in **ダッシュボード設定 → アプリの権限**                |
+| App permission         | アプリのアクセス権 | `app_permissions`: rows for 全員 / one 従業員カテゴリ / one employee × 閲覧・追加・編集・削除・ファイル読み込み・ファイル書き出し・アプリ管理 | administrators, in **ダッシュボード設定 → アプリの権限**                |
 | Record permission      | レコードのアクセス権 | `app_record_rules` (condition = a 絞り込む filter, in order) + `app_record_rule_entries`: 作成者 / 個人 / 従業員カテゴリ / 全員 × 閲覧・編集・削除 | administrators, **アプリの権限 → レコード** (or アプリの設定 → 設定 → アクセス権) |
 | Field permission       | フィールドのアクセス権 | `app_field_permissions`: per field, in order, 個人 / 従業員カテゴリ / 全員 × 編集 / 閲覧 / なし | administrators, **アプリの権限 → フィールド** |
 
@@ -54,6 +54,24 @@ user's own `dashboards` plus the `dashboards` of all their 従業員カテゴリ
    Neither an app row nor another space can take away what a space gives. Leaving a space drops one's 個人 row there.
    The app's アプリの権限 page lists its spaces' rows (スペースの権限).
    During メンテナンス中 only 閲覧 and ファイル書き出し remain. Without 閲覧 a row grants nothing (like the legacy system).
+
+### アプリ管理 — the administrator of one app (user, 2026-11-11)
+
+A row of an app's or a space's アクセス権 may also tick **アプリ管理** (`AppAbility::Manage`, `can_manage`). It ticks
+every other ability (the form greys them out; `GrantsAppAbilities` saves them so) and makes its users the app's
+administrators — `AppAccess::manages($user, $appCode)`, true for administrators too:
+
+- アプリの設定 of that app: 一覧, 設定 (アプリ名, その他の設定), 帳票出力 (designer included), the ⚙ menu, 保存 of 絞り込む
+  as a 一覧, 一括削除;
+- what only administrators may do in that app: the legacy buttons and steps for administrators (e.g. 06. 売上入力's
+  編集制限 and 納品書 / 請求書レコード作成, 05. 納品(仕入)入力's 買掛レコード更新, the 売掛 / 23. 買掛管理 一括更新 and
+  再集計, 25. 販売先別売上計画's 売上実績を反映, 16. 申請管理 and 20. 消耗品発注 承認), 帳票 marked 管理者のみ, all 申請
+  of 16;
+- no limit from the レコード / フィールドのアクセス権 of that app.
+
+It stays inside the app: ダッシュボード設定 (スペース, アプリの権限 with the app's own アクセス権 / レコード / フィールド),
+共通管理, ユーザー管理, 会社カレンダー and 通知 for administrators follow ユーザー種別 only, and so do 作業単価 / 残業単価
+(EmployeeDataAccess, confidential pay). During メンテナンス中 アプリ管理 falls away like the other abilities that change data.
 
 ## Which records (`Modules\Core\Access\RecordAccess`)
 

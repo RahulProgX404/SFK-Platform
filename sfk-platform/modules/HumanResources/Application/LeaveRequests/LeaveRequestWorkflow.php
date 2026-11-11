@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\HumanResources\Application\LeaveRequests;
 
 use App\Models\User;
+use Modules\Core\Access\AppAccess;
 use Modules\Core\Application\Notifications\Notice;
 use Modules\Core\Application\Notifications\Notifier;
 use Modules\HumanResources\Application\HrActionNotAllowed;
@@ -36,9 +37,12 @@ final class LeaveRequestWorkflow
             return false;
         }
 
+        // the app's administrators: administrators and アプリ管理 of 16. 申請管理
+        $administers = AppAccess::manages($user, LeaveRequest::APP_CODE);
+
         return $request->status === LeaveRequestStatus::Draft
-            ? $user->user_type->isAdministrator() || $request->isOwnedBy($user)
-            : $user->user_type->isAdministrator();
+            ? $administers || $request->isOwnedBy($user)
+            : $administers;
     }
 
     /** @param  string  $url  the request's record page */

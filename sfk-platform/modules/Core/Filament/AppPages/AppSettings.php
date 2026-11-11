@@ -8,6 +8,7 @@ use App\Models\User;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
 use LogicException;
+use Modules\Core\Access\AppAccess;
 use Modules\Core\Application\Apps\AppLifecycle;
 use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
 use Modules\Core\Filament\AppPages\Concerns\ManagesDocuments;
@@ -50,7 +51,10 @@ abstract class AppSettings extends Page
     {
         $user = auth()->user();
 
-        return $user instanceof User && $user->user_type->isAdministrator() && static::appModel() !== null;
+        $app = static::appModel();
+
+        // the app's administrators: administrators and アプリ管理 of this app
+        return $user instanceof User && $app !== null && AppAccess::manages($user, $app->code);
     }
 
     public function mount(): void

@@ -11,6 +11,7 @@ use Filament\Resources\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Livewire\Attributes\Url;
 use LogicException;
+use Modules\Core\Access\AppAccess;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Application\Views\ListViewInvalid;
 use Modules\Core\Application\Views\ListViewSchema;
@@ -42,7 +43,10 @@ abstract class AppListViewSettings extends Page
     {
         $user = auth()->user();
 
-        return $user instanceof User && $user->user_type->isAdministrator() && static::appModel() !== null;
+        $app = static::appModel();
+
+        // the app's administrators: administrators and アプリ管理 of this app
+        return $user instanceof User && $app !== null && AppAccess::manages($user, $app->code);
     }
 
     public function mount(): void

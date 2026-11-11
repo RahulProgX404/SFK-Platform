@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use Modules\Core\Access\AppAccess;
 use Modules\Core\Application\Comments\HasRecordComments;
 use Modules\Core\Application\History\HasRecordHistory;
 use Modules\Core\Models\Concerns\RecordsComments;
@@ -39,6 +40,9 @@ use Modules\HumanResources\Domain\LeaveRequests\LeaveRequestStatus;
  */
 final class LeaveRequest extends Model implements HasRecordComments, HasRecordHistory
 {
+    /** The app's code (LeaveRequestResource::appCode()). */
+    public const APP_CODE = 'leave-request';
+
     use RecordsComments, TracksAuthors {
         TracksAuthors::commentRecipients insteadof RecordsComments;
     }
@@ -72,7 +76,7 @@ final class LeaveRequest extends Model implements HasRecordComments, HasRecordHi
      */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
-        return $user->user_type->isAdministrator()
+        return AppAccess::manages($user, self::APP_CODE)
             ? $query
             : $query->where(fn (Builder $own): Builder => $own->where('leave_requests.applicant_id', $user->id)->orWhere('leave_requests.created_by', $user->id));
     }

@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Modules\Core\Access\AppAccess;
 use Modules\Core\Application\Documents\DocumentPrinter;
 use Modules\Core\Application\Documents\DocumentSource;
 use Modules\Core\Application\Documents\PrintedFile;
@@ -36,7 +37,7 @@ final class DocumentController
 {
     public function background(DocumentTemplate $template, TemplateBackgrounds $backgrounds): SymfonyResponse
     {
-        $this->administrator();
+        $this->appAdministrator($template->app);
         $file = $backgrounds->file($template);
         abort_if($file === null, 404);
 
@@ -45,7 +46,7 @@ final class DocumentController
 
     public function preview(Request $request, DocumentTemplate $template, DocumentPrinter $printer): Response
     {
-        $user = $this->administrator();
+        $user = $this->appAdministrator($template->app);
         $resource = $this->resource($template->app);
         $source = DocumentSource::for($resource, $user);
 
@@ -147,10 +148,11 @@ final class DocumentController
         return $user;
     }
 
-    private function administrator(): User
+    /** The designer of the app's 帳票 (アプリの設定 → 帳票出力): administrators and アプリ管理 of the app. */
+    private function appAdministrator(?BusinessApp $app): User
     {
         $user = $this->user();
-        abort_unless($user->user_type->isAdministrator(), 403);
+        abort_unless($app !== null && AppAccess::manages($user, $app->code), 403);
 
         return $user;
     }

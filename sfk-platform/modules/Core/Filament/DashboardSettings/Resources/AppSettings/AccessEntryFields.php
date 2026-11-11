@@ -13,6 +13,7 @@ use Filament\Forms\Components\Select;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Modules\Core\Access\UserType;
 use Modules\Core\Domain\Apps\AccessSubject;
 use Modules\Core\Domain\Apps\AppAbility;
@@ -87,11 +88,37 @@ final class AccessEntryFields
                     ->distinct()
                     ->searchable()
                     ->columnSpan(4),
-                self::rights(array_map(
-                    fn (AppAbility $ability): Checkbox => Checkbox::make($ability->column())->label($ability->label()),
-                    AppAbility::cases(),
-                ))->columnSpanFull(),
+                self::rights(self::abilityBoxes())->columnSpanFull(),
             ]);
+    }
+
+    /**
+     * 閲覧 … ファイル書き出し and アプリ管理: ticking アプリ管理 ticks all the others, which stay ticked while it is
+     * (GrantsAppAbilities saves them so too).
+     *
+     * @return list<Checkbox>
+     */
+    private static function abilityBoxes(): array
+    {
+        $manage = AppAbility::Manage->column();
+
+        return array_map(fn (AppAbility $ability): Checkbox => $ability === AppAbility::Manage
+            ? Checkbox::make($manage)
+                ->label($ability->label())
+                ->live()
+                ->afterStateUpdated(function (bool $state, Set $set) use ($manage): void {
+                    if ($state) {
+                        foreach (AppAbility::columns() as $column) {
+                            if ($column !== $manage) {
+                                $set($column, true);
+                            }
+                        }
+                    }
+                })
+            : Checkbox::make($ability->column())
+                ->label($ability->label())
+                ->disabled(fn (Get $get): bool => (bool) $get($manage))
+                ->dehydrated(), AppAbility::cases());
     }
 
     /** @return array<int, string> every employee, by name */

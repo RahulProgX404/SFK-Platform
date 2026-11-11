@@ -74,7 +74,7 @@ it('gives super admins everything in every status, even before the app is regist
     $superAdmin = User::factory()->superAdmin()->create();
 
     foreach (AppStatus::cases() as $status) {
-        expect(abilities_of($superAdmin, app_with_status($status)))->toHaveCount(6);
+        expect(abilities_of($superAdmin, app_with_status($status)))->toHaveCount(count(AppAbility::cases()));
         BusinessApp::query()->delete();
     }
 
@@ -86,7 +86,7 @@ it('gives admins everything once the app has left development', function () {
     $admin = User::factory()->admin()->create();
 
     foreach (AppStatus::cases() as $status) {
-        $expected = $status->isSuperAdminOnly() ? 0 : 6;
+        $expected = $status->isSuperAdminOnly() ? 0 : count(AppAbility::cases());
         expect(abilities_of($admin, app_with_status($status)))->toHaveCount($expected);
         BusinessApp::query()->delete();
     }
@@ -142,7 +142,7 @@ it('opens only 公開中 and メンテナンス中 apps to employees, read-only 
         'developing' => [],
         'testing' => [],
         'ready' => [],
-        'published' => ['view', 'create', 'update', 'delete', 'import', 'export'],
+        'published' => ['view', 'create', 'update', 'delete', 'import', 'export', 'manage'],
         'maintenance' => ['view', 'export'],
         'stopped' => [],
     ];
@@ -293,7 +293,7 @@ it('counts only spaces of dashboards the user can open, and keeps the status rul
 
     space_permit($this->space, PermissionSubject::Everyone, AppAbility::cases());
     $app->spaces()->attach($this->space);
-    expect(abilities_of($this->employee, $app))->toHaveCount(6);
+    expect(abilities_of($this->employee, $app))->toHaveCount(count(AppAbility::cases()));
 
     $app->forceFill(['status' => AppStatus::Maintenance])->save();
     expect(abilities_of($this->employee, $app))->toBe(['view', 'export']);

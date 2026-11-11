@@ -6,7 +6,10 @@ namespace Modules\Core\Domain\Apps;
 
 /**
  * What a user may do in an app — the legacy app permissions (レコード閲覧・追加・編集・削除, ファイル読み込み・
- * 書き出し). App management (アプリ管理) is not an ability: app settings are for administrators only.
+ * 書き出し) and アプリ管理 (user, 2026-11-11): the app's administrator. アプリ管理 includes every other ability and what
+ * only administrators may do in that app — アプリの設定 (一覧, 設定, 帳票出力), the buttons and steps for administrators,
+ * no レコード / フィールドのアクセス権 limits (AppAccess::manages()). It stays inside the app: ダッシュボード設定, 共通管理
+ * and the like follow ユーザー種別 only.
  */
 enum AppAbility: string
 {
@@ -16,6 +19,7 @@ enum AppAbility: string
     case Delete = 'delete';
     case Import = 'import';
     case Export = 'export';
+    case Manage = 'manage';
 
     public function label(): string
     {
@@ -26,10 +30,11 @@ enum AppAbility: string
             self::Delete => '削除',
             self::Import => 'ファイル読み込み',
             self::Export => 'ファイル書き出し',
+            self::Manage => 'アプリ管理',
         };
     }
 
-    /** Column of app_permissions that stores this ability. */
+    /** Column of app_permissions / space_permissions that stores this ability. */
     public function column(): string
     {
         return 'can_'.$this->value;

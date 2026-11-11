@@ -26,6 +26,7 @@ use Modules\Core\Models\Concerns\GrantsAppAbilities;
  * @property bool $can_delete
  * @property bool $can_import
  * @property bool $can_export
+ * @property bool $can_manage アプリ管理 (includes everything else)
  */
 final class SpacePermission extends Model
 {
@@ -33,7 +34,7 @@ final class SpacePermission extends Model
 
     protected $fillable = [
         'subject_type', 'employee_category_id', 'user_id',
-        'can_view', 'can_create', 'can_update', 'can_delete', 'can_import', 'can_export',
+        'can_view', 'can_create', 'can_update', 'can_delete', 'can_import', 'can_export', 'can_manage',
     ];
 
     protected function casts(): array
@@ -46,6 +47,7 @@ final class SpacePermission extends Model
             'can_delete' => 'boolean',
             'can_import' => 'boolean',
             'can_export' => 'boolean',
+            'can_manage' => 'boolean',
         ];
     }
 

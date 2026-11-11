@@ -27,7 +27,8 @@ use WeakMap;
  * - in that rule the first entry that applies to the user decides (作成者: the user created the record), and a user no
  *   entry applies to gets nothing on those records;
  * - the rights only narrow the app permissions (閲覧 needs the app's 閲覧, 編集 its 編集, 削除 its 削除);
- * - administrators are not restricted (as with the app permissions).
+ * - administrators are not restricted (as with the app permissions), nor the app's administrators (アプリ管理,
+ *   AppAccess::manages()).
  *
  * Conditions are evaluated as「key in (records matching the condition)」so that a record with blank values is never
  * dropped by a negated comparison.
@@ -46,9 +47,10 @@ final class RecordAccess
     /** @var array<string, bool> table => has created_by */
     private static array $creatorColumns = [];
 
-    public static function restricts(User $user): bool
+    /** Whether the rules apply to the user in the app (not to administrators nor to the app's アプリ管理). */
+    public static function restricts(User $user, BusinessApp $app): bool
     {
-        return ! $user->user_type->isAdministrator();
+        return ! AppAccess::manages($user, $app->code);
     }
 
     /**
@@ -59,7 +61,7 @@ final class RecordAccess
      */
     public static function rights(User $user, BusinessApp $app, Model $record, array $fields): ?array
     {
-        if (! self::restricts($user)) {
+        if (! self::restricts($user, $app)) {
             return null;
         }
 
@@ -107,7 +109,7 @@ final class RecordAccess
     public static function scope(Builder $query, User $user, BusinessApp $app, array $fields): Builder
     {
         $rules = self::rulesOf($app);
-        if ($rules === [] || ! self::restricts($user)) {
+        if ($rules === [] || ! self::restricts($user, $app)) {
             return $query;
         }
 

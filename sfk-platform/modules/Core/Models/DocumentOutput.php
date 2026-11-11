@@ -7,6 +7,7 @@ namespace Modules\Core\Models;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Modules\Core\Access\AppAccess;
 use Modules\Core\Domain\Documents\FileNamePattern;
 use Modules\Core\Domain\Documents\OutputDelivery;
 use Modules\Core\Domain\Documents\OutputMode;
@@ -99,10 +100,10 @@ final class DocumentOutput extends Model
         return false;
     }
 
-    /** 管理者のみ: the button is for administrators. */
+    /** 管理者のみ: the button is for the app's administrators (administrators and アプリ管理 of the app). */
     public function isAvailableTo(User $user): bool
     {
-        return ! $this->admin_only || $user->user_type->isAdministrator();
+        return ! $this->admin_only || AppAccess::manages($user, $this->app->code);
     }
 
     /** Its entry in the menu of a button shared with other 出力設定: the サブボタン名, else the template's name. */

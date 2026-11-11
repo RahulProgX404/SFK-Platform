@@ -46,7 +46,7 @@ final class ConsumableOrderResource extends AppResource
 
     public static function appCode(): string
     {
-        return 'consumable-order';
+        return ConsumableOrder::APP_CODE;
     }
 
     public static function appName(): string
