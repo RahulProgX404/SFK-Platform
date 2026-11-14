@@ -22,6 +22,7 @@ use Modules\Core\Filament\Support\UserPopup;
 use Modules\Core\Filament\Tables\AppRecordActions;
 use Modules\Core\Filament\Tables\AppTextColumn;
 use Modules\Core\Filament\Tables\InlineField;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
 use Modules\Sales\Filament\Resources\Receipts\ReceiptLayout;
 use Modules\Sales\Filament\Resources\Receipts\ReceiptResource;
@@ -108,7 +109,7 @@ final class ReceiptsTable
 
         return [
             FilterField::text('invoice_id', $label('invoice_id'))->query(self::filterInvoiceNumber(...)),
-            FilterField::choice('customer_id', $label('customer_id'), fn (): array => Partner::query()->where('is_customer', true)->orderByDesc('id')
+            FilterField::choice('customer_id', $label('customer_id'), fn (): array => PartnerResource::visibleOr(Partner::query()->where('is_customer', true), ReceiptResource::getEloquentQuery()->select('receipts.customer_id'))->orderByDesc('id')
                 ->pluck('name', 'id')->mapWithKeys(fn (string $name, int|string $id): array => [(string) $id => $name])->all()),
             FilterField::user('assignees', $label('assignees'))->relationship('assignees', 'id'),
             FilterField::choice('collection_month', $label('collection_month'), array_combine($months, $months))->relationship('customer', 'collection_month'),

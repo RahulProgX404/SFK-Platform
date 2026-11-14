@@ -72,6 +72,15 @@ Japanese text in the generated PDFs uses the standard Japanese CID fonts by name
 |---|---|---|
 | Noto Sans JP (variable, weights 400–700; Google / Adobe, the Noto project) | SIL Open Font License 1.1 | `public/fonts/noto-sans-jp/` — the screen font, served by this system as unicode-range slices (`noto-sans-jp.css`, linked by `BasePanelProvider::FONT_STYLESHEET`); taken unmodified from Google Fonts. The OFL allows bundling and redistribution with software; the font may not be sold on its own and a modified version may not keep the name. |
 
+## Security update (2026-11-14)
+
+`composer update "symfony/*" laravel/framework --with-dependencies` (security review: 12 advisories, none left in
+`composer audit`) brought in one new package; everything else was a version update of packages listed below.
+
+| Component | License | Where |
+|---|---|---|
+| symfony/polyfill-time 1.42 (Symfony) | MIT | Composer, with symfony/clock 8.1 |
+
 ## Dependency license review (2026-10-22)
 
 PHP (Composer, production — `composer licenses --no-dev`, 118 packages): all permissive.

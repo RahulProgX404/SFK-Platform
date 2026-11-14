@@ -7,11 +7,13 @@
         'updated' => ['tone' => 'purple', 'icon' => 'heroicon-o-pencil-square'],
         'comment' => ['tone' => 'amber', 'icon' => 'heroicon-o-chat-bubble-left-ellipsis'],
     ];
-    // two columns over the whole width; one when the card has half the row (個人, 全体 with 財務分析を表示)
-    $columns = $half ? [$items] : array_chunk($items, max(1, (int) ceil(count($items) / 2)));
+    // two columns over the whole width; one when the card has half the row (個人, 全体) or a third (without 財務分析を表示)
+    $single = $span < 12;
+    $columns = $single ? [$items] : array_chunk($items, max(1, (int) ceil(count($items) / 2)));
 @endphp
 
-<div class="sfk-dash-cell sfk-dash-span-{{ $half ? 6 : 12 }} is-fit">
+{{-- tablets: a third of the row becomes a row of its own under 最近表示した項目 · 休暇・勤怠予定 --}}
+<div @class(['sfk-dash-cell', 'sfk-dash-span-'.$span, 'is-fit', 'sfk-dash-t-full' => $span === 4])>
     <style>
         .sfk-activity { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--sfk-space-8); }
         .sfk-activity ol { margin: 0; padding: 0; list-style: none; }
@@ -21,9 +23,9 @@
         .sfk-activity-icon { position: relative; z-index: 1; display: grid; place-items: center; width: 32px; height: 32px; flex: none; border-radius: 9999px; background: var(--sfk-tone); color: #fff; }
         .sfk-activity-icon .fi-icon { width: 16px; height: 16px; }
         .sfk-activity-text { flex: 1; min-width: 0; padding-top: 4px; }
-        .sfk-activity-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sfk-space-3); }
+        .sfk-activity-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px var(--sfk-space-3); }
         .sfk-activity-head strong { min-width: 0; color: var(--sfk-ink); font-size: var(--sfk-fs-label); font-weight: var(--sfk-fw-semibold); overflow-wrap: anywhere; }
-        .sfk-activity-head time { display: flex; flex: none; align-items: baseline; gap: 6px; color: var(--sfk-text); font-size: var(--sfk-fs-badge); line-height: 1.35; white-space: nowrap; }
+        .sfk-activity-head time { display: flex; flex: none; align-items: baseline; margin-left: auto; gap: 6px; color: var(--sfk-text); font-size: var(--sfk-fs-badge); line-height: 1.35; white-space: nowrap; }
         .sfk-activity-head time small { color: var(--sfk-muted); font-size: var(--sfk-fs-badge); font-variant-numeric: tabular-nums; }
         .sfk-activity-body { display: block; margin-top: 2px; color: var(--sfk-text); font-size: var(--sfk-fs-small); overflow-wrap: anywhere; }
         a.sfk-activity-text { color: inherit; text-decoration: none; }
@@ -41,7 +43,7 @@
         @if ($items === [])
             <p class="sfk-dash-empty">まだアクティビティはありません。</p>
         @else
-            <div @class(['sfk-activity', 'is-single' => $half])>
+            <div @class(['sfk-activity', 'is-single' => $single])>
                 @foreach ($columns as $column)
                     <ol>
                         @foreach ($column as $item)

@@ -31,6 +31,7 @@ use Modules\Core\Filament\DashboardSettings\DashboardSettingsPlugin;
 use Modules\Core\Filament\Profile\ProfilePage;
 use Modules\Core\Filament\Support\InitialAvatarProvider;
 use Modules\Core\Filament\Support\ThemeAssets;
+use Modules\Core\Http\Middleware\EnsureAccountIsActive;
 use Modules\Core\Http\Middleware\EnsurePasswordIsChanged;
 
 /**
@@ -106,6 +107,7 @@ abstract class BasePanelProvider extends PanelProvider
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
                 AuthenticateSession::class,
+                EnsureAccountIsActive::class,
                 ShareErrorsFromSession::class,
                 $csrf,
                 SubstituteBindings::class,

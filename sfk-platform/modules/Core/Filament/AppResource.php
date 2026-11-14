@@ -273,6 +273,41 @@ abstract class AppResource extends Resource
         return $query->whereIn($key, static::getEloquentQuery()->select($key));
     }
 
+    /**
+     * The app's records offered on another app's screen — dropdowns, lookups (and the values they copy), 絞り込む choices
+     * (security review 2026-11-14; the legacy lookups offered only what the user may see in the source app): those the
+     * user may see (onlyVisible), plus $keep — the keys the other app's records the user can already see refer to (a
+     * subquery such as `SaleResource::getEloquentQuery()->select('sales.customer_id')`, or ids). So a record keeps its
+     * value when edited, a filter offers what the list shows, and nothing else of the app is revealed.
+     *
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     * @param  Builder<covariant Model>|\Illuminate\Database\Query\Builder|array<int|string>|int|string|null  $keep
+     * @return Builder<TModel>
+     */
+    public static function visibleOr(Builder $query, Builder|\Illuminate\Database\Query\Builder|array|int|string|null $keep = null): Builder
+    {
+        $key = $query->getModel()->getQualifiedKeyName();
+
+        return $query->where(function (Builder $query) use ($key, $keep): void {
+            if (static::canViewAny()) {
+                $query->whereIn($key, static::getEloquentQuery()->select($key));
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+
+            if ($keep instanceof Builder || $keep instanceof \Illuminate\Database\Query\Builder) {
+                $query->orWhereIn($key, $keep);
+            } elseif ($keep !== null) {
+                $ids = array_values(array_filter((array) $keep, fn (mixed $id): bool => is_numeric($id)));
+                if ($ids !== []) {
+                    $query->orWhereIn($key, $ids);
+                }
+            }
+        });
+    }
+
     /** Whether the レコードのアクセス権 allow the right (RecordAccess::VIEW / EDIT / DELETE) on the record. */
     public static function recordAllows(Model $record, string $right): bool
     {

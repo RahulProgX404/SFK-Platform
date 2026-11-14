@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Modules\Core\Http\Controllers;
 
 use App\Models\User;
+use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 use Modules\Core\Application\Users\UserAccountService;
@@ -38,26 +40,23 @@ final class PasswordController
             return redirect()->route('core.portal');
         }
 
+        // the temporary password an administrator issued (and saw) is never kept — not even typed again
+        // (security review 2026-11-14: 「仮パスワードをそのまま使う」 let administrators sign in as the employee)
         $data = $request->validate([
-            'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
+            'password' => [
+                'required', 'confirmed', Password::min(8)->letters()->numbers(),
+                function (string $attribute, mixed $value, Closure $fail) use ($user): void {
+                    if (is_string($value) && Hash::check($value, $user->getAuthPassword())) {
+                        $fail('仮パスワードとは別のパスワードを入力してください。');
+                    }
+                },
+            ],
         ]);
 
         $accounts->changeOwnPassword($user, $data['password']);
         $this->keepSessionValid($request, $user);
 
         return redirect()->route('core.portal')->with('status', 'パスワードを変更しました。');
-    }
-
-    /** 仮パスワードをそのまま使う: keep the temporary password and stop asking. */
-    public function keep(Request $request, UserAccountService $accounts): RedirectResponse
-    {
-        $user = $request->user();
-
-        if ($user instanceof User && $user->must_change_password) {
-            $accounts->keepTemporaryPassword($user);
-        }
-
-        return redirect()->route('core.portal');
     }
 
     /** AuthenticateSession compares the stored password hash; refresh it after a change. */

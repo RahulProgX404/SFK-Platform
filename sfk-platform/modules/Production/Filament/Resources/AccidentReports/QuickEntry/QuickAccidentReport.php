@@ -13,6 +13,7 @@ use Modules\Core\Filament\QuickEntry\QuickField;
 use Modules\Core\Filament\QuickEntry\QuickPeople;
 use Modules\Core\Filament\QuickEntry\QuickStep;
 use Modules\Core\Filament\Support\AppFormat;
+use Modules\Core\Filament\Support\VisibleChoice;
 use Modules\Orders\Filament\Resources\Orders\OrderResource;
 use Modules\Orders\Models\Order;
 use Modules\Production\Application\AccidentReports\AccidentAlert;
@@ -181,7 +182,11 @@ final class QuickAccidentReport extends QuickEntry
     /** The rules of every screen of the app (its RecordRules). */
     protected function rules(): array
     {
-        return $this->recordRules();
+        $rules = $this->recordRules();
+        // 注番: one the search offers (a job the user may see), not any job (security review 2026-11-14)
+        $rules['data.order_id'][] = new VisibleChoice(OrderResource::class, Order::class, fn (): Builder => AccidentReportResource::getEloquentQuery()->select('accident_reports.order_id'));
+
+        return $rules;
     }
 
     protected function customSummary(string $field): string

@@ -7,6 +7,7 @@ namespace Modules\Sales\Filament\Resources\Sales\Pages;
 use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Url;
 use Modules\Core\Filament\AppPages\AppCreateRecord;
+use Modules\Orders\Filament\Resources\Orders\OrderResource;
 use Modules\Orders\Models\Order;
 use Modules\Sales\Filament\Resources\Sales\SaleResource;
 use Modules\Sales\Models\Sale;
@@ -29,7 +30,8 @@ final class CreateSale extends AppCreateRecord
 
     protected function afterFill(): void
     {
-        $order = $this->duplicate === null && is_numeric($this->fromOrder) ? Order::query()->find((int) $this->fromOrder) : null;
+        // only a job the user may see (security review 2026-11-14: any 受注 could be read through ?order=)
+        $order = $this->duplicate === null && is_numeric($this->fromOrder) ? OrderResource::onlyVisible(Order::query())->find((int) $this->fromOrder) : null;
         if ($order === null) {
             return;
         }

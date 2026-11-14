@@ -20,6 +20,7 @@ use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Tables\AppRecordActions;
 use Modules\Core\Filament\Tables\AppTextColumn;
 use Modules\Core\Filament\Tables\InlineField;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
 
 /**
@@ -81,7 +82,7 @@ final class SalesPlansTable
         $label = fn (string $name): string => SalesPlanLayout::columnLabel($name);
 
         return [
-            FilterField::choice('customer_id', $label('customer_name'), fn (): array => Partner::query()->where('is_customer', true)->orderByDesc('id')
+            FilterField::choice('customer_id', $label('customer_name'), fn (): array => PartnerResource::visibleOr(Partner::query()->where('is_customer', true), SalesPlanResource::getEloquentQuery()->select('sales_plans.customer_id'))->orderByDesc('id')
                 ->pluck('name', 'id')->mapWithKeys(fn (string $name, int|string $id): array => [(string) $id => $name])->all()),
             FilterField::text('sub_category', $label('sub_category')),
             FilterField::date('planned_on', $label('planned_on')),

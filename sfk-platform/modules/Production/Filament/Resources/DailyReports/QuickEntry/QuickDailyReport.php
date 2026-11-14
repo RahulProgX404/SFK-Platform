@@ -20,10 +20,12 @@ use Modules\Core\Application\History\RecordHistory;
 use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Domain\Apps\FieldAccessLevel;
 use Modules\Core\Domain\People\EmploymentStatus;
+use Modules\Core\Filament\Support\VisibleChoice;
 use Modules\MasterData\Domain\Consumables\ConsumableKind;
 use Modules\MasterData\Models\Consumable;
 use Modules\MasterData\Models\Machine;
 use Modules\Orders\Domain\Orders\OrderChoices;
+use Modules\Orders\Filament\Resources\Orders\OrderResource;
 use Modules\Orders\Models\Order;
 use Modules\Production\Domain\DailyReports\TaskCosting;
 use Modules\Production\Domain\ProductionChoices;
@@ -267,7 +269,7 @@ final class QuickDailyReport extends Component
         $columns = ['id', 'order_number', 'product_name'];
         $search = trim($this->orderSearch);
         if ($search !== '') {
-            $orders = Order::query()->select($columns)->whereNotNull('order_number')
+            $orders = self::orders()->select($columns)->whereNotNull('order_number')
                 ->where(function (Builder $query) use ($search): void {
                     SearchQuery::where($query, 'order_number', $search);
                     SearchQuery::where($query, 'product_name', $search, 'or');
@@ -276,9 +278,9 @@ final class QuickDailyReport extends Component
         } else {
             $recent = DailyReport::query()->where('user_id', $this->workerId())->whereNotNull('order_id')->groupBy('order_id')
                 ->orderByRaw('MAX(id) DESC')->limit(4)->pluck('order_id')->map(fn (mixed $id): int => (int) $id)->all();
-            $byId = $recent === [] ? collect() : Order::query()->select($columns)->whereKey($recent)->get()->keyBy('id');
+            $byId = $recent === [] ? collect() : self::orders()->select($columns)->whereKey($recent)->get()->keyBy('id');
             $orders = collect($recent)->map(fn (int $id): ?Order => $byId->get($id))->filter()
-                ->merge(Order::query()->select($columns)->whereNotNull('order_number')->whereKeyNot($recent)->orderByDesc('id')->limit(8 - count($byId))->get());
+                ->merge(self::orders()->select($columns)->whereNotNull('order_number')->whereKeyNot($recent)->orderByDesc('id')->limit(8 - count($byId))->get());
         }
 
         return $orders->map(fn (Order $order): array => ['id' => $order->id, 'number' => (string) $order->order_number, 'product' => (string) $order->product_name])
@@ -289,7 +291,7 @@ final class QuickDailyReport extends Component
     #[Computed]
     public function selectedOrder(): ?array
     {
-        $order = is_numeric($this->data['order_id'] ?? null) ? Order::query()->find((int) $this->data['order_id']) : null;
+        $order = is_numeric($this->data['order_id'] ?? null) ? self::orders()->find((int) $this->data['order_id']) : null;
 
         return $order === null ? null : [
             'number' => (string) $order->order_number,
@@ -322,6 +324,17 @@ final class QuickDailyReport extends Component
         return User::query()
             ->where(fn (Builder $query): Builder => $query->where('employment_status', EmploymentStatus::Active->value)->orWhereKey($this->workerId()))
             ->orderByDesc('id')->pluck('name', 'id')->mapWithKeys(fn (mixed $name, int|string $id): array => [(int) $id => (string) $name])->all();
+    }
+
+    /**
+     * The jobs of 04. 受注入力 the search may offer: those the user may see, or those of their visible reports (security
+     * review 2026-11-14 — any job could be found and its 品名 / 数量 read).
+     *
+     * @return Builder<Order>
+     */
+    private static function orders(): Builder
+    {
+        return OrderResource::visibleOr(Order::query(), DailyReportResource::getEloquentQuery()->select('daily_reports.order_id'));
     }
 
     /** @return array<int, string> ダンボール of 19. 消耗品マスタ */
@@ -496,7 +509,8 @@ final class QuickDailyReport extends Component
         $boxes = Rule::exists('consumables', 'id')->where('kind', ConsumableKind::Cardboard->value);
 
         return [
-            'data.order_id' => ['required', 'integer', Rule::exists((new Order)->getTable(), 'id')],
+            'data.order_id' => ['required', 'integer', Rule::exists((new Order)->getTable(), 'id'),
+                new VisibleChoice(OrderResource::class, Order::class, fn (): Builder => DailyReportResource::getEloquentQuery()->select('daily_reports.order_id'))],
             'data.machine_id' => ['required', 'integer', Rule::exists((new Machine)->getTable(), 'id')],
             'data.started_at' => ['required', 'date_format:H:i'],
             'data.ended_at' => ['required', 'date_format:H:i', $this->afterStart(...)],

@@ -19,6 +19,7 @@ use Modules\Core\Filament\Support\UserPopup;
 use Modules\Core\Filament\Tables\AppRecordActions;
 use Modules\Core\Filament\Tables\AppTextColumn;
 use Modules\Core\Filament\Tables\InlineField;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
 use Modules\Sales\Domain\Sales\SaleChoices;
 use Modules\Sales\Filament\Resources\DeliveryNotes\DeliveryNoteLayout;
@@ -105,7 +106,7 @@ final class DeliveryNotesTable
             FilterField::text('registration_number', $label('registration_number')),
             FilterField::text('number', $label('number')),
             FilterField::date('sold_on', $label('sold_on')),
-            FilterField::choice('customer_id', $label('customer_id'), fn (): array => Partner::query()->where('is_customer', true)->orderByDesc('id')
+            FilterField::choice('customer_id', $label('customer_id'), fn (): array => PartnerResource::visibleOr(Partner::query()->where('is_customer', true), DeliveryNoteResource::getEloquentQuery()->select('delivery_notes.customer_id'))->orderByDesc('id')
                 ->pluck('name', 'id')->mapWithKeys(fn (string $name, int|string $id): array => [(string) $id => $name])->all()),
             FilterField::user('assignees', $label('assignees'))->relationship('assignees', 'id'),
             FilterField::date('billing_due_on', $label('billing_due_on')),

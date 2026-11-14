@@ -22,6 +22,7 @@ use Modules\Core\Filament\Records\RecordSections;
 use Modules\Core\Filament\Records\RecordTable;
 use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Support\UserPopup;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Consumable;
 use Modules\MasterData\Models\Partner;
 use Modules\Purchasing\Domain\ConsumableOrders\ConsumableOrderStatus;
@@ -93,13 +94,13 @@ final class ConsumableOrderLayout
     private static function input(string $name): ?Component
     {
         $label = self::label($name);
-        $supplier = fn (Get $get): ?Partner => is_numeric($get('supplier_id')) ? Partner::query()->find((int) $get('supplier_id')) : null;
+        $supplier = fn (Get $get): ?Partner => is_numeric($get('supplier_id')) ? PartnerResource::visibleOr(Partner::query(), ConsumableOrderResource::getEloquentQuery()->select('consumable_orders.supplier_id'))->find((int) $get('supplier_id')) : null;
 
         return match (true) {
             $name === 'ordered_on' => DatePicker::make($name)->label($label)->required()->default(fn (): string => now()->toDateString()),
             $name === 'supplier_id' => Select::make($name)
                 ->label($label)
-                ->relationship('supplier', 'name', fn (Builder $query): Builder => $query->where('is_supplier', true)->orderByDesc('id'))
+                ->relationship('supplier', 'name', fn (Builder $query): Builder => PartnerResource::visibleOr($query->where('is_supplier', true), ConsumableOrderResource::getEloquentQuery()->select('consumable_orders.supplier_id'))->orderByDesc('id'))
                 ->searchable(['name', 'short_name', 'name_kana'])
                 ->preload()
                 ->placeholder('-----')

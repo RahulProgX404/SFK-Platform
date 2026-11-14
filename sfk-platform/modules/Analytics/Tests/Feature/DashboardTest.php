@@ -447,21 +447,33 @@ it('frames the user\'s own row in 作業者ランキング', function () {
         ->assertSeeInOrder(['sfk-workers-row is-1"', '営業 一郎', 'sfk-workers-row is-2 is-me"', 'aria-current="true"', '管理者'], escape: false);
 });
 
-it('puts クイックアクション first in row 3 for users without 財務分析を表示, with no 作業者ランキング, half the row each', function () {
+it('puts 最近表示した項目, 休暇・勤怠予定 and 最近のアクティビティ in one row for users without 財務分析を表示 (2026-11-14)', function () {
     $row3 = fn (): array => array_values(array_filter(
         (new PortalPage)->dashboardWidgets(),
-        fn (string $widget): bool => in_array($widget, [TopWorkersCard::class, AbsencesCard::class, QuickActionsCard::class], true),
+        fn (string $widget): bool => in_array($widget, [TopWorkersCard::class, AbsencesCard::class, QuickActionsCard::class, RecentActivityCard::class], true),
     ));
 
     $this->actingAs($this->admin);
-    expect($row3())->toBe([TopWorkersCard::class, QuickActionsCard::class, AbsencesCard::class]);
+    expect($row3())->toBe([TopWorkersCard::class, QuickActionsCard::class, AbsencesCard::class, RecentActivityCard::class]);
+    // 全体: 作業者ランキング · 最近表示した項目 a third each; 休暇・勤怠予定 · 最近のアクティビティ half each — unchanged
+    Livewire::test(QuickActionsCard::class)->assertSee('sfk-dash-span-4');
+    Livewire::test(AbsencesCard::class)->assertSee('sfk-dash-span-6');
+    Livewire::test(RecentActivityCard::class)->assertSee(['sfk-dash-span-6', 'is-single'])->assertDontSee('sfk-dash-t-full');
 
     $this->actingAs($this->employee);
-    expect($row3())->toBe([QuickActionsCard::class, AbsencesCard::class])
+    expect($row3())->toBe([QuickActionsCard::class, AbsencesCard::class, RecentActivityCard::class])
         ->and(array_slice((new PortalPage)->dashboardWidgets(), 0, 2))->toBe([PersonalOverviewCard::class, WorkTrendCard::class]);
-    Livewire::test(PortalPage::class)->assertSeeInOrder(['個人の概要', '勤務時間・収入の推移', 'sfk-quick-title', '休暇・勤怠予定'], escape: false);
-    Livewire::test(AbsencesCard::class)->assertSee('sfk-dash-span-6');
-    Livewire::test(QuickActionsCard::class)->assertSee('sfk-dash-span-6');
+    Livewire::test(PortalPage::class)->assertSeeInOrder(['個人の概要', '勤務時間・収入の推移', 'sfk-quick-title', '休暇・勤怠予定', '最近のアクティビティ'], escape: false);
+    // one row, a third each; the activity in one column (on tablets its own row under the two others)
+    Livewire::test(QuickActionsCard::class)->assertSee('sfk-dash-span-4');
+    Livewire::test(AbsencesCard::class)->assertSee('sfk-dash-span-4');
+    Livewire::test(RecentActivityCard::class)->assertSee(['sfk-dash-span-4', 'sfk-dash-t-full', 'is-single']);
+
+    // 財務分析を表示 without the sales app shows no money either: the same row of three (the 個人 layout with the sales
+    // app keeps half each — 'lays out 個人 the same …')
+    $this->employee->forceFill(['show_financial_analysis' => true, 'financial_scope' => User::FINANCE_PERSONAL])->save();
+    Livewire::test(AbsencesCard::class)->assertSee('sfk-dash-span-4');
+    Livewire::test(RecentActivityCard::class)->assertSee('sfk-dash-span-4');
 });
 
 it('shows 作業者ランキング, 上位の売上先, 担当者別売上 and 売れ筋 TOP3 only to users who see everyone\'s money (bug.md 2026-11-07)', function () {

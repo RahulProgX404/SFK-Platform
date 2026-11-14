@@ -18,7 +18,14 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   PostgreSQL does not add one) — `DatabaseIndexTest` fails otherwise.
 - Records of an app shown on another screen (related lists, 履歴 sections, searches) are read through
   `<Resource>::onlyVisible(<Model>::query())`, so app permissions and レコードのアクセス権 apply — never a bare
-  `Model::query()` for what the user sees.
+  `Model::query()` for what the user sees. Choices of another app's records (security review 2026-11-14, as the legacy
+  lookups): relationship dropdowns, the lookups and the values they copy, 絞り込む choices and prefills (`?order=`) use
+  `<Resource>::visibleOr($query, <this app's visible records' foreign key subquery>)` — what the user may see, plus
+  what their records already refer to, so an edit keeps its value; a reference saved outside a Filament select (quick
+  entries) is checked with Core `Filament\Support\VisibleChoice`. Applies to 受注 / 売上 / 請求書 / 取引先; the equipment
+  masters (03. 機械マスタ, 19. 消耗品マスタ) stay open so 日報 can always be filed. Calculations (rounding, 締日, prices)
+  read the related record as it is. Signed-in users whose 在籍状況 can no longer sign in are signed out on their next
+  request (Core `EnsureAccountIsActive`); temporary passwords must be changed (no 「そのまま使う」).
 - Speed first (user, 2026-11-11 — pages must never feel like loading; check it on every change): each query is a round
   trip to the database (~80 ms from Japan to Neon), so count the queries of the pages you touch before and after. No new
   query on every request: setup and access data (registry, spaces, アクセス権, 一覧, 帳票, field / record rules, user
@@ -260,8 +267,9 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   差額 and 前年同月比 of whole months; 最近のアクティビティ lists the 10 latest;
   売上の推移 (everyone's) · 上位の売上先 · 売れ筋 TOP3 (50 / 30 / 20 %, `sfk-dash-span-6` / `-30p` / `-20p` — the grid has
   60 tracks at ≥ 1280 px, the space between cards is their padding); 担当者別売上 · 作業者ランキング · 最近表示した項目 (a third
-  each); 休暇・勤怠予定 · 最近のアクティビティ (half each, one column). Rows 3–4 are for everyone (休暇・勤怠予定 and クイックアクション, half
-  the row each without 作業者ランキング, クイックアクション first without 財務分析を表示; 作業者ランキング frames the user's own
+  each); 休暇・勤怠予定 · 最近のアクティビティ (half each, one column). Rows 3–4 are for everyone (without money cards and 作業者ランキング —
+  no 財務分析を表示 — 最近表示した項目 · 休暇・勤怠予定 · 最近のアクティビティ share one row, a third each, user 2026-11-14,
+  `DashboardCard::teamRowOfThree()`; クイックアクション first without 財務分析を表示; 作業者ランキング frames the user's own
   row; クイックアクション is called 最近表示した項目 while it lists recent apps). The
   top bar has アプリ in place of the search box (the search is in the sidebar): one panel over the whole screen with a
   search box, スペース, よく使うアプリ (the five the user opens most, `AppUsageLog` written by every app screen; before

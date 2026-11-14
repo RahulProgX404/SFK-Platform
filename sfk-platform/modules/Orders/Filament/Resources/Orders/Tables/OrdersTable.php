@@ -20,12 +20,14 @@ use Modules\Core\Filament\Support\UserPopup;
 use Modules\Core\Filament\Tables\AppRecordActions;
 use Modules\Core\Filament\Tables\AppTextColumn;
 use Modules\Core\Filament\Tables\InlineField;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Machine;
 use Modules\MasterData\Models\Partner;
 use Modules\Orders\Domain\Orders\OrderChoices;
 use Modules\Orders\Filament\Resources\Orders\OrderFormat;
 use Modules\Orders\Filament\Resources\Orders\OrderLayout;
 use Modules\Orders\Filament\Resources\Orders\OrderResource;
+use Modules\Orders\Filament\Resources\Orders\Schemas\OrderForm;
 use Modules\Orders\Models\Order;
 
 /**
@@ -340,8 +342,8 @@ final class OrdersTable
     private static function customerOptions(): array
     {
         /** @var array<int, string> $options */
-        $options = Partner::query()
-            ->where(fn (Builder $q) => $q->where('is_customer', true)->orWhere('is_other', true))
+        $options = PartnerResource::visibleOr(Partner::query()
+            ->where(fn (Builder $q) => $q->where('is_customer', true)->orWhere('is_other', true)), OrderForm::keptPartners())
             ->orderByDesc('id')
             ->pluck('name', 'id')
             ->all();

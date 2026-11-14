@@ -273,6 +273,16 @@ it('orders consumables: 単価 / 単位 copied from the master, 承認依頼 and
     $box = Consumable::query()->create(['name' => '段ボール A式', 'unit_price' => '85.5', 'unit' => '枚']);
     $this->actingAs($creator);
     $undoFake = Repeater::fake();
+    $fill = ['ordered_on' => '2026-11-09', 'supplier_id' => $this->supplier->id, 'orderers' => [$creator->id], 'lines' => [
+        ['consumable_id' => $box->id, 'quantity' => '200', 'requested_on' => '2026-11-20', 'orderer' => '発注 太郎', 'delivered_on' => null, 'notes' => null],
+    ]];
+
+    // 発注先 is a 取引先 the user may see in 01. 取引先マスタ (security review 2026-11-14) — without 閲覧 there, none
+    Livewire::test(CreateConsumableOrder::class)->fillForm($fill)->call('create')->assertHasFormErrors(['supplier_id']);
+    $partners = BusinessApp::query()->firstOrNew(['code' => 'partner-master'], ['name' => '01. 取引先マスタ']);
+    $partners->forceFill(['status' => AppStatus::Published])->save();
+    $partners->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true]);
+    $partners->spaces()->syncWithoutDetaching($app->spaces->pluck('id')->all());
 
     Livewire::test(CreateConsumableOrder::class)
         ->fillForm(['ordered_on' => '2026-11-09', 'supplier_id' => $this->supplier->id, 'orderers' => [$creator->id], 'lines' => [

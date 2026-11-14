@@ -103,11 +103,6 @@ final class UserAccountService
     }
 
     /** The user keeps the temporary password set by an administrator; they are no longer asked to change it. */
-    public function keepTemporaryPassword(User $user): void
-    {
-        $user->forceFill(['must_change_password' => false])->save();
-    }
-
     public function delete(User $user, ?User $actor = null): void
     {
         if ($actor !== null && $actor->is($user)) {

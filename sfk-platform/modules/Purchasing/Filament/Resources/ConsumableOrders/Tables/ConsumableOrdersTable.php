@@ -22,6 +22,7 @@ use Modules\Core\Filament\Support\UserPopup;
 use Modules\Core\Filament\Tables\AppRecordActions;
 use Modules\Core\Filament\Tables\AppTextColumn;
 use Modules\Core\Filament\Tables\InlineField;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Consumable;
 use Modules\MasterData\Models\Partner;
 use Modules\Purchasing\Domain\ConsumableOrders\ConsumableOrderStatus;
@@ -99,7 +100,7 @@ final class ConsumableOrdersTable
 
         return [
             FilterField::date('ordered_on', $label('ordered_on')),
-            FilterField::choice('supplier_id', $label('supplier_id'), fn (): array => Partner::query()->where('is_supplier', true)->orderByDesc('id')
+            FilterField::choice('supplier_id', $label('supplier_id'), fn (): array => PartnerResource::visibleOr(Partner::query()->where('is_supplier', true), ConsumableOrderResource::getEloquentQuery()->select('consumable_orders.supplier_id'))->orderByDesc('id')
                 ->pluck('name', 'id')->mapWithKeys(fn (string $name, int|string $id): array => [(string) $id => $name])->all()),
             FilterField::user('orderers', $label('orderers'))->relationship('orderers', 'id'),
             FilterField::choice('consumable_id', $label('consumable_id'), fn (): array => Consumable::query()->orderByDesc('id')

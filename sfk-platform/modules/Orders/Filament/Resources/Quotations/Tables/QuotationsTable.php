@@ -19,6 +19,7 @@ use Modules\Core\Filament\Support\UserPopup;
 use Modules\Core\Filament\Tables\AppRecordActions;
 use Modules\Core\Filament\Tables\AppTextColumn;
 use Modules\Core\Filament\Tables\InlineField;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
 use Modules\Orders\Filament\Resources\Quotations\QuotationLayout;
 use Modules\Orders\Filament\Resources\Quotations\QuotationResource;
@@ -86,7 +87,7 @@ final class QuotationsTable
 
         return [
             FilterField::date('quoted_on', $label('quoted_on')),
-            FilterField::choice('customer_id', $label('customer_id'), fn (): array => Partner::query()->orderByDesc('id')->pluck('name', 'id')
+            FilterField::choice('customer_id', $label('customer_id'), fn (): array => PartnerResource::visibleOr(Partner::query(), QuotationResource::getEloquentQuery()->select('quotations.customer_id'))->orderByDesc('id')->pluck('name', 'id')
                 ->mapWithKeys(fn (string $name, int|string $id): array => [(string) $id => $name])->all()),
             FilterField::user('assignees', $label('assignees'))->relationship('assignees', 'id'),
             FilterField::text('quote_number', $label('quote_number')),

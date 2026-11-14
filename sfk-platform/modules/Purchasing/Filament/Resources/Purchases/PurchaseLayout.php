@@ -24,6 +24,7 @@ use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Support\FieldTip;
 use Modules\Core\Filament\Support\UserPopup;
 use Modules\MasterData\Domain\Partners\PurchaseCategory;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
 use Modules\Orders\Filament\Resources\Orders\OrderResource;
 use Modules\Orders\Models\Order;
@@ -107,7 +108,7 @@ final class PurchaseLayout
             'purchased_on' => DatePicker::make($name)->label($label)->required()->default(fn (): string => now()->toDateString()),
             'supplier_id' => Select::make($name)
                 ->label($label)
-                ->relationship('supplier', 'name', fn (Builder $query): Builder => $query->where('is_supplier', true)->orderByDesc('id'))
+                ->relationship('supplier', 'name', fn (Builder $query): Builder => PartnerResource::visibleOr($query->where('is_supplier', true), PurchaseResource::getEloquentQuery()->select('purchases.supplier_id'))->orderByDesc('id'))
                 ->searchable(['name', 'short_name', 'name_kana'])
                 ->preload()
                 ->placeholder('-----')
@@ -281,6 +282,6 @@ final class PurchaseLayout
 
     private static function partner(mixed $id): ?Partner
     {
-        return is_numeric($id) ? Partner::query()->find((int) $id) : null;
+        return is_numeric($id) ? PartnerResource::visibleOr(Partner::query(), PurchaseResource::getEloquentQuery()->select('purchases.supplier_id'))->find((int) $id) : null;
     }
 }

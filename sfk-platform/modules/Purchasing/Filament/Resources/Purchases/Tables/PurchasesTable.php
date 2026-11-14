@@ -22,6 +22,7 @@ use Modules\Core\Filament\Support\UserPopup;
 use Modules\Core\Filament\Tables\AppRecordActions;
 use Modules\Core\Filament\Tables\AppTextColumn;
 use Modules\Core\Filament\Tables\InlineField;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
 use Modules\Orders\Models\Order;
 use Modules\Purchasing\Domain\PurchaseChoices;
@@ -95,7 +96,7 @@ final class PurchasesTable
 
         return [
             FilterField::date('purchased_on', $label('purchased_on')),
-            FilterField::choice('supplier_id', $label('supplier_id'), fn (): array => Partner::query()->where('is_supplier', true)->orderByDesc('id')
+            FilterField::choice('supplier_id', $label('supplier_id'), fn (): array => PartnerResource::visibleOr(Partner::query()->where('is_supplier', true), PurchaseResource::getEloquentQuery()->select('purchases.supplier_id'))->orderByDesc('id')
                 ->pluck('name', 'id')->mapWithKeys(fn (string $name, int|string $id): array => [(string) $id => $name])->all()),
             FilterField::choice('tax_mode', $label('tax_mode'), array_combine($modes, $modes))->relationship('supplier', 'supplier_tax_mode'),
             FilterField::choice('master_category', $label('master_category'), PurchaseLayout::categoryOptions())->relationship('supplier', 'purchase_category'),

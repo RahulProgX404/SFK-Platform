@@ -90,7 +90,7 @@ final class ReceiptLayout
         return match ($name) {
             'invoice_id' => Select::make($name)
                 ->label($label)
-                ->relationship('invoice', 'number', fn (Builder $query, ?Receipt $record): Builder => $query
+                ->relationship('invoice', 'number', fn (Builder $query, ?Receipt $record): Builder => InvoiceResource::visibleOr($query, ReceiptResource::getEloquentQuery()->select('receipts.invoice_id'))
                     ->where(fn (Builder $q): Builder => $q->whereDoesntHave('receipt')->when($record?->invoice_id !== null, fn (Builder $open): Builder => $open->orWhereKey($record?->invoice_id)))
                     ->orderByDesc('id'))
                 ->searchable(['number'])
@@ -228,7 +228,7 @@ final class ReceiptLayout
 
     private static function invoice(mixed $id): ?Invoice
     {
-        return is_numeric($id) ? Invoice::query()->with('customer')->find((int) $id) : null;
+        return is_numeric($id) ? InvoiceResource::visibleOr(Invoice::query(), ReceiptResource::getEloquentQuery()->select('receipts.invoice_id'))->with('customer')->find((int) $id) : null;
     }
 
     private static function liveSettled(Get $get): int

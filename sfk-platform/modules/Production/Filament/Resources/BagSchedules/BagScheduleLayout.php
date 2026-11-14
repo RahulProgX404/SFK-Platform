@@ -93,7 +93,8 @@ final class BagScheduleLayout
     private static function input(string $name): ?Component
     {
         $label = self::label($name);
-        $order = fn (Get $get): ?Order => is_numeric($get('order_id')) ? Order::query()->with('customer')->find((int) $get('order_id')) : null;
+        // a job the user may see, or one of their visible schedules (security review 2026-11-14)
+        $order = fn (Get $get): ?Order => is_numeric($get('order_id')) ? OrderResource::visibleOr(Order::query(), BagScheduleResource::getEloquentQuery()->select('bag_schedules.order_id'))->with('customer')->find((int) $get('order_id')) : null;
         $ofOrder = fn (Get $get): bool => is_numeric($get('order_id'));
         $text = fn (callable $state): TextEntry => TextEntry::make($name)->label($label)->placeholder('')->state($state);
 
@@ -104,7 +105,7 @@ final class BagScheduleLayout
             $name === 'highlight_color' => Select::make($name)->label($label)->placeholder('なし')->native(false)->options(ScheduleBoard::HIGHLIGHTS),
             $name === 'order_id' => Select::make($name)
                 ->label($label)
-                ->relationship('order', 'order_number', fn (Builder $query): Builder => $query->orderByDesc('id'))
+                ->relationship('order', 'order_number', fn (Builder $query): Builder => OrderResource::visibleOr($query, BagScheduleResource::getEloquentQuery()->select('bag_schedules.order_id'))->orderByDesc('id'))
                 ->searchable(['order_number', 'product_name'])
                 ->preload()
                 ->optionsLimit(100)

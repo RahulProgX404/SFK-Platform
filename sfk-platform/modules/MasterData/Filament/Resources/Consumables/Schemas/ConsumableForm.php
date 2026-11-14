@@ -18,6 +18,8 @@ use Modules\MasterData\Domain\Consumables\BoxType;
 use Modules\MasterData\Domain\Consumables\ConsumableFields;
 use Modules\MasterData\Domain\Consumables\ConsumableKind;
 use Modules\MasterData\Filament\Resources\Consumables\ConsumableLayout;
+use Modules\MasterData\Filament\Resources\Consumables\ConsumableResource;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Consumable;
 use Modules\MasterData\Models\Partner;
 
@@ -44,7 +46,7 @@ final class ConsumableForm
     private static function input(string $name): Component
     {
         $label = ConsumableLayout::label($name);
-        $supplier = fn (Get $get): ?Partner => is_numeric($get('supplier_id')) ? Partner::query()->find((int) $get('supplier_id')) : null;
+        $supplier = fn (Get $get): ?Partner => is_numeric($get('supplier_id')) ? PartnerResource::visibleOr(Partner::query(), ConsumableResource::getEloquentQuery()->select('consumables.supplier_id'))->find((int) $get('supplier_id')) : null;
 
         return match (true) {
             $name === 'name' => TextInput::make($name)->label($label)->required()->maxLength(64)->unique(ignoreRecord: true),
@@ -59,7 +61,7 @@ final class ConsumableForm
                 ->state(fn (?Consumable $record): ?string => ConsumableInfolist::quantity($record?->stock())),
             $name === 'supplier_id' => Select::make($name)
                 ->label($label)
-                ->relationship('supplier', 'name', fn (Builder $query): Builder => $query->where('is_supplier', true)->orderByDesc('id'))
+                ->relationship('supplier', 'name', fn (Builder $query): Builder => PartnerResource::visibleOr($query->where('is_supplier', true), ConsumableResource::getEloquentQuery()->select('consumables.supplier_id'))->orderByDesc('id'))
                 ->searchable(['name', 'short_name', 'name_kana'])
                 ->preload()
                 ->placeholder('-----')

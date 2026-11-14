@@ -20,6 +20,7 @@ use Modules\Core\Filament\Support\UserPopup;
 use Modules\Core\Filament\Tables\AppRecordActions;
 use Modules\Core\Filament\Tables\AppTextColumn;
 use Modules\Core\Filament\Tables\InlineField;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
 use Modules\Sales\Domain\Sales\SaleChoices;
 use Modules\Sales\Filament\Resources\Invoices\InvoiceLayout;
@@ -115,7 +116,7 @@ final class InvoicesTable
             FilterField::text('registration_number', $label('registration_number')),
             FilterField::text('number', $label('number')),
             FilterField::date('invoiced_on', $label('invoiced_on')),
-            FilterField::choice('customer_id', $label('customer_id'), fn (): array => Partner::query()->where('is_customer', true)->orderByDesc('id')
+            FilterField::choice('customer_id', $label('customer_id'), fn (): array => PartnerResource::visibleOr(Partner::query()->where('is_customer', true), InvoiceResource::getEloquentQuery()->select('invoices.customer_id'))->orderByDesc('id')
                 ->pluck('name', 'id')->mapWithKeys(fn (string $name, int|string $id): array => [(string) $id => $name])->all()),
             FilterField::user('assignees', $label('assignees'))->relationship('assignees', 'id'),
             FilterField::choice('closing_day', $label('closing_day'), array_combine($days, $days)),

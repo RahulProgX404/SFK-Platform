@@ -24,6 +24,7 @@ use Modules\MasterData\Domain\Consumables\ConsumableKind;
 use Modules\MasterData\Filament\Resources\Consumables\ConsumableLayout;
 use Modules\MasterData\Filament\Resources\Consumables\ConsumableResource;
 use Modules\MasterData\Filament\Resources\Consumables\Schemas\ConsumableInfolist;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Consumable;
 use Modules\MasterData\Models\Partner;
 
@@ -97,7 +98,7 @@ final class ConsumablesTable
             FilterField::text('unit', $label('unit')),
             FilterField::number('stock', $label('stock'))->query(self::filterStock(...)),
             FilterField::number('lot_size', $label('lot_size')),
-            FilterField::choice('supplier_id', $label('supplier_id'), fn (): array => Partner::query()->where('is_supplier', true)->orderByDesc('id')
+            FilterField::choice('supplier_id', $label('supplier_id'), fn (): array => PartnerResource::visibleOr(Partner::query()->where('is_supplier', true), ConsumableResource::getEloquentQuery()->select('consumables.supplier_id'))->orderByDesc('id')
                 ->pluck('name', 'id')->mapWithKeys(fn (string $name, int|string $id): array => [(string) $id => $name])->all()),
             FilterField::textarea('notes', $label('notes')),
             FilterField::choice('reorder_flag', $label('reorder_flag'), [ConsumableFields::REORDER => ConsumableFields::REORDER])->query(self::filterReorder(...)),

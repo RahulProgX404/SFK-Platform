@@ -31,7 +31,6 @@ Route::middleware('auth')->group(function (): void {
     Route::put('account/password', [PasswordController::class, 'update'])
         ->middleware('throttle:10,1')
         ->name('core.password.update');
-    Route::post('account/password/keep', [PasswordController::class, 'keep'])->name('core.password.keep');
 });
 
 // 帳票出力 of the apps (PDF files; the app screens put the buttons and settings around them).

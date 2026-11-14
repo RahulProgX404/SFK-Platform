@@ -19,6 +19,7 @@ use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Tables\AppRecordActions;
 use Modules\Core\Filament\Tables\AppTextColumn;
 use Modules\Core\Filament\Tables\InlineField;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
 use Modules\Purchasing\Domain\Payables\PayableCategories;
 use Modules\Purchasing\Filament\Resources\Payables\PayableLayout;
@@ -109,7 +110,7 @@ final class PayablesTable
 
         return [
             FilterField::text('year_month', $label('year_month')),
-            FilterField::choice('supplier_id', $label('supplier_id'), fn (): array => Partner::query()->where('is_supplier', true)->orderByDesc('id')
+            FilterField::choice('supplier_id', $label('supplier_id'), fn (): array => PartnerResource::visibleOr(Partner::query()->where('is_supplier', true), PayableResource::getEloquentQuery()->select('payable_months.supplier_id'))->orderByDesc('id')
                 ->pluck('name', 'id')->mapWithKeys(fn (string $name, int|string $id): array => [(string) $id => $name])->all()),
             FilterField::choice('purchase_category', $label('purchase_category'), PurchaseLayout::categoryOptions())->relationship('supplier', 'purchase_category'),
             FilterField::choice('tax_mode', $label('tax_mode'), array_combine($modes, $modes))->relationship('supplier', 'supplier_tax_mode'),

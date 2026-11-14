@@ -165,12 +165,22 @@ abstract class DashboardCard extends Widget implements FollowsDashboardFilters
     }
 
     /**
-     * Width of 休暇・勤怠予定 and クイックアクション in row 3: a third next to 作業者ランキング (全体), else half each so the
-     * row stays full.
+     * The dashboard of a user without money cards and without 作業者ランキング (no 財務分析を表示; user 2026-11-14):
+     * after 個人の概要 and 勤務時間・収入の推移, 最近表示した項目 (クイックアクション) · 休暇・勤怠予定 · 最近のアクティビティ
+     * share one row, a third each.
+     */
+    protected static function teamRowOfThree(): bool
+    {
+        return ! static::showsMoney() && ! static::seesEveryonesMoney();
+    }
+
+    /**
+     * Width of 休暇・勤怠予定 and クイックアクション in row 3: a third next to 作業者ランキング (全体) or next to each other
+     * and 最近のアクティビティ (teamRowOfThree), else half each so the row stays full.
      */
     protected function teamCardSpan(): int
     {
-        return static::seesEveryonesMoney() && ! $this->inPersonalLayout() ? 4 : 6;
+        return (static::seesEveryonesMoney() && ! $this->inPersonalLayout()) || static::teamRowOfThree() ? 4 : 6;
     }
 
     /** The list of an app in this dashboard, while the user may open it. */

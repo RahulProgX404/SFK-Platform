@@ -24,6 +24,7 @@ use Modules\Core\Filament\Records\RecordSections;
 use Modules\Core\Filament\Records\RecordTable;
 use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Support\UserPopup;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
 use Modules\Orders\Domain\Quotations\QuotationFields;
 use Modules\Orders\Models\Quotation;
@@ -77,14 +78,14 @@ final class QuotationLayout
     private static function input(string $name): ?Component
     {
         $label = self::label($name);
-        $customer = fn (Get $get): ?Partner => is_numeric($get('customer_id')) ? Partner::query()->find((int) $get('customer_id')) : null;
+        $customer = fn (Get $get): ?Partner => is_numeric($get('customer_id')) ? PartnerResource::visibleOr(Partner::query(), QuotationResource::getEloquentQuery()->select('quotations.customer_id'))->find((int) $get('customer_id')) : null;
         $text = fn (callable $state): TextEntry => TextEntry::make($name)->label($label)->placeholder('')->state($state);
 
         return match (true) {
             $name === 'quoted_on' => DatePicker::make($name)->label($label)->required()->default(fn (): string => now()->toDateString()),
             $name === 'customer_id' => Select::make($name)
                 ->label($label)
-                ->relationship('customer', 'name', fn (Builder $query): Builder => $query->orderByDesc('id'))
+                ->relationship('customer', 'name', fn (Builder $query): Builder => PartnerResource::visibleOr($query, QuotationResource::getEloquentQuery()->select('quotations.customer_id'))->orderByDesc('id'))
                 ->searchable(['name', 'short_name', 'name_kana'])
                 ->preload()
                 ->placeholder('-----')

@@ -19,6 +19,7 @@ use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\Tables\AppRecordActions;
 use Modules\Core\Filament\Tables\AppTextColumn;
 use Modules\Core\Filament\Tables\InlineField;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
 use Modules\Sales\Domain\Receivables\ReceivableBasis;
 use Modules\Sales\Filament\Resources\Receivables\CycleReceivableResource;
@@ -124,7 +125,7 @@ final class ReceivablesTable
 
         return [
             FilterField::text('year_month', $label('year_month')),
-            FilterField::choice('customer_id', $label('customer_id'), fn (): array => Partner::query()->where('is_customer', true)->orderByDesc('id')
+            FilterField::choice('customer_id', $label('customer_id'), fn (): array => PartnerResource::visibleOr(Partner::query()->where('is_customer', true), ReceivableResource::getEloquentQuery()->select('receivable_months.customer_id'))->orderByDesc('id')
                 ->pluck('name', 'id')->mapWithKeys(fn (string $name, int|string $id): array => [(string) $id => $name])->all()),
             ...($basis === ReceivableBasis::Cycle ? [FilterField::choice('closing_day', $label('closing_day'), array_combine($days, $days))] : []),
             ...array_map(fn (string $name): FilterField => FilterField::number($name, $label($name)), self::AMOUNTS),

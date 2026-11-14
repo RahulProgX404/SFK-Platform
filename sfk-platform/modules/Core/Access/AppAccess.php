@@ -54,7 +54,7 @@ final class AppAccess
      */
     public static function manages(?User $user, string $appCode): bool
     {
-        return $user !== null && ($user->user_type->isAdministrator() || self::can($user, $appCode, AppAbility::Manage));
+        return $user !== null && (($user->user_type->isAdministrator() && ($user->isSuperAdmin() || $user->employment_status->canSignIn())) || self::can($user, $appCode, AppAbility::Manage));
     }
 
     /** @return list<AppAbility> */
@@ -104,8 +104,10 @@ final class AppAccess
             return [];
         }
 
+        // an administrator who may no longer sign in (在籍状況) has no rights left (security review 2026-11-14) —
+        // employees lose theirs through DashboardAccess
         if ($user->user_type->isAdministrator()) {
-            return AppAbility::cases();
+            return $user->employment_status->canSignIn() ? AppAbility::cases() : [];
         }
 
         return self::employeeAbilities($user, $app);

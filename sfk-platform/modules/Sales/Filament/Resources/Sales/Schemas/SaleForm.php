@@ -25,7 +25,9 @@ use Modules\Core\Domain\Money\Yen;
 use Modules\Core\Domain\Tax\TaxRate;
 use Modules\Core\Filament\Records\RecordTable;
 use Modules\Core\Filament\Support\FieldTip;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
+use Modules\Orders\Filament\Resources\Orders\OrderResource;
 use Modules\Orders\Models\Order;
 use Modules\Sales\Application\Sales\SaleOrderTotals;
 use Modules\Sales\Domain\Sales\SaleChoices;
@@ -80,7 +82,7 @@ final class SaleForm
             'sales_number' => TextInput::make($name)->label($label)->disabled()->dehydrated(false),
             'customer_id' => Select::make($name)
                 ->label($label)
-                ->relationship('customer', 'name', fn (Builder $query): Builder => $query->where('is_customer', true)->orderByDesc('id'))
+                ->relationship('customer', 'name', fn (Builder $query): Builder => PartnerResource::visibleOr($query->where('is_customer', true), SaleResource::getEloquentQuery()->select('sales.customer_id'))->orderByDesc('id'))
                 ->searchable(['name', 'short_name', 'name_kana'])
                 ->preload()
                 ->placeholder('-----')
@@ -133,7 +135,7 @@ final class SaleForm
             'summary' => TextInput::make($name)->label($label)->maxLength(255),
             'order_id' => FieldTip::add(Select::make($name)
                 ->label($label)
-                ->relationship('order', 'order_number', fn (Builder $query, ?Sale $record): Builder => $query
+                ->relationship('order', 'order_number', fn (Builder $query, ?Sale $record): Builder => OrderResource::visibleOr($query, SaleResource::getEloquentQuery()->select('sales.order_id'))
                     ->where(fn (Builder $q): Builder => $q->where('sales_remaining', '>=', 1)->when($record?->order_id !== null, fn (Builder $q): Builder => $q->orWhereKey($record?->order_id)))
                     ->orderByDesc('id'))
                 ->searchable(['order_number', 'product_name'])
@@ -299,7 +301,8 @@ final class SaleForm
             return null;
         }
 
-        return Partner::query()->find((int) $id);
+        // what the lookups copy: a customer the user may see, or one of the sales they can see (security review 2026-11-14)
+        return PartnerResource::visibleOr(Partner::query(), SaleResource::getEloquentQuery()->select('sales.customer_id'))->find((int) $id);
     }
 
     private static function order(mixed $id): ?Order
@@ -308,7 +311,7 @@ final class SaleForm
             return null;
         }
 
-        return Order::query()->with('customer')->find((int) $id);
+        return OrderResource::visibleOr(Order::query(), SaleResource::getEloquentQuery()->select('sales.order_id'))->with('customer')->find((int) $id);
     }
 
     private static function actor(): ?User

@@ -23,6 +23,7 @@ use Modules\Core\Filament\Tables\AppRecordActions;
 use Modules\Core\Filament\Tables\AppTextColumn;
 use Modules\Core\Filament\Tables\InlineField;
 use Modules\MasterData\Domain\Partners\PurchaseCategory;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
 use Modules\Orders\Models\Order;
 use Modules\Purchasing\Application\Freight\FreightPurchasePoster;
@@ -135,7 +136,7 @@ final class FreightChargesTable
             ->schema([
                 Select::make('supplier_id')
                     ->label(PurchaseLayout::label('supplier_id'))
-                    ->options(fn (): array => Partner::query()->where('is_supplier', true)->orderByDesc('id')->pluck('name', 'id')->all())
+                    ->options(fn (): array => PartnerResource::visibleOr(Partner::query()->where('is_supplier', true), PurchaseResource::getEloquentQuery()->select('purchases.supplier_id'))->orderByDesc('id')->pluck('name', 'id')->all())
                     ->searchable()
                     ->preload()
                     ->placeholder('-----')
@@ -143,7 +144,7 @@ final class FreightChargesTable
                 Select::make('category')->label(PurchaseLayout::label('category'))->placeholder('-----')->options(PurchaseLayout::categoryOptions())->searchable(),
             ])
             ->action(function (Collection $records, array $data): void {
-                $carrier = Partner::query()->find((int) ($data['supplier_id'] ?? 0));
+                $carrier = PartnerResource::visibleOr(Partner::query(), PurchaseResource::getEloquentQuery()->select('purchases.supplier_id'))->find((int) ($data['supplier_id'] ?? 0));
                 if ($carrier === null) {
                     return;
                 }

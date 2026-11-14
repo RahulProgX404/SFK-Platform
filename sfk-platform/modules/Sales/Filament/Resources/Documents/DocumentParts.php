@@ -25,9 +25,12 @@ use Modules\Core\Domain\Money\RoundingMode;
 use Modules\Core\Domain\Tax\TaxRate;
 use Modules\Core\Filament\Records\RecordTable;
 use Modules\Core\Filament\Support\UserPopup;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
 use Modules\Sales\Domain\Documents\TaxBreakdown;
 use Modules\Sales\Domain\Sales\SaleChoices;
+use Modules\Sales\Filament\Resources\DeliveryNotes\DeliveryNoteResource;
+use Modules\Sales\Filament\Resources\Invoices\InvoiceResource;
 use Modules\Sales\Filament\SalesFormat;
 use Modules\Sales\Models\DeliveryNoteLine;
 use Modules\Sales\Models\InvoiceLine;
@@ -56,7 +59,8 @@ final class DocumentParts
     public static function input(string $name, array $labels, bool $invoice): ?Component
     {
         $label = $labels[$name] ?? $name;
-        $customer = fn (Get $get): ?Partner => is_numeric($get('customer_id')) ? Partner::query()->find((int) $get('customer_id')) : null;
+        $keep = ($invoice ? InvoiceResource::getEloquentQuery()->select('invoices.customer_id') : DeliveryNoteResource::getEloquentQuery()->select('delivery_notes.customer_id'));
+        $customer = fn (Get $get): ?Partner => is_numeric($get('customer_id')) ? PartnerResource::visibleOr(Partner::query(), $keep)->find((int) $get('customer_id')) : null;
 
         return match (true) {
             $name === 'send_status' => Radio::make($name)->label($label)->options(SaleChoices::options(SaleChoices::SEND_STATUSES))->default('未')->required()->inline(),
@@ -64,7 +68,7 @@ final class DocumentParts
             $name === 'number' => TextInput::make($name)->label($label)->disabled()->dehydrated(false),
             $name === 'customer_id' => Select::make($name)
                 ->label($label)
-                ->relationship('customer', 'name', fn (Builder $query): Builder => $query->where('is_customer', true)->orderByDesc('id'))
+                ->relationship('customer', 'name', fn (Builder $query): Builder => PartnerResource::visibleOr($query->where('is_customer', true), $keep)->orderByDesc('id'))
                 ->searchable(['name', 'short_name', 'name_kana'])
                 ->preload()
                 ->placeholder('-----')

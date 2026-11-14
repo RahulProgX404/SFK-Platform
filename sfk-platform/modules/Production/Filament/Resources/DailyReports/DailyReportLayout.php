@@ -29,6 +29,7 @@ use Modules\MasterData\Domain\Consumables\ConsumableKind;
 use Modules\MasterData\Models\Consumable;
 use Modules\MasterData\Models\Machine;
 use Modules\Orders\Domain\Orders\OrderChoices;
+use Modules\Orders\Filament\Resources\Orders\OrderResource;
 use Modules\Orders\Models\Order;
 use Modules\Production\Application\DailyReports\BoxUsage;
 use Modules\Production\Domain\DailyReports\TaskCosting;
@@ -113,7 +114,8 @@ final class DailyReportLayout
 
         $label = self::label($name);
         $worker = fn (Get $get): ?User => is_numeric($get('user_id')) ? User::query()->find((int) $get('user_id')) : null;
-        $order = fn (Get $get): ?Order => is_numeric($get('order_id')) ? Order::query()->find((int) $get('order_id')) : null;
+        // a job the user may see, or one of their visible reports (security review 2026-11-14)
+        $order = fn (Get $get): ?Order => is_numeric($get('order_id')) ? OrderResource::visibleOr(Order::query(), DailyReportResource::getEloquentQuery()->select('daily_reports.order_id'))->find((int) $get('order_id')) : null;
         $machine = fn (Get $get): ?Machine => is_numeric($get('machine_id')) ? Machine::query()->find((int) $get('machine_id')) : null;
         $shown = fn (Closure $state): TextEntry => TextEntry::make($name)->label($label)->placeholder('')->state($state);
         $number = fn (): TextInput => TextInput::make($name)->label($label)->numeric()->step('any')->rule('decimal:0,4')
@@ -155,7 +157,7 @@ final class DailyReportLayout
                 ->required()
                 ->live(),
             'order_id' => Select::make($name)->label($label)->placeholder('-----')
-                ->relationship('order', 'order_number', fn (Builder $query): Builder => $query->orderByDesc('id'))->searchable()->preload()->live()->required(),
+                ->relationship('order', 'order_number', fn (Builder $query): Builder => OrderResource::visibleOr($query, DailyReportResource::getEloquentQuery()->select('daily_reports.order_id'))->orderByDesc('id'))->searchable()->preload()->live()->required(),
             'product_name' => $shown(fn (Get $get): ?string => $order($get)?->product_name),
             'order_quantity' => $shown(fn (Get $get): string => AppFormat::number($order($get)?->quantity)),
             'manufactured_quantity' => $shown(fn (Get $get): string => AppFormat::number($order($get)?->getAttribute('manufactured_quantity'))),

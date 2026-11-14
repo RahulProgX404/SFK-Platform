@@ -15,6 +15,7 @@ use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Tables\AppRecordActions;
 use Modules\Core\Filament\Tables\AppTextColumn;
 use Modules\Core\Filament\Tables\InlineField;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
 use Modules\Purchasing\Domain\PurchaseChoices;
 use Modules\Purchasing\Filament\Resources\Payments\PaymentLayout;
@@ -83,7 +84,7 @@ final class PaymentsTable
         return [
             FilterField::date('paid_on', $label('paid_on')),
             FilterField::number('total', $label('total')),
-            FilterField::choice('supplier_id', $label('supplier_id'), fn (): array => Partner::query()->where('is_supplier', true)->orderByDesc('id')
+            FilterField::choice('supplier_id', $label('supplier_id'), fn (): array => PartnerResource::visibleOr(Partner::query()->where('is_supplier', true), PaymentLine::query()->whereIn('payment_id', PaymentResource::getEloquentQuery()->select('payments.id'))->select('payment_lines.supplier_id'))->orderByDesc('id')
                 ->pluck('name', 'id')->mapWithKeys(fn (string $name, int|string $id): array => [(string) $id => $name])->all())
                 ->relationship('lines', 'supplier_id'),
             FilterField::choice('method', $label('method'), PurchaseChoices::options(PurchaseChoices::PAYMENT_METHODS))->relationship('lines', 'method'),

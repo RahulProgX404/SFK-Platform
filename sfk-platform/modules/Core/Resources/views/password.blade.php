@@ -41,10 +41,6 @@
                 </form>
 
                 <div class="kt-actions">
-                    <form method="POST" action="{{ route('core.password.keep') }}">
-                        @csrf
-                        <button type="submit" class="kt-button kt-button-normal">仮パスワードをそのまま使う</button>
-                    </form>
                     <button type="submit" form="change-password" class="kt-button">変更を保存</button>
                 </div>
             </div>

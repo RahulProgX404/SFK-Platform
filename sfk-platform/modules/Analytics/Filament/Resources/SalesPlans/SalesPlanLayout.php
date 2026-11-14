@@ -22,6 +22,7 @@ use Modules\Analytics\Models\SalesPlan;
 use Modules\Core\Filament\Records\RecordSections;
 use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Support\UserPopup;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
 
 /**
@@ -67,7 +68,7 @@ final class SalesPlanLayout
     private static function input(string $name): ?Component
     {
         $label = self::label($name);
-        $customer = fn (Get $get): ?Partner => is_numeric($get('customer_id')) ? Partner::query()->find((int) $get('customer_id')) : null;
+        $customer = fn (Get $get): ?Partner => is_numeric($get('customer_id')) ? PartnerResource::visibleOr(Partner::query(), SalesPlanResource::getEloquentQuery()->select('sales_plans.customer_id'))->find((int) $get('customer_id')) : null;
         $text = fn (callable $state): TextEntry => TextEntry::make($name)->label($label)->placeholder('')->state($state);
         $actualTotal = fn (Get $get): int => PastSale::sumOf(array_map(fn (string $column): mixed => $get($column), FiscalYear::columns('actual_')));
 
@@ -76,7 +77,7 @@ final class SalesPlanLayout
                 ->prefix('¥')->live(onBlur: true),
             $name === 'customer_id' => Select::make($name)
                 ->label($label)
-                ->relationship('customer', 'name', fn (Builder $query): Builder => $query->where('is_customer', true)->orderByDesc('id'))
+                ->relationship('customer', 'name', fn (Builder $query): Builder => PartnerResource::visibleOr($query->where('is_customer', true), SalesPlanResource::getEloquentQuery()->select('sales_plans.customer_id'))->orderByDesc('id'))
                 ->searchable(['name', 'short_name', 'code'])
                 ->preload()
                 ->placeholder('-----')

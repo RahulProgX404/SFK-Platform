@@ -23,6 +23,7 @@ use Modules\Core\Filament\Support\UserPopup;
 use Modules\Core\Filament\Tables\AppRecordActions;
 use Modules\Core\Filament\Tables\AppTextColumn;
 use Modules\Core\Filament\Tables\InlineField;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
 use Modules\Orders\Models\Order;
 use Modules\Sales\Domain\Sales\SaleChoices;
@@ -138,7 +139,7 @@ final class SalesTable
             FilterField::choice('kind', $label('kind'), SaleChoices::options(SaleChoices::KINDS)),
             FilterField::date('sold_on', $label('sold_on')),
             FilterField::text('sales_number', $label('sales_number')),
-            FilterField::choice('customer_id', $label('customer_id'), fn (): array => Partner::query()->where('is_customer', true)->orderByDesc('id')
+            FilterField::choice('customer_id', $label('customer_id'), fn (): array => PartnerResource::visibleOr(Partner::query()->where('is_customer', true), SaleResource::getEloquentQuery()->select('sales.customer_id'))->orderByDesc('id')
                 ->pluck('name', 'id')->mapWithKeys(fn (string $name, int|string $id): array => [(string) $id => $name])->all()),
             FilterField::choice('closing_day', $label('closing_day'), array_combine($days, $days)),
             FilterField::choice('closing_day_override', $label('closing_day_override'), SaleChoices::options(SaleChoices::CLOSING_DAY_OVERRIDES)),

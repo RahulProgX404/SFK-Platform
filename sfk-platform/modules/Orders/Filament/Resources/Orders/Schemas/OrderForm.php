@@ -25,13 +25,18 @@ use Modules\Core\Application\Files\Uploads;
 use Modules\Core\Domain\Money\RoundingMode;
 use Modules\Core\Domain\People\EmploymentStatus;
 use Modules\Core\Filament\Records\RecordTable;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
 use Modules\Orders\Domain\Orders\JobCosting;
 use Modules\Orders\Domain\Orders\OrderChoices;
 use Modules\Orders\Domain\Orders\OrderFields;
 use Modules\Orders\Filament\Resources\Orders\OrderFormat;
 use Modules\Orders\Filament\Resources\Orders\OrderLayout;
+use Modules\Orders\Filament\Resources\Orders\OrderResource;
 use Modules\Orders\Models\Order;
+use Modules\Orders\Models\OrderFinishing;
+use Modules\Orders\Models\OrderPaper;
+use Modules\Orders\Models\OrderPrinting;
 
 /**
  * Create / edit form of 04. 受注入力, laid out like the legacy form (OrderLayout). Like the legacy save check
@@ -294,7 +299,7 @@ final class OrderForm
             ->hiddenLabel()
             ->native()
             ->placeholder('-----')
-            ->relationship('supplier', 'name', fn (Builder $query): Builder => $query->where('is_supplier', true)->orderByDesc('id'))
+            ->relationship('supplier', 'name', fn (Builder $query): Builder => PartnerResource::visibleOr($query->where('is_supplier', true), self::keptPartners())->orderByDesc('id'))
             ->preload()
             ->live();
     }
@@ -308,7 +313,7 @@ final class OrderForm
     /** @return list<TextEntry> 得意先ID and 略名 of the chosen supplier (legacy lookup copies) */
     private static function supplierInfo(): array
     {
-        $supplier = fn (Get $get): ?Partner => is_numeric($get('supplier_id')) ? Partner::query()->find((int) $get('supplier_id')) : null;
+        $supplier = fn (Get $get): ?Partner => is_numeric($get('supplier_id')) ? PartnerResource::visibleOr(Partner::query(), self::keptPartners())->find((int) $get('supplier_id')) : null;
 
         return [
             TextEntry::make('supplier_partner_id')->hiddenLabel()->placeholder('')->state(fn (Get $get): ?string => ($partner = $supplier($get)) !== null ? (string) $partner->id : null),
@@ -387,13 +392,35 @@ final class OrderForm
         return is_numeric($customerId) ? Partner::query()->find((int) $customerId)?->closing_day?->value : null;
     }
 
+    /**
+     * The 取引先 the user's 受注 already refer to — 得意先, the suppliers of the job and of its 用紙 / 印刷 / 加工 rows: kept
+     * in the choices (PartnerResource::visibleOr) so an order keeps its values even where 01. 取引先マスタ is not visible
+     * to the user (security review 2026-11-14).
+     *
+     * @return \Illuminate\Database\Query\Builder ids of partners
+     */
+    public static function keptPartners(): \Illuminate\Database\Query\Builder
+    {
+        $orders = fn (): \Illuminate\Database\Query\Builder => OrderResource::getEloquentQuery()->toBase();
+        $ids = fn (): \Illuminate\Database\Query\Builder => OrderResource::getEloquentQuery()->toBase()->select('orders.id');
+        $query = $orders()->select('orders.customer_id');
+        foreach (['plate_supplier_id', 'manufacturer_id', 'data_supplier_id', 'film_supplier_id'] as $column) {
+            $query->union($orders()->select('orders.'.$column));
+        }
+        foreach ([OrderPaper::class, OrderPrinting::class, OrderFinishing::class] as $rows) {
+            $query->union($rows::query()->toBase()->select('supplier_id')->whereIn('order_id', $ids()));
+        }
+
+        return $query;
+    }
+
     private static function partner(string $name, string $relationship, bool $customers = false): Select
     {
         return Select::make($name)
             ->label(OrderLayout::label($name))
-            ->relationship($relationship, 'name', fn (Builder $query): Builder => ($customers
+            ->relationship($relationship, 'name', fn (Builder $query): Builder => PartnerResource::visibleOr($customers
                 ? $query->where(fn (Builder $q) => $q->where('is_customer', true)->orWhere('is_other', true))
-                : $query->where('is_supplier', true))->orderByDesc('id'))
+                : $query->where('is_supplier', true), self::keptPartners())->orderByDesc('id'))
             ->searchable(['name', 'short_name', 'name_kana'])
             ->preload()
             ->placeholder('-----')

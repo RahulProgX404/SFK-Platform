@@ -17,6 +17,7 @@ use Filament\Schemas\Schema;
 use Modules\Core\Domain\Billing\ClosingDay;
 use Modules\Core\Domain\Money\RoundingMode;
 use Modules\Core\Filament\Records\RecordSections;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
 use Modules\Sales\Domain\Documents\DocumentFields;
 use Modules\Sales\Domain\Documents\TaxBreakdown;
@@ -79,7 +80,7 @@ final class InvoiceLayout
     private static function input(string $name): ?Component
     {
         $label = self::label($name);
-        $customer = fn (Get $get): ?Partner => is_numeric($get('customer_id')) ? Partner::query()->find((int) $get('customer_id')) : null;
+        $customer = fn (Get $get): ?Partner => is_numeric($get('customer_id')) ? PartnerResource::visibleOr(Partner::query(), InvoiceResource::getEloquentQuery()->select('invoices.customer_id'))->find((int) $get('customer_id')) : null;
         $amount = fn (): TextInput => TextInput::make($name)->label($label)->numeric()->integer()->minValue(-99999999999)->maxValue(99999999999)
             ->prefix('¥')->default(0)->live(onBlur: true);
         $days = array_map(fn (ClosingDay $day): string => $day->value, ClosingDay::cases());

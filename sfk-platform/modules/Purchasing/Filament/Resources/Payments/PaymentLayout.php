@@ -23,6 +23,7 @@ use Modules\Core\Filament\Records\RecordSections;
 use Modules\Core\Filament\Records\RecordTable;
 use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Support\UserPopup;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
 use Modules\Purchasing\Domain\PurchaseChoices;
 use Modules\Purchasing\Domain\PurchasingFields;
@@ -127,11 +128,11 @@ final class PaymentLayout
             ['method' => PurchaseChoices::DEFAULT_PAYMENT_METHOD],
         )->schema([
             Select::make('supplier_id')->hiddenLabel()->native()->placeholder('-----')
-                ->relationship('supplier', 'name', fn (Builder $query): Builder => $query->where('is_supplier', true)->orderByDesc('id'))
+                ->relationship('supplier', 'name', fn (Builder $query): Builder => PartnerResource::visibleOr($query->where('is_supplier', true), PaymentLine::query()->whereIn('payment_id', PaymentResource::getEloquentQuery()->select('payments.id'))->select('payment_lines.supplier_id'))->orderByDesc('id'))
                 ->preload()
                 ->live(),
             TextEntry::make('supplier_code')->hiddenLabel()->placeholder('')
-                ->state(fn (Get $get): ?string => is_numeric($get('supplier_id')) ? Partner::query()->whereKey((int) $get('supplier_id'))->value('code') : null),
+                ->state(fn (Get $get): ?string => is_numeric($get('supplier_id')) ? PartnerResource::visibleOr(Partner::query(), PaymentLine::query()->whereIn('payment_id', PaymentResource::getEloquentQuery()->select('payments.id'))->select('payment_lines.supplier_id'))->whereKey((int) $get('supplier_id'))->value('code') : null),
             Select::make('method')->hiddenLabel()->native()->selectablePlaceholder(false)
                 ->options(PurchaseChoices::options(PurchaseChoices::PAYMENT_METHODS))->default(PurchaseChoices::DEFAULT_PAYMENT_METHOD),
             TextInput::make('amount')->hiddenLabel()->numeric()->integer()->minValue(-99999999999)->maxValue(99999999999)->live(onBlur: true),

@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\Orders\Models\Order;
 use Modules\Sales\Domain\Sales\SaleChoices;
+use Modules\Sales\Filament\Resources\Sales\SaleResource;
 use Modules\Sales\Models\Sale;
 
 /**
@@ -21,7 +22,8 @@ final class SalesLookup
     /** @return array{order: Order, person: string, product: string, quantity: string|null}|null */
     public function find(string $orderNumber): ?array
     {
-        $sales = Sale::query()
+        // only the sales the user may see (security review 2026-11-14: 品名 / 数量 / 担当者 of any 注番 could be read)
+        $sales = SaleResource::onlyVisible(Sale::query())
             ->with(['assignees', 'order'])
             ->whereHas('order', fn (Builder $query): Builder => $query->where('order_number', $orderNumber))
             ->orderByDesc('id');
