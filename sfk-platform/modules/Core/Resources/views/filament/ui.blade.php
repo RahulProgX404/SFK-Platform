@@ -265,24 +265,226 @@
         cursor: not-allowed;
     }
 
-    /* ── Tooltip: near-black box with white text ── */
-    .tippy-box {
-        --tippy-background-color: var(--sfk-ui-tooltip);
-        max-width: 260px !important;
-        color: #ffffff;
-        font-size: .8125rem;
-        line-height: 1.5;
-        box-shadow: none;
+    /* ── Tooltip — one look on every screen (user 2026-11-14): Filament's tooltips (`->tooltip()`, its light / dark
+       themes), the information tooltips of Modules\Core\Filament\Support\Tip (window.sfkTip) and the browser `title`s
+       (shown through window.sfkTipTitle, below) are all a light card with a hairline border, a soft shadow and an
+       arrow, fading in with a 3px rise. The chart tooltips draw the same card (sfk-tip-panel). `[data-state]` is on
+       every tippy box: it outranks Filament's theme rules. ── */
+    .tippy-box[data-state],
+    .sfk-tip-panel {
+        --tippy-background-color: var(--sfk-surface, #fff);
+        --tippy-box-shadow: 0 8px 24px rgba(16, 24, 40, .12), 0 2px 6px rgba(16, 24, 40, .06);
+        border: 1px solid var(--sfk-line, #e3e6ea);
+        border-radius: var(--sfk-radius, 6px);
+        background: var(--sfk-surface, #fff);
+        box-shadow: 0 8px 24px rgba(16, 24, 40, .12), 0 2px 6px rgba(16, 24, 40, .06);
+        color: var(--sfk-ink, #1f2326);
+        font-size: var(--sfk-fs-small, 13px);
+        line-height: 1.55;
+        text-align: left;
+        white-space: normal;
     }
 
-    .tippy-box[data-theme~='light'] {
-        --tippy-background-color: var(--sfk-ui-tooltip);
-        --tippy-box-shadow: none;
-        color: #ffffff;
+    .tippy-box[data-state] {
+        max-width: min(320px, calc(100vw - 16px)) !important;
     }
 
-    .tippy-content {
-        padding: 6px 10px;
+    .tippy-box[data-theme~='sfk-tip'] {
+        pointer-events: none;
+    }
+
+    .tippy-box[data-state]>.tippy-content {
+        padding: 7px 10px;
+    }
+
+    .tippy-box[data-state]>.tippy-content:has(> .sfk-tip-title, > .sfk-tip > .sfk-tip-title) {
+        padding: 9px 12px;
+    }
+
+    .tippy-box[data-animation='sfk-tip'] {
+        transition-property: opacity, transform;
+        transition-timing-function: ease-out;
+    }
+
+    .tippy-box[data-animation='sfk-tip'][data-state='hidden'] {
+        opacity: 0;
+    }
+
+    .tippy-box[data-animation='sfk-tip'][data-placement^='top'][data-state='hidden'] {
+        transform: translateY(3px);
+    }
+
+    .tippy-box[data-animation='sfk-tip'][data-placement^='bottom'][data-state='hidden'] {
+        transform: translateY(-3px);
+    }
+
+    /* the arrow: a small square turned on its corner, the border on its two outer sides */
+    .tippy-box[data-state]>.tippy-arrow {
+        width: 12px;
+        height: 12px;
+        color: var(--sfk-surface, #fff);
+    }
+
+    .tippy-box[data-state]>.tippy-arrow::before {
+        width: 9px;
+        height: 9px;
+        border: 0 !important;
+        background: var(--sfk-surface, #fff);
+        transform: rotate(45deg) !important;
+        transform-origin: center !important;
+    }
+
+    .tippy-box[data-state][data-placement^='top']>.tippy-arrow::before {
+        top: auto !important;
+        bottom: -4px !important;
+        left: 1.5px !important;
+        box-shadow: 1px 1px 0 var(--sfk-line, #e3e6ea);
+    }
+
+    .tippy-box[data-state][data-placement^='bottom']>.tippy-arrow::before {
+        top: -4px !important;
+        bottom: auto !important;
+        left: 1.5px !important;
+        box-shadow: -1px -1px 0 var(--sfk-line, #e3e6ea);
+    }
+
+    .tippy-box[data-state][data-placement^='left']>.tippy-arrow::before {
+        top: 1.5px !important;
+        right: -4px !important;
+        left: auto !important;
+        box-shadow: 1px -1px 0 var(--sfk-line, #e3e6ea);
+    }
+
+    .tippy-box[data-state][data-placement^='right']>.tippy-arrow::before {
+        top: 1.5px !important;
+        left: -4px !important;
+        right: auto !important;
+        box-shadow: -1px 1px 0 var(--sfk-line, #e3e6ea);
+    }
+
+    .sfk-tip-title {
+        margin: 0 0 4px;
+        color: var(--sfk-ink, #1f2326);
+        font-size: var(--sfk-fs-small, 13px);
+        font-weight: var(--sfk-fw-bold, 700);
+    }
+
+    .sfk-tip-text {
+        margin: 0;
+        color: var(--sfk-text, #3c4249);
+    }
+
+    .sfk-tip-text+.sfk-tip-text {
+        margin-top: 2px;
+    }
+
+    .sfk-tip-rows {
+        display: grid;
+        gap: 3px;
+        margin: 6px 0 0;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .sfk-tip-title+.sfk-tip-rows {
+        margin-top: 2px;
+    }
+
+    .sfk-tip-rows>div {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 16px;
+    }
+
+    .sfk-tip-rows dt {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        color: var(--sfk-muted, #6b7280);
+    }
+
+    .sfk-tip-rows dd {
+        margin: 0;
+        color: var(--sfk-ink, #1f2326);
+        font-weight: var(--sfk-fw-semibold, 600);
+        white-space: nowrap;
+    }
+
+    .sfk-tip-rows>div.is-strong dt {
+        color: var(--sfk-ink, #1f2326);
+    }
+
+    .sfk-tip-rows dd.is-up {
+        color: var(--sfk-success, #12805c);
+    }
+
+    .sfk-tip-rows dd.is-down {
+        color: var(--sfk-danger-text, #c0322a);
+    }
+
+    .sfk-tip-rows dd.is-flat {
+        color: var(--sfk-text, #3c4249);
+    }
+
+    .sfk-tip-dot {
+        width: 8px;
+        height: 8px;
+        flex: none;
+        border-radius: 9999px;
+    }
+
+    .sfk-tip-divider {
+        height: 0;
+        margin: 3px 0;
+        border-top: 1px solid var(--sfk-line-soft, #eef0f2);
+    }
+
+    .sfk-tip-formula {
+        margin: 6px 0 0;
+        padding: 6px 8px;
+        border-radius: 4px;
+        background: var(--sfk-hover, #f5f6f8);
+        color: var(--sfk-text, #3c4249);
+        font-size: var(--sfk-fs-badge, 12px);
+    }
+
+    .sfk-tip-formula span {
+        display: block;
+        color: var(--sfk-muted, #6b7280);
+        font-weight: var(--sfk-fw-semibold, 600);
+    }
+
+    .sfk-tip-note {
+        margin: 6px 0 0;
+        color: var(--sfk-muted, #6b7280);
+        font-size: var(--sfk-fs-badge, 12px);
+    }
+
+    /* a term that explains itself on hover / focus / tap: a dotted underline, no icon */
+    .sfk-tip-term {
+        border-radius: 2px;
+        text-decoration: underline dotted;
+        text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+        text-underline-offset: 3px;
+        cursor: help;
+    }
+
+    .sfk-tip-term:focus-visible,
+    [data-sfk-tip]:focus-visible {
+        outline: 2px solid var(--sfk-primary, #05467e);
+        outline-offset: 2px;
+    }
+
+    [data-sfk-tip] {
+        cursor: help;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .tippy-box[data-state] {
+            transition-duration: 0s !important;
+            transform: none !important;
+        }
     }
 
     /* ── Loading: the spinner in the system blue ── */
@@ -686,3 +888,81 @@
         color: var(--kt-blue);
     }
 </style>
+
+<script>
+    // Information tooltip (Modules\Core\Filament\Support\Tip): the shared settings of `x-tooltip="sfkTip(html)"` —
+    // light theme, arrow, shown after a short delay on hover, at once on keyboard focus or a tap (touch), kept inside
+    // the screen (it flips and shifts near the edges), described to screen readers (aria-describedby), closed by Esc,
+    // a tap elsewhere or leaving. Defined once (served in the cached theme script; safe to run again).
+    window.sfkTip = window.sfkTip || function (content, extra) {
+        const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        return Object.assign({
+            content: content,
+            allowHTML: true,
+            theme: 'sfk-tip',
+            animation: 'sfk-tip',
+            placement: 'top',
+            arrow: true,
+            offset: [0, 8],
+            maxWidth: 320,
+            delay: [250, 0],
+            duration: reduced ? [0, 0] : [160, 120],
+            trigger: 'mouseenter focus',
+            touch: true,
+            hideOnClick: true,
+            interactive: false,
+            aria: { content: 'describedby', expanded: false },
+            appendTo: () => document.body,
+            popperOptions: { modifiers: [{ name: 'preventOverflow', options: { padding: 8 } }, { name: 'flip', options: { fallbackPlacements: ['bottom'] } }] },
+            onShow(instance) {
+                instance.sfkEsc = (event) => { if (event.key === 'Escape') { instance.hide(); } };
+                document.addEventListener('keydown', instance.sfkEsc);
+            },
+            onHide(instance) {
+                document.removeEventListener('keydown', instance.sfkEsc);
+            },
+        }, extra || {});
+    };
+
+    // Browser `title`s become the same tooltip (user 2026-11-14): on the first hover or focus of an element with a
+    // title, the title moves to data-sfk-title and the element gets `x-tooltip="sfkTipTitle($el)"` (Alpine sets it up
+    // from the attribute). Touch screens never showed titles: nothing changes there. A redraw by Livewire puts the
+    // title back; the next hover takes it again. Form fields, frames and [data-native-title] keep the browser's.
+    window.sfkTipTitle = window.sfkTipTitle || function (el) {
+        const text = (el.dataset.sfkTitle || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+        return window.sfkTip('<p class="sfk-tip-text">' + text + '</p>', { touch: false, delay: [400, 0] });
+    };
+
+    if (!window.sfkTitleTips) {
+        window.sfkTitleTips = true;
+        const adopt = (event) => {
+            if (event.pointerType === 'touch' || !(event.target instanceof Element)) {
+                return;
+            }
+            const el = event.target.closest('[title]');
+            if (!el || el.hasAttribute('x-tooltip') || el.closest('[data-native-title]') || el.matches('iframe, input, textarea, select, option, link, style, svg *')) {
+                return;
+            }
+            const text = (el.getAttribute('title') || '').trim();
+            el.removeAttribute('title');
+            if (text === '') {
+                return;
+            }
+            el.dataset.sfkTitle = text;
+            el.setAttribute('x-tooltip', 'sfkTipTitle($el)');
+            setTimeout(() => {
+                if (!el.__x_tippy) {
+                    // not set up (outside Alpine): the browser's title again
+                    el.removeAttribute('x-tooltip');
+                    el.setAttribute('title', text);
+                } else if (el.matches(':hover') || el === document.activeElement) {
+                    el.__x_tippy.show();
+                }
+            }, 30);
+        };
+        document.addEventListener('pointerover', adopt, true);
+        document.addEventListener('focusin', adopt, true);
+    }
+</script>

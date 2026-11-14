@@ -29,6 +29,8 @@ final class TopCustomersCard extends DashboardCard
     {
         return [
             'customers' => $this->salesData()->topCustomers($this->period()),
+            // 構成比 of the tooltips: the period's 売上合計 (the figure 売上合計 has already added up, from the cache)
+            'whole' => $this->salesData()->totals($this->period())['amount'],
             'salesUrl' => self::appUrl('sales-entry'),
         ];
     }

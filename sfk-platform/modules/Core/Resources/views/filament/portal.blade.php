@@ -120,9 +120,25 @@
             font-size: var(--sfk-fs-small);
         }
 
-        .sfk-dash-date-presets button:hover {
+        .sfk-dash-date-presets button:hover,
+        .sfk-dash-date-presets button.is-active {
             background: var(--sfk-primary-soft);
             color: var(--sfk-primary-dark);
+        }
+
+        .sfk-dash-date-presets button.is-active {
+            box-shadow: inset 0 0 0 1px var(--sfk-primary);
+            font-weight: var(--sfk-fw-semibold);
+        }
+
+        /* the date button names what it is: 選択期間 (and the preset it matches), so the cards' own periods stand apart */
+        .sfk-dash-date-kind {
+            color: var(--sfk-muted);
+            font-size: var(--sfk-fs-small);
+        }
+
+        .sfk-dash-date-short {
+            display: none;
         }
 
         .sfk-dash-date-range {
@@ -209,8 +225,15 @@
             .sfk-dash-span-5,
             .sfk-dash-span-6,
             .sfk-dash-span-8,
-            .sfk-dash-span-12 {
+            .sfk-dash-span-12,
+            .sfk-dash-t-full {
                 grid-column: 1 / -1;
+            }
+        }
+
+        @media (min-width: 768px) and (max-width: 1279px) {
+            .sfk-dash-t-half {
+                grid-column: auto;
             }
         }
 
@@ -273,6 +296,11 @@
         .sfk-dash-cell>* {
             flex: 1;
             min-width: 0;
+        }
+
+        /* lists (rankings, people, activity): as high as their rows, not stretched to the tallest card of the row */
+        .sfk-dash-cell.is-fit {
+            align-self: start;
         }
 
         .sfk-dash-card {
@@ -562,13 +590,52 @@
         }
 
         .sfk-dash-caption {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
             color: var(--sfk-muted);
             font-size: var(--sfk-fs-badge);
             font-variant-numeric: tabular-nums;
             white-space: nowrap;
         }
 
-        /* a comparison chip: what it is compared with is part of its text (前期間比, 前年同期比 …) */
+        /* what a card's period is: 選択期間 (the date button, blue) or the card's own (暦年・月別, 今日・明日 — grey) */
+        .sfk-dash-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 0 6px;
+            border-radius: 4px;
+            background: var(--sfk-hover-strong);
+            color: var(--sfk-text);
+            font-size: var(--sfk-fs-badge);
+            font-weight: var(--sfk-fw-medium);
+            line-height: 18px;
+        }
+
+        .sfk-dash-tag.is-selected {
+            background: var(--sfk-primary-soft);
+            color: var(--sfk-primary-dark);
+        }
+
+        /* how far the sales data goes, when a figure reaches past it (no percentage then) */
+        .sfk-dash-datanote {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: var(--sfk-warning);
+            font-size: var(--sfk-fs-badge);
+            font-weight: var(--sfk-fw-medium);
+            white-space: nowrap;
+        }
+
+        .sfk-dash-datanote .fi-icon {
+            width: 14px;
+            height: 14px;
+            flex: none;
+        }
+
+        /* a comparison chip (analytics::widgets.partials.change): green ▲ up, red ▼ down, grey ± — on every card; what it is
+           compared with is part of its text (前期間比, 前年同期比 …) */
         .sfk-dash-trend.is-flat {
             background: var(--sfk-hover);
             color: var(--sfk-text);
@@ -1207,13 +1274,24 @@
                 width: 100%;
             }
 
+            /* 全体 | 個人 and 新規作成 on one row, the date button on a row of its own under them */
             .sfk-dash-header-tools>.sfk-dash-date-menu {
-                flex: 1;
+                order: 3;
+                flex: 1 1 100%;
                 min-width: 0;
             }
 
             .sfk-dash-scope {
-                width: 100%;
+                flex: 1;
+                width: auto;
+            }
+
+            .sfk-dash-date-long {
+                display: none;
+            }
+
+            .sfk-dash-date-short {
+                display: inline;
             }
 
             .sfk-dash-scope-option {
@@ -1223,7 +1301,15 @@
 
             .sfk-dash-date {
                 width: 100%;
-                justify-content: space-between;
+                justify-content: flex-start;
+            }
+
+            .sfk-dash-date-chevron {
+                margin-left: auto;
+            }
+
+            .sfk-dash-date-presets button {
+                height: var(--sfk-control);
             }
 
             .sfk-dash {

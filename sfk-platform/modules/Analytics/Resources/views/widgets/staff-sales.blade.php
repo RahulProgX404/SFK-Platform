@@ -2,18 +2,19 @@
      first (sfk-dash-ranking); 個人 ($latest): the user's own newest sales --}}
 @php
     use Modules\Analytics\Filament\Dashboard\DashboardCard;
+    use Modules\Analytics\Filament\Dashboard\DashboardTips;
     use Modules\Core\Filament\Support\AppFormat;
 @endphp
 
-<div class="sfk-dash-cell sfk-dash-span-4">
+<div class="sfk-dash-cell sfk-dash-span-4 is-fit">
     <section class="sfk-dash-card" aria-labelledby="sfk-staff-sales-title">
         <header class="sfk-dash-card-head">
             <div class="sfk-dash-card-titles">
                 <h2 class="sfk-dash-card-title" id="sfk-staff-sales-title">{{ $latest === null ? '担当者別売上' : '担当した売上' }}</h2>
-                <span class="sfk-dash-caption">{{ $this->periodCaption() }}</span>
+                <span class="sfk-dash-caption"><span class="sfk-dash-tag is-selected">選択期間</span>{{ $this->periodCaption() }}</span>
             </div>
             @if ($analysisUrl !== null)
-                <a href="{{ $analysisUrl }}" class="sfk-dash-more" title="売上分析を見る"><x-filament::icon icon="heroicon-m-arrow-right" /><span class="fi-sr-only">売上分析を見る</span></a>
+                <a href="{{ $analysisUrl }}" class="sfk-dash-more" x-tooltip="{{ \Modules\Core\Filament\Support\Tip::text('売上分析を見る')->x() }}"><x-filament::icon icon="heroicon-m-arrow-right" /><span class="fi-sr-only">売上分析を見る</span></a>
             @endif
         </header>
 
@@ -25,7 +26,7 @@
                 <li wire:key="latest-sale-{{ $sale['id'] }}">
                     <span class="sfk-dash-avatar is-solid is-{{ $index + 1 }}">{{ DashboardCard::initials($sale['customer']) }}</span>
                     @if ($sale['url'] !== null)
-                        <a href="{{ $sale['url'] }}" class="sfk-dash-people-text" title="レコードを開く">
+                        <a href="{{ $sale['url'] }}" class="sfk-dash-people-text">
                     @else
                         <span class="sfk-dash-people-text">
                     @endif
@@ -55,7 +56,8 @@
                 @if ($loop->first)
                     <ol class="sfk-dash-ranking">
                 @endif
-                <li>
+                @php($tip = DashboardTips::ranking($person['name'], DashboardTips::share($person['amount'], $whole)))
+                <li tabindex="0" data-sfk-tip x-tooltip="{{ $tip->x() }}">
                     <span @class(['sfk-dash-rankno', 'is-'.($index + 1)])>{{ $index + 1 }}</span>
                     <span class="sfk-dash-ranking-name">
                         <strong>{{ $person['name'] }}</strong>

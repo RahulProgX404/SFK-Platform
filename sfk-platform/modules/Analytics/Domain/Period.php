@@ -115,7 +115,6 @@ final readonly class Period
         return $parts;
     }
 
-    /** 「2026/10/07 〜 2026/11/05」 */
     /**
      * The calendar months the period touches, each with the part of it inside the period (days in the period / days
      * of the month): a monthly 売上目標 or 予想 counts only for the days the period covers (2026-11-11 — the whole
@@ -148,6 +147,7 @@ final readonly class Period
         return $this->from->format('Y/m/d').'〜'.$this->to->format($this->from->format('Y') === $this->to->format('Y') ? 'm/d' : 'Y/m/d');
     }
 
+    /** 「2026/10/07 〜 2026/11/05」 */
     public function label(): string
     {
         return $this->from->format('Y/m/d').' 〜 '.$this->to->format('Y/m/d');

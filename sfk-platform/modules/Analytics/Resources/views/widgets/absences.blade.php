@@ -6,7 +6,7 @@
     $weekdays = ['日', '月', '火', '水', '木', '金', '土'];
 @endphp
 
-<div class="sfk-dash-cell sfk-dash-span-{{ $span }}">
+<div class="sfk-dash-cell sfk-dash-span-{{ $span }} sfk-dash-t-half is-fit">
     <style>
         .sfk-absence-days { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--sfk-space-3); }
         .sfk-absence-day { min-width: 0; padding: var(--sfk-space-3); border-radius: var(--sfk-radius-lg); box-shadow: inset 0 0 0 1px var(--sfk-line-soft); }
@@ -21,10 +21,10 @@
         <header class="sfk-dash-card-head">
             <div class="sfk-dash-card-titles">
                 <h2 class="sfk-dash-card-title" id="sfk-absences-title">休暇・勤怠予定</h2>
-                <span class="sfk-dash-caption">{{ $dates['today']->format('Y/m/d') }}〜{{ $dates['tomorrow']->format('m/d') }}</span>
+                <span class="sfk-dash-caption"><span class="sfk-dash-tag">今日・明日</span>{{ $dates['today']->format('Y/m/d') }}〜{{ $dates['tomorrow']->format('m/d') }}</span>
             </div>
             @if ($requestsUrl !== null)
-                <a href="{{ $requestsUrl }}" class="sfk-dash-more" title="申請管理を開く"><x-filament::icon icon="heroicon-m-arrow-right" /><span class="fi-sr-only">申請管理を開く</span></a>
+                <a href="{{ $requestsUrl }}" class="sfk-dash-more" x-tooltip="{{ \Modules\Core\Filament\Support\Tip::text('申請管理を開く')->x() }}"><x-filament::icon icon="heroicon-m-arrow-right" /><span class="fi-sr-only">申請管理を開く</span></a>
             @endif
         </header>
 

@@ -105,6 +105,8 @@ final class PortalPage extends Dashboard
             'to' => (string) $this->filters['to'],
             // 全体 | 個人 before the date button: users who see everyone's money (財務分析の範囲 全体)
             'scope' => $this->allowedScope($this->filters['scope'] ?? null),
+            // the preset the chosen days are (今年度 …), named on the date button next to 選択期間
+            'preset' => array_search([(string) $this->filters['from'], (string) $this->filters['to']], self::presetPeriods(), true) ?: null,
             'switchesScope' => self::actor()?->seesOverallFinance() ?? false,
             'createItems' => $this->createItems(),
         ]);
@@ -116,18 +118,26 @@ final class PortalPage extends Dashboard
      */
     public function setPeriod(string $preset): void
     {
+        $presets = self::presetPeriods();
+        [$from, $to] = $presets[$preset] ?? $presets['30d'];
+        $this->filters = ['from' => $from, 'to' => $to, 'scope' => $this->allowedScope($this->filters['scope'] ?? null)];
+        $this->updatedFilters();
+    }
+
+    /** @return array<string, array{0: string, 1: string}> the days (Y-m-d) of each preset of the date button, today */
+    public static function presetPeriods(): array
+    {
         $today = Carbon::today();
-        [$from, $to] = match ($preset) {
+
+        return array_map(fn (array $days): array => [$days[0]->toDateString(), $days[1]->toDateString()], [
             'today' => [$today, $today],
             '7d' => [$today->copy()->subDays(6), $today],
+            '30d' => [$today->copy()->subDays(29), $today],
             'month' => [$today->copy()->startOfMonth(), $today],
             'lastMonth' => [$today->copy()->subMonthNoOverflow()->startOfMonth(), $today->copy()->subMonthNoOverflow()->endOfMonth()],
             'year' => [$today->copy()->startOfYear(), $today],
             'fiscalYear' => [Carbon::create($today->month >= 5 ? $today->year : $today->year - 1, 5, 1), $today],
-            default => [$today->copy()->subDays(29), $today],
-        };
-        $this->filters = ['from' => $from->toDateString(), 'to' => $to->toDateString(), 'scope' => $this->allowedScope($this->filters['scope'] ?? null)];
-        $this->updatedFilters();
+        ]);
     }
 
     /** Two dates of the date button (Y-m-d, in any order). */

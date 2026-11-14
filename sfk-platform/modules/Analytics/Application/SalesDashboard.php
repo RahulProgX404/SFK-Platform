@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\JoinClause;
 use Modules\Analytics\Domain\FiscalYear;
 use Modules\Analytics\Domain\Period;
+use Modules\Analytics\Domain\SalesCoverage;
 use Modules\Analytics\Filament\Resources\SalesPlans\SalesPlanResource;
 use Modules\Analytics\Models\SalesForecast;
 use Modules\Analytics\Models\SalesPlan;
@@ -124,14 +125,27 @@ final class SalesDashboard
                 return $this->forecast($period, $this->staffId);
             }
 
-            // each month's plan for the days of it the period covers (Period::monthShares)
-            $total = null;
-            foreach ($period->monthShares() as [$year, $month, $share]) {
+            // each month's plan (the plans of its business year) for the days of it the period covers
+            // (Period::monthShares) — every month in one query: a year chosen in the date button touched 12
+            $shares = $period->monthShares();
+            $sums = [];
+            $bindings = [];
+            foreach ($shares as $index => [$year, $month]) {
                 [$from, $after] = FiscalYear::days(FiscalYear::ofMonth($year, $month));
-                $sum = SalesPlanResource::onlyVisible(SalesPlan::query())
-                    ->where('planned_on', '>=', $from)->where('planned_on', '<', $after)
-                    ->sum('plan_'.FiscalYear::column($month));
-                if ((int) $sum !== 0) {
+                $column = 'sales_plans.plan_'.FiscalYear::column($month);
+                $sums[] = "coalesce(sum(case when sales_plans.planned_on >= ? and sales_plans.planned_on < ? then {$column} end), 0) as s{$index}";
+                array_push($bindings, $from, $after);
+            }
+            $row = SalesPlanResource::onlyVisible(SalesPlan::query())
+                ->where('sales_plans.planned_on', '>=', FiscalYear::days(FiscalYear::ofMonth($shares[0][0], $shares[0][1]))[0])
+                ->where('sales_plans.planned_on', '<', FiscalYear::days(FiscalYear::ofMonth($shares[count($shares) - 1][0], $shares[count($shares) - 1][1]))[1])
+                ->selectRaw(implode(', ', $sums), $bindings)
+                ->toBase()->first();
+
+            $total = null;
+            foreach ($shares as $index => [, , $share]) {
+                $sum = (int) ($row->{"s{$index}"} ?? 0);
+                if ($sum !== 0) {
                     $total = ($total ?? 0) + $sum * $share;
                 }
             }
@@ -190,6 +204,21 @@ final class SalesDashboard
 
             return $amounts;
         });
+    }
+
+    /**
+     * The days the sales data covers (Domain\SalesCoverage): the first and last 売上日 of the sales the user may see —
+     * everyone's even in 個人: a 担当者 without sales in a month sold nothing then, a month without any sale has no data.
+     */
+    public function coverage(DateTimeImmutable $today): SalesCoverage
+    {
+        $range = DataCache::remember('sales-dashboard:'.auth()->id().':coverage', function (): array {
+            $row = SaleResource::onlyVisible(Sale::query())->selectRaw('min(sales.sold_on) as first_on, max(sales.sold_on) as last_on')->toBase()->first();
+
+            return [$row?->first_on === null ? null : (string) $row->first_on, $row?->last_on === null ? null : (string) $row->last_on];
+        });
+
+        return SalesCoverage::of($range[0], $range[1], $today);
     }
 
     /** @return list<array{id: int, name: string, code: string|null, count: int, amount: int}> by 売上金額 */

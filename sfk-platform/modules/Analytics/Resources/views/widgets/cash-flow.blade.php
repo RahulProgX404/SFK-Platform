@@ -35,17 +35,17 @@
         <header class="sfk-dash-card-head">
             <div class="sfk-dash-card-titles">
                 <h2 class="sfk-dash-card-title" id="sfk-cash-title">入出金</h2>
-                <span class="sfk-dash-caption">{{ $this->periodCaption() }}</span>
+                <span class="sfk-dash-caption"><span class="sfk-dash-tag is-selected">選択期間</span>{{ $this->periodCaption() }}</span>
             </div>
             @if ($receiptsUrl !== null)
-                <a href="{{ $receiptsUrl }}" class="sfk-dash-more" title="売入金管理を開く"><x-filament::icon icon="heroicon-m-arrow-right" /><span class="fi-sr-only">売入金管理を開く</span></a>
+                <a href="{{ $receiptsUrl }}" class="sfk-dash-more" x-tooltip="{{ \Modules\Core\Filament\Support\Tip::text('売入金管理を開く')->x() }}"><x-filament::icon icon="heroicon-m-arrow-right" /><span class="fi-sr-only">売入金管理を開く</span></a>
             @endif
         </header>
 
         <dl class="sfk-cash-rows">
             @foreach ($rows as $row)
                 <div class="sfk-cash-row sfk-tone-{{ $row['tone'] }}">
-                    <dt><span class="sfk-cash-icon" aria-hidden="true"><x-filament::icon :icon="$row['icon']" /></span>{{ $row['label'] }}</dt>
+                    <dt><span class="sfk-cash-icon" aria-hidden="true"><x-filament::icon :icon="$row['icon']" /></span>@if (($tips[$row['label']] ?? null) !== null)@include('analytics::widgets.partials.term', ['tip' => $tips[$row['label']], 'label' => $row['label']])@else{{ $row['label'] }}@endif</dt>
                     <dd>{{ $row['amount'] > 0 ? $row['sign'] : '' }}{{ AppFormat::yen($row['amount']) }}</dd>
                 </div>
             @endforeach
@@ -53,7 +53,7 @@
 
         @if ($waiting === null)
             <div @class(['sfk-cash-net', 'is-minus' => $net < 0])>
-                <span>差引</span>
+                <span>@include('analytics::widgets.partials.term', ['tip' => $tips['差引'], 'label' => '差引'])</span>
                 <strong>{{ $net < 0 ? '−'.AppFormat::yen(abs($net)) : AppFormat::yen($net) }}</strong>
             </div>
         @endif

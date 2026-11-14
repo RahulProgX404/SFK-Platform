@@ -2,12 +2,13 @@
      horizontal bars — place, 品名 (two lines at most, the whole name on hover), the amount and the number of sales, the bar
      against the first. Across the narrow card nothing overlaps (2026-11-11; the upright bars crowded their labels). --}}
 @php
+    use Modules\Analytics\Filament\Dashboard\DashboardTips;
     use Modules\Core\Filament\Support\AppFormat;
 
     $colors = ['var(--sfk-primary)', '#16956b', '#d48806'];
 @endphp
 
-<div class="sfk-dash-cell sfk-dash-span-20p">
+<div class="sfk-dash-cell sfk-dash-span-20p is-fit">
     <style>
         .sfk-products { display: flex; flex-direction: column; gap: var(--sfk-space-4); margin: 0; padding: 0; list-style: none; }
         .sfk-products-item { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 6px var(--sfk-space-2); }
@@ -24,10 +25,10 @@
         <header class="sfk-dash-card-head">
             <div class="sfk-dash-card-titles">
                 <h2 class="sfk-dash-card-title" id="sfk-products-title">売れ筋 TOP3</h2>
-                <span class="sfk-dash-caption">{{ $this->periodCaption() }}</span>
+                <span class="sfk-dash-caption"><span class="sfk-dash-tag is-selected">選択期間</span>{{ $this->periodCaption() }}</span>
             </div>
             @if ($salesUrl !== null)
-                <a href="{{ $salesUrl }}" class="sfk-dash-more" title="売上入力を開く"><x-filament::icon icon="heroicon-m-arrow-right" /><span class="fi-sr-only">売上入力を開く</span></a>
+                <a href="{{ $salesUrl }}" class="sfk-dash-more" x-tooltip="{{ \Modules\Core\Filament\Support\Tip::text('売上入力を開く')->x() }}"><x-filament::icon icon="heroicon-m-arrow-right" /><span class="fi-sr-only">売上入力を開く</span></a>
             @endif
         </header>
 
@@ -36,7 +37,8 @@
         @else
             <ol class="sfk-products">
                 @foreach ($products as $index => $product)
-                    <li class="sfk-products-item" title="{{ $product['name'] }}：{{ AppFormat::yen($product['amount']) }}（{{ number_format($product['count']) }}件）">
+                    @php($tip = DashboardTips::ranking($product['name'], DashboardTips::share($product['amount'], $whole)))
+                    <li class="sfk-products-item" tabindex="0" data-sfk-tip x-tooltip="{{ $tip->x() }}">
                         <span @class(['sfk-dash-rankno', 'is-'.($index + 1)])>{{ $index + 1 }}</span>
                         <span class="sfk-products-name">{{ $product['name'] }}</span>
                         <span class="sfk-products-bar" aria-hidden="true"><i style="width: {{ max(3, (int) round($product['amount'] / $top * 100)) }}%; background: {{ $colors[$index] ?? $colors[0] }}"></i></span>

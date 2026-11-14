@@ -1,5 +1,6 @@
 {{-- 売上の推移 (Modules\Analytics\Filament\Widgets\SalesTrendCard; personal-growth.png): the sales per month of the chosen
-     calendar year (solid, with the area) against the year before (dashed), exact amounts on hover (個人: the user's own) --}}
+     calendar year (solid, with the area) against the year before (dashed), exact amounts on hover (個人: the user's own);
+     the total says which days it covers, 前年同期比 the days of the year before it is compared with and their amount --}}
 @php
     use Modules\Core\Filament\Support\AppFormat;
 @endphp
@@ -12,7 +13,7 @@
             <div class="sfk-dash-card-titles">
                 <h2 class="sfk-dash-card-title" id="sfk-sales-trend-title">売上の推移</h2>
                 {{-- the months of a calendar year: the business year (May – April) is in 売上分析 --}}
-                <span class="sfk-dash-caption">暦年（1月〜12月）・月別</span>
+                <span class="sfk-dash-caption"><span class="sfk-dash-tag">暦年・月別</span>{{ $shownYear }}年1月〜12月</span>
             </div>
             <div class="sfk-growth-tools">
                 <ul class="sfk-growth-legend">
@@ -34,13 +35,16 @@
 
         <dl class="sfk-growth-figures">
             <div>
-                <dt>{{ $shownYear }}年の売上</dt>
-                <dd>
-                    {{ AppFormat::yen($total) }}
-                    @if ($change !== null)
-                        <span @class(['sfk-growth-change', 'is-up' => $change >= 0, 'is-down' => $change < 0]) title="前年の同じ月との比較">前年比 {{ $change >= 0 ? '▲' : '▼' }} {{ abs($change) }}%</span>
-                    @endif
-                </dd>
+                <dt>{{ $shownYear }}年の売上 @if ($totalNote !== null)<small class="sfk-growth-days">（{{ $totalNote }}）</small>@endif</dt>
+                <dd>{{ AppFormat::yen($total) }}</dd>
+                {{-- 前年同期比 over the days both years have data, which may be fewer than the total's --}}
+                @if ($comparison['label'] !== null)
+                    <dd class="sfk-growth-note">
+                        @include('analytics::widgets.partials.change', ['label' => '前年同期比', 'change' => $change])
+                        <span>{{ $comparison['days'] }} {{ AppFormat::yen($comparison['now']) }}</span>
+                        <span>前年同期（{{ $comparison['label'] }}） {{ AppFormat::yen($comparison['before']) }}</span>
+                    </dd>
+                @endif
             </div>
         </dl>
 

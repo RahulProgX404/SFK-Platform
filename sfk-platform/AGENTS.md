@@ -239,7 +239,25 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   the activity in one column). 全体 (bug.md 2026-11-11, `DashboardCard::inOverallLayout()`): 売上合計 · 売上概要 · 入出金 (4 + 5 + 3; every card
   under its title shows its period, `DashboardCard::periodCaption()`; comparisons say their baseline — 前期間比 with that amount
   and days, 前年同期比 — and are left out without one; amounts in whole yen, rankings in `sfk-dash-ranking` rows with a bar
-  against the first; 売上目標 counts each month's plan for the days of it the period covers, `Period::monthShares()`);
+  against the first; 売上目標 counts each month's plan for the days of it the period covers, `Period::monthShares()`, in
+  one query). Refinement 2026-11-14: a card's period caption starts with a tag — `sfk-dash-tag is-selected` 選択期間 for the
+  date button's days (the button says 選択期間 and the preset, e.g. 今年度), a grey tag for a card's own period (暦年・月別,
+  今日・明日); the year-before comparison is 前年度同期 when the period is the business year so far. Every comparison chip is
+  `widgets.partials.change` (green ▲ / red ▼ / grey ±, 1 decimal) with its baseline amount and days beside it. Sales data
+  has a coverage (`Domain\SalesCoverage`, `SalesDashboard::coverage()`: first to last 売上日, or to today while sales are
+  entered — stale after 14 days without one): days outside it are no data, never ¥0 — no percentage when a compared period
+  reaches past it (the card says 「売上データは…まで」), chart months without data are not drawn or bridged
+  (「データなし」), the month the data ends in is dotted with a ring, and 売上の推移's 前年同期比 compares the same days of
+  both years that have data. List cards (rankings, 最近表示した項目, 休暇・勤怠予定, 最近のアクティビティ) are as high as their
+  rows (`sfk-dash-cell is-fit`); on tablets (768–1279 px) cards pair up two per row (`sfk-dash-t-half` / `-t-full` say
+  when a card's desktop width does not decide it). Tooltips (user 2026-11-14): ONE tooltip on every screen — the light card of
+  `core::filament.ui` (all tippy boxes: Filament's `->tooltip()`, `x-tooltip="{{ $tip->x() }}"` built with Core
+  `Filament\Support\Tip`, and browser `title`s, which `window.sfkTipTitle` turns into the same tooltip on first hover);
+  no other tooltip style. Keep them short ("only important things"): a figure gets one line, a comparison chip the two
+  periods with their values and the difference, a ranking row the full name and 構成比 — never what the card already
+  shows. Dashboard texts live in `Analytics\Filament\Dashboard\DashboardTips` (from the cards' values, never a query on
+  open). The 12-month chart tooltip has the same look (`sfk-tip-panel`) and, with `TrendChart::build(…, $compare)`,
+  差額 and 前年同月比 of whole months; 最近のアクティビティ lists the 10 latest;
   売上の推移 (everyone's) · 上位の売上先 · 売れ筋 TOP3 (50 / 30 / 20 %, `sfk-dash-span-6` / `-30p` / `-20p` — the grid has
   60 tracks at ≥ 1280 px, the space between cards is their padding); 担当者別売上 · 作業者ランキング · 最近表示した項目 (a third
   each); 休暇・勤怠予定 · 最近のアクティビティ (half each, one column). Rows 3–4 are for everyone (休暇・勤怠予定 and クイックアクション, half

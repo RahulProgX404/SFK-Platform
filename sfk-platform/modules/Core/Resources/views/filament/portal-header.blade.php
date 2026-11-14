@@ -3,7 +3,7 @@
     全体 | 個人 (whose money the cards show; users whose 財務分析の範囲 is 全体), the period (a date button: presets or
     two dates) and 新規作成 (a menu of the apps the user may add records to — the page itself when there is one,
     disabled when there is none).
-    $from, $to: Y-m-d; $scope: overall | personal; $switchesScope: bool; $createItems: label => [url, app] (app: the quick-create panel it opens on the dashboard, AppResource::QUICK_CREATE_EVENT)
+    $from, $to: Y-m-d; $preset: the preset they are (今年度 …) or null; $scope: overall | personal; $switchesScope: bool; $createItems: label => [url, app] (app: the quick-create panel it opens on the dashboard, AppResource::QUICK_CREATE_EVENT)
 --}}
 @php
     use Illuminate\Support\Carbon;
@@ -11,6 +11,8 @@
     use Modules\Core\Filament\AppResource;
 
     $label = Carbon::parse($from)->format('Y/m/d').' 〜 '.Carbon::parse($to)->format('Y/m/d');
+    // phones: the year once when both days are in it (2026/05/01〜11/14)
+    $shortLabel = Carbon::parse($from)->format('Y/m/d').'〜'.Carbon::parse($to)->format(substr($from, 0, 4) === substr($to, 0, 4) ? 'm/d' : 'Y/m/d');
     $presets = ['today' => '今日', '7d' => '過去7日間', '30d' => '過去30日間', 'month' => '今月', 'lastMonth' => '先月', 'year' => '今年', 'fiscalYear' => '今年度'];
 @endphp
 
@@ -32,17 +34,22 @@
 
         <x-filament::dropdown placement="bottom-end" width="sm" :teleport="true" class="sfk-dash-date-menu">
             <x-slot name="trigger">
-                <button type="button" class="sfk-dash-date" title="期間を変更">
+                <button type="button" class="sfk-dash-date">
                     <x-filament::icon icon="heroicon-o-calendar" class="sfk-dash-date-icon" />
-                    <span>{{ $label }}</span>
+                    <span class="sfk-dash-date-kind">選択期間</span>
+                    @if ($preset !== null)
+                        <span class="sfk-dash-tag is-selected">{{ $presets[$preset] }}</span>
+                    @endif
+                    <span class="sfk-dash-date-long">{{ $label }}</span>
+                    <span class="sfk-dash-date-short">{{ $shortLabel }}</span>
                     <x-filament::icon icon="heroicon-m-chevron-down" class="sfk-dash-date-chevron" />
                 </button>
             </x-slot>
 
             <div class="sfk-dash-date-panel" x-data="{ from: @js($from), to: @js($to) }">
                 <div class="sfk-dash-date-presets">
-                    @foreach ($presets as $preset => $presetLabel)
-                        <button type="button" wire:click="setPeriod(@js($preset))" x-on:click="close()">{{ $presetLabel }}</button>
+                    @foreach ($presets as $presetKey => $presetLabel)
+                        <button type="button" @class(['is-active' => $presetKey === $preset]) wire:click="setPeriod(@js($presetKey))" x-on:click="close()">{{ $presetLabel }}</button>
                     @endforeach
                 </div>
                 <div class="sfk-dash-date-range">

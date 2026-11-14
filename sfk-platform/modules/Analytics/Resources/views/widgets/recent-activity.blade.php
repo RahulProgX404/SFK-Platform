@@ -1,4 +1,5 @@
-{{-- 最近のアクティビティ (Modules\Analytics\Filament\Widgets\RecentActivityCard): a timeline, in two columns on wide screens --}}
+{{-- 最近のアクティビティ (Modules\Analytics\Filament\Widgets\RecentActivityCard): a timeline, in two columns on wide screens;
+     the card is as high as its entries (is-fit), each entry with its time on one line --}}
 @php
     $kinds = [
         'notice' => ['tone' => 'blue', 'icon' => 'heroicon-o-bell'],
@@ -10,11 +11,11 @@
     $columns = $half ? [$items] : array_chunk($items, max(1, (int) ceil(count($items) / 2)));
 @endphp
 
-<div class="sfk-dash-cell sfk-dash-span-{{ $half ? 6 : 12 }}">
+<div class="sfk-dash-cell sfk-dash-span-{{ $half ? 6 : 12 }} is-fit">
     <style>
         .sfk-activity { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--sfk-space-8); }
         .sfk-activity ol { margin: 0; padding: 0; list-style: none; }
-        .sfk-activity-item { position: relative; display: flex; gap: var(--sfk-space-3); padding-bottom: var(--sfk-space-4); }
+        .sfk-activity-item { position: relative; display: flex; gap: var(--sfk-space-3); padding-bottom: var(--sfk-space-3); }
         .sfk-activity-item::before { content: ""; position: absolute; left: 15px; top: 34px; bottom: 2px; width: 2px; border-radius: 2px; background: linear-gradient(180deg, var(--sfk-tone-soft), transparent); }
         .sfk-activity-item:last-child::before { display: none; }
         .sfk-activity-icon { position: relative; z-index: 1; display: grid; place-items: center; width: 32px; height: 32px; flex: none; border-radius: 9999px; background: var(--sfk-tone); color: #fff; }
@@ -22,13 +23,14 @@
         .sfk-activity-text { flex: 1; min-width: 0; padding-top: 4px; }
         .sfk-activity-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sfk-space-3); }
         .sfk-activity-head strong { min-width: 0; color: var(--sfk-ink); font-size: var(--sfk-fs-label); font-weight: var(--sfk-fw-semibold); overflow-wrap: anywhere; }
-        .sfk-activity-head time { display: flex; flex: none; flex-direction: column; align-items: flex-end; color: var(--sfk-text); font-size: var(--sfk-fs-badge); line-height: 1.35; white-space: nowrap; }
+        .sfk-activity-head time { display: flex; flex: none; align-items: baseline; gap: 6px; color: var(--sfk-text); font-size: var(--sfk-fs-badge); line-height: 1.35; white-space: nowrap; }
         .sfk-activity-head time small { color: var(--sfk-muted); font-size: var(--sfk-fs-badge); font-variant-numeric: tabular-nums; }
         .sfk-activity-body { display: block; margin-top: 2px; color: var(--sfk-text); font-size: var(--sfk-fs-small); overflow-wrap: anywhere; }
         a.sfk-activity-text { color: inherit; text-decoration: none; }
         a.sfk-activity-text:hover strong { color: var(--sfk-primary); }
         .sfk-activity.is-single { grid-template-columns: minmax(0, 1fr); }
         @media (max-width: 1023px) { .sfk-activity { grid-template-columns: minmax(0, 1fr); } }
+        @media (max-width: 480px) { .sfk-activity-head time { flex-direction: column; align-items: flex-end; gap: 0; } }
     </style>
 
     <section class="sfk-dash-card" aria-labelledby="sfk-activity-title">
@@ -53,7 +55,7 @@
                                 @endif
                                     <span class="sfk-activity-head">
                                         <strong>{{ $item['title'] }}</strong>
-                                        <time datetime="{{ $item['at']->toIso8601String() }}" title="{{ $item['at']->format('Y/m/d H:i') }}">{{ $item['at']->locale('ja')->diffForHumans() }}<small>{{ $item['at']->format('n/j H:i') }}</small></time>
+                                        <time datetime="{{ $item['at']->toIso8601String() }}">{{ $item['at']->locale('ja')->diffForHumans() }}<small>{{ $item['at']->format('n/j H:i') }}</small></time>
                                     </span>
                                     @if (filled($item['body']))
                                         <span class="sfk-activity-body">{{ $item['body'] }}</span>

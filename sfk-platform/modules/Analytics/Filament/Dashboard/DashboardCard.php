@@ -10,7 +10,9 @@ use Filament\Facades\Filament;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Filament\Widgets\Widget;
 use Modules\Analytics\Application\SalesDashboard;
+use Modules\Analytics\Domain\FiscalYear;
 use Modules\Analytics\Domain\Period;
+use Modules\Analytics\Domain\SalesCoverage;
 use Modules\Core\Filament\AppResource;
 use Modules\Core\Filament\Portal\FollowsDashboardFilters;
 use Modules\Sales\Filament\Resources\Sales\SaleResource;
@@ -37,6 +39,23 @@ abstract class DashboardCard extends Widget implements FollowsDashboardFilters
     public function periodCaption(): string
     {
         return $this->period()->shortLabel();
+    }
+
+    /**
+     * 前年同期, or 前年度同期 when the period is the business year so far (今年度: from 1 May — May to April,
+     * FiscalYear) — the label of the comparison with Period::lastYear().
+     */
+    public function lastYearLabel(Period $period): string
+    {
+        $fiscalStart = new DateTimeImmutable(FiscalYear::days(FiscalYear::startingYear($period->from))[0]);
+
+        return $period->from == $fiscalStart && $period->to < $fiscalStart->modify('+1 year') ? '前年度同期' : '前年同期';
+    }
+
+    /** The days the sales data covers (a comparison reaching past them has no valid baseline). */
+    protected function coverage(): SalesCoverage
+    {
+        return $this->salesData()->coverage($this->today());
     }
 
     protected function period(): Period
@@ -170,9 +189,13 @@ abstract class DashboardCard extends Widget implements FollowsDashboardFilters
         return mb_substr($name !== '' ? $name : '?', 0, 2);
     }
 
-    /** Percentage change, 1 decimal; null without a base. */
-    public static function change(int|float $now, int|float $before): ?float
+    /**
+     * Percentage change, 1 decimal; null without a base (nothing before, or a base that is not positive — a percentage of
+     * a negative or zero amount says nothing) and when $valid is false (the figures do not cover the same days of data,
+     * SalesCoverage).
+     */
+    public static function change(int|float $now, int|float $before, bool $valid = true): ?float
     {
-        return $before > 0 ? round(($now - $before) / $before * 100, 1) : null;
+        return $valid && $before > 0 ? round(($now - $before) / $before * 100, 1) : null;
     }
 }

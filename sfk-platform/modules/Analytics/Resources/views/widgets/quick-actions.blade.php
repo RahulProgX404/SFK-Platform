@@ -4,7 +4,7 @@
     $tones = ['is-blue', 'is-teal', 'is-green', 'is-orange', 'is-dark', 'is-purple'];
 @endphp
 
-<div class="sfk-dash-cell sfk-dash-span-{{ $span }}">
+<div class="sfk-dash-cell sfk-dash-span-{{ $span }} sfk-dash-t-half is-fit">
     <style>
         .sfk-quick { display: flex; flex-direction: column; gap: var(--sfk-space-3); margin: 0; padding: 0; list-style: none; }
         .sfk-quick-row { display: flex; align-items: center; gap: var(--sfk-space-3); min-height: 56px; padding: var(--sfk-space-2) var(--sfk-space-3); border-radius: var(--sfk-radius-lg); background: var(--sfk-quick); color: #fff; }
@@ -49,7 +49,7 @@
             <ul class="sfk-recent" aria-label="最近開いたアプリ">
                 @foreach ($recent as $item)
                     <li wire:key="recent-{{ $item['code'] }}">
-                        <a href="{{ $item['url'] }}" class="sfk-recent-link" title="{{ $item['record'] !== null ? 'レコードを開く' : 'アプリを開く' }}">
+                        <a href="{{ $item['url'] }}" class="sfk-recent-link">
                             <span class="sfk-recent-icon" aria-hidden="true">{{ $item['icon'] }}</span>
                             <span class="sfk-recent-text">
                                 <strong>{{ $item['app'] }}</strong>
@@ -75,11 +75,11 @@
                         <span class="sfk-quick-icon" aria-hidden="true">
                             <x-filament::icon :icon="$action['kind'] === 'leave' ? 'heroicon-o-calendar-days' : 'heroicon-o-shopping-cart'" />
                         </span>
-                        <a href="{{ $action['url'] }}" class="sfk-quick-text" title="レコードを開く">
+                        <a href="{{ $action['url'] }}" class="sfk-quick-text">
                             <strong>{{ $action['title'] }}</strong>
                             <small>{{ $action['subtitle'] }}</small>
                         </a>
-                        <button type="button" class="sfk-quick-run" wire:click="runAction(@js($action['key']))" wire:loading.attr="disabled" title="{{ $action['action'] }}">
+                        <button type="button" class="sfk-quick-run" wire:click="runAction(@js($action['key']))" wire:loading.attr="disabled">
                             {{ $action['action'] }}
                             <x-filament::icon icon="heroicon-m-arrow-right" />
                         </button>

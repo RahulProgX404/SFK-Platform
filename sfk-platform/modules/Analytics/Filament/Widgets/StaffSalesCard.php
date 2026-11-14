@@ -38,6 +38,8 @@ final class StaffSalesCard extends DashboardCard
             // 個人: the user's own newest sales in place of the ranking of everyone
             'staff' => $service->isPersonal() ? [] : $service->topStaff($this->period()),
             'latest' => $service->isPersonal() ? $service->latestSales($this->period()) : null,
+            // 構成比 of the tooltips: the period's 売上合計 (from the cache, as 売上合計)
+            'whole' => $service->isPersonal() ? 0 : $service->totals($this->period())['amount'],
             'analysisUrl' => SalesAnalysis::canAccess() ? SalesAnalysis::getUrl() : null,
         ];
     }

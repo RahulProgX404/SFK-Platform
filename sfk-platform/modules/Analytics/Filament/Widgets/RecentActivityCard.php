@@ -16,6 +16,9 @@ final class RecentActivityCard extends DashboardCard
 {
     protected static ?int $sort = 11;
 
+    /** the latest activities shown (user 2026-11-14: only the 10 latest) */
+    public const LIMIT = 10;
+
     protected string $view = 'analytics::widgets.recent-activity';
 
     /** @return array<string, mixed> */
@@ -24,7 +27,7 @@ final class RecentActivityCard extends DashboardCard
         $user = self::actor();
 
         return [
-            'items' => $user !== null ? app(ActivityFeed::class)->for($user, 10) : [],
+            'items' => $user !== null ? app(ActivityFeed::class)->for($user, self::LIMIT) : [],
             'half' => $this->inPersonalLayout() || $this->inOverallLayout(),
         ];
     }

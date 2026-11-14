@@ -31,6 +31,8 @@ final class TopProductsCard extends DashboardCard
 
         return [
             'products' => $products,
+            // 構成比 of the tooltips: the period's 売上合計 (from the cache, as 売上合計)
+            'whole' => $this->salesData()->totals($this->period())['amount'],
             // the bars against the first
             'top' => max(1, $products === [] ? 0 : max(array_column($products, 'amount'))),
             'salesUrl' => self::appUrl('sales-entry'),
