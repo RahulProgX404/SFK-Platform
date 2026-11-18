@@ -55,7 +55,7 @@ use Modules\Core\Models\Space;
  * @property bool $managed_by_env
  * @property Carbon|null $last_login_at
  * @property Carbon|null $password_changed_at
- * @property int|null $list_page_size 表示件数 of the app lists (blank = 100)
+ * @property int|null $list_page_size 表示件数 of the app lists (blank = 60, AppListRecords::DEFAULT_PAGE_SIZE)
  * @property bool $show_financial_analysis 財務分析を表示 (set by administrators)
  * @property string $financial_scope 財務分析の範囲: overall (全体) | personal (個人のみ) — with 財務分析を表示
  * @property list<int>|null $app_order the user's own order of the apps in the アプリ panel (app ids)

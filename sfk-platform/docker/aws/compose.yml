@@ -1,0 +1,65 @@
+# SFK platform on one AWS EC2 server (docs/deploy-aws.md). Lives in /opt/sfk on the server; deploy.sh refreshes this
+# file from the image on every deploy, so edit it here in the repository, never on the server.
+#
+#   caddy  :80/:443  HTTPS (Let's Encrypt, automatic) → app:8080
+#   app             the production image (docker/render/Dockerfile): nginx + PHP-FPM + queue worker + scheduler;
+#                   migrates the database on start (docker/render/start.sh)
+#   redis           cache, sessions and the queue (the 通知 / メッセージ pulses are cache reads: never the database)
+#
+# Outside the server: RDS PostgreSQL 17 (DB_URL), S3 (uploads), SES (mail) — credentials from the EC2 role, no keys.
+# /opt/sfk/.env holds ECR_IMAGE, APP_TAG and SFK_DOMAIN (written by hand once, APP_TAG by deploy.sh);
+# /opt/sfk/app.env holds the Laravel settings (docker/aws/app.env.example).
+
+name: sfk
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  app:
+    image: ${ECR_IMAGE:?set ECR_IMAGE in /opt/sfk/.env}:${APP_TAG:?run deploy.sh <tag>}
+    env_file: app.env
+    environment:
+      PORT: "8080"
+    volumes:
+      # a PHP-FPM pool for the server's 2 GB (the image's own is sized for Render's 512 MB)
+      - ./php-fpm-pool.conf:/usr/local/etc/php-fpm.d/zz-render.conf:ro
+    depends_on:
+      - redis
+    restart: unless-stopped
+    logging: *logging
+
+  redis:
+    image: redis:7.4-alpine
+    # noeviction: the queue and the sessions live here too — a full Redis must refuse writes, not drop jobs
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    logging: *logging
+
+  caddy:
+    image: caddy:2.8-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SFK_DOMAIN: ${SFK_DOMAIN:?set SFK_DOMAIN in /opt/sfk/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # the certificates: keep them, or Let's Encrypt's rate limit hits after a few re-creations
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  redis-data:
+  caddy-data:
+  caddy-config:

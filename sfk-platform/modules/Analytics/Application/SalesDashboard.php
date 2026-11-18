@@ -8,7 +8,6 @@ use App\Models\User;
 use Closure;
 use DateTimeImmutable;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Query\JoinClause;
 use Modules\Analytics\Domain\FiscalYear;
 use Modules\Analytics\Domain\Period;
 use Modules\Analytics\Domain\SalesCoverage;
@@ -242,10 +241,8 @@ final class SalesDashboard
     {
         return $this->cached('topStaff', [$period->start().'~'.$period->after(), (string) $limit], function () use ($period, $limit): array {
             $rows = $this->sales($period)
-                ->join('sale_user as first_staff', function (JoinClause $join): void {
-                    $join->on('first_staff.sale_id', '=', 'sales.id')
-                        ->whereRaw('first_staff.id = (select min(staff.id) from sale_user as staff where staff.sale_id = sales.id)');
-                })
+                ->joinSub(FirstStaff::rows(), 'first_staff_row', 'first_staff_row.sale_id', '=', 'sales.id')
+                ->join('sale_user as first_staff', 'first_staff.id', '=', 'first_staff_row.id')
                 ->groupBy('first_staff.user_id')
                 ->selectRaw('first_staff.user_id, count(*) as count, sum(sales.amount) as amount')
                 ->orderByDesc('amount')
@@ -352,11 +349,7 @@ final class SalesDashboard
         return SaleResource::onlyVisible(Sale::query())
             ->where('sales.sold_on', '>=', $period->start())
             ->where('sales.sold_on', '<', $period->after())
-            ->when($this->staffId !== null, fn (Builder $query) => $query->whereExists(fn ($exists) => $exists
-                ->from('sale_user as mine')
-                ->whereColumn('mine.sale_id', 'sales.id')
-                ->where('mine.user_id', $this->staffId)
-                ->whereRaw('mine.id = (select min(staff.id) from sale_user as staff where staff.sale_id = sales.id)')));
+            ->when($this->staffId !== null, fn (Builder $query) => $query->whereIn('sales.id', FirstStaff::salesOf((int) $this->staffId)));
     }
 
     /**

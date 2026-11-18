@@ -77,14 +77,45 @@ final class SearchQuery
         return str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $value);
     }
 
-    /** sfk_search_norm on SQLite (PostgreSQL has it from the migration). */
+    /**
+     * sfk_search_norm on SQLite (PostgreSQL has it from the migration) — when the connection really opens. A connection
+     * object is often made without being used (a database cache store resolved at boot, e.g. by a rate limiter):
+     * asking for its PDO here would open it, and with no database (docker build: composer → package:discover) the
+     * build failed (2026-11-18). So an unopened connection gets the function on its first use, through its PDO factory.
+     */
     public static function registerFunction(Connection $connection): void
     {
         if ($connection->getDriverName() !== 'sqlite') {
             return;
         }
 
-        $pdo = $connection->getPdo();
+        $pdo = $connection->getRawPdo();
+        if ($pdo instanceof PDO) {
+            self::createFunction($pdo);
+        } elseif ($pdo instanceof Closure) {
+            $connection->setPdo(static function () use ($pdo): PDO {
+                $opened = $pdo();
+                self::createFunction($opened);
+
+                return $opened;
+            });
+        }
+
+        $read = $connection->getRawReadPdo();
+        if ($read instanceof PDO && $read !== $pdo) {
+            self::createFunction($read);
+        } elseif ($read instanceof Closure) {
+            $connection->setReadPdo(static function () use ($read): PDO {
+                $opened = $read();
+                self::createFunction($opened);
+
+                return $opened;
+            });
+        }
+    }
+
+    private static function createFunction(PDO $pdo): void
+    {
         $fold = fn (mixed $text): ?string => $text === null ? null : SearchText::fold((string) $text);
 
         if (method_exists($pdo, 'createFunction')) {

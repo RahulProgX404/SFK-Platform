@@ -58,7 +58,9 @@ use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\Records\RecordTabs;
 use Modules\Core\Filament\Records\RelatedLists;
 use Modules\Core\Filament\Support\AppRecordDirectory;
+use Modules\Core\Filament\Tables\RecordLink;
 use Modules\Core\Filament\Users\UserDetailWidgets;
+use Modules\Core\Http\Middleware\ServerTiming;
 use Modules\Core\Http\Portal\DashboardDirectory;
 use Modules\Core\Http\Portal\DashboardEntry;
 use Modules\Core\Http\Responses\LoginPageLogoutResponse;
@@ -118,6 +120,13 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
     protected function bootModule(): void
     {
+        // measurement only (SFK_SERVER_TIMING): count the queries from here on for the Server-Timing header
+        if (ServerTiming::enabled()) {
+            ServerTiming::listen();
+        }
+        // table cells link to their record without a wire:navigate.hover each (RecordLink, docs/performance.md)
+        RecordLink::register();
+
         // a change of the registry, the access rights, 一覧 or 帳票 is read afresh on the next request (ReferenceCache)
         foreach ([BusinessApp::class, Space::class, AppPermission::class, SpacePermission::class, AppFieldPermission::class,
             AppRecordRule::class, AppRecordRuleEntry::class, AppListView::class, DocumentOutput::class, DocumentTemplate::class,

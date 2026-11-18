@@ -55,10 +55,9 @@ final class SalesAnalysis extends Page
 
     public function mount(): void
     {
-        $sales = $this->analysis();
         $current = FiscalYear::startingYear(now());
-        $this->years = array_slice($sales->years(), -2);
-        $this->staff = $this->defaultStaff($sales->actuals([$current, $current - 1]), $current);
+        $this->years = array_slice($this->availableYears(), -2);
+        $this->staff = $this->defaultStaff($this->actualsOf([$current, $current - 1]), $current);
     }
 
     public function showDetail(?int $staffId, int $year, int $month): void
@@ -103,6 +102,31 @@ final class SalesAnalysis extends Page
     /**
      * The sales the page sums: everyone's, or — 財務分析の範囲 個人のみ (bug.md 2026-11-06) — only the user's own as 担当者.
      */
+    /**
+     * The fiscal years with sales, and the 実績 of some years: the first load asks both in mount() and again to draw the
+     * page — read once per request (a private property: Livewire keeps it for this request only; docs/performance.md).
+     *
+     * @return list<int>
+     */
+    private function availableYears(): array
+    {
+        return $this->perRequest['years'] ??= $this->analysis()->years();
+    }
+
+    /**
+     * @param  list<int>  $years
+     * @return array<int, array<int, array<int, int>>>
+     */
+    private function actualsOf(array $years): array
+    {
+        sort($years);
+
+        return $this->perRequest['actuals:'.implode(',', $years)] ??= $this->analysis()->actuals($years);
+    }
+
+    /** @var array<string, mixed> values read once per request (availableYears(), actualsOf()) */
+    private array $perRequest = [];
+
     private function analysis(): StaffSalesAnalysis
     {
         $user = auth()->user();
@@ -129,11 +153,11 @@ final class SalesAnalysis extends Page
     private function salesData(int $current, int $currentMonth): array
     {
         $service = $this->analysis();
-        $available = $service->years();
+        $available = $this->availableYears();
         $years = array_values(array_intersect($available, array_map('intval', $this->years)));
         sort($years);
 
-        $actuals = $service->actuals(array_values(array_unique([...$years, $current, $current - 1])));
+        $actuals = $this->actualsOf(array_values(array_unique([...$years, $current, $current - 1])));
         $staff = $service->staff($years, $actuals);
         $forecasts = $service->forecasts($current);
         $kinds = fn (?SalesForecast $forecast): array => [

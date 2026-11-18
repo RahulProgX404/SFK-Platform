@@ -1,0 +1,102 @@
+# Deploy the SFK platform to the AWS EC2 server (sfk-platform/docs/deploy-aws.md, step 9).
+# Run by hand: GitHub → Actions → "Deploy to AWS" → Run workflow (branch main).
+#
+# 1. signs in to AWS with GitHub's OIDC token — no AWS keys stored in GitHub (role: docker/aws/iam/github-*.json)
+# 2. builds the production image (sfk-platform/docker/render/Dockerfile) and pushes it to ECR, tagged with the commit
+# 3. tells the server through SSM Run Command to run /opt/sfk/deploy.sh <commit> (no SSH port open)
+#
+# Repository variables (Settings → Secrets and variables → Actions → Variables): AWS_DEPLOY_ROLE_ARN, ECR_REPOSITORY,
+# EC2_INSTANCE_ID. None of them is a secret.
+name: Deploy to AWS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # the OIDC token AWS trusts
+  contents: read
+
+concurrency:
+  group: deploy-aws
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-northeast-1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sign in to AWS (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Sign in to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push the image
+        uses: docker/build-push-action@v6
+        with:
+          context: sfk-platform
+          file: sfk-platform/docker/render/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
+            ${{ steps.ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:latest
+          # layers kept in GitHub's cache: a code-only change rebuilds in a minute or two
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy on the server (SSM Run Command)
+        env:
+          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+          TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # what the server runs; the first time, deploy.sh is not there yet: take it out of the new image
+          cat > deploy-command.sh <<EOF
+          set -eu
+          cd /opt/sfk
+          if [ ! -x deploy.sh ]; then
+            IMG=\$(sed -n 's/^ECR_IMAGE=//p' .env)
+            aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin "\${IMG%%/*}" >/dev/null
+            CID=\$(docker create "\$IMG:$TAG")
+            docker cp "\$CID:/var/www/html/docker/aws/deploy.sh" deploy.sh
+            docker rm "\$CID" >/dev/null
+            chmod +x deploy.sh
+          fi
+          ./deploy.sh $TAG
+          EOF
+          jq -n --rawfile script deploy-command.sh '{commands: [$script]}' > deploy-params.json
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "deploy ${TAG:0:12}" \
+            --parameters file://deploy-params.json \
+            --query Command.CommandId --output text)
+          echo "SSM command: $COMMAND_ID"
+
+          # wait up to 10 minutes for the result (deploy.sh itself waits for the app to answer /up)
+          STATUS=Pending
+          for _ in $(seq 1 120); do
+            sleep 5
+            STATUS=$(aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+              --query Status --output text 2>/dev/null || echo Pending)
+            case "$STATUS" in Pending|InProgress|Delayed) ;; *) break ;; esac
+          done
+          aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
+            --query '[StandardOutputContent, StandardErrorContent]' --output text
+          echo "Status: $STATUS"
+          test "$STATUS" = "Success"

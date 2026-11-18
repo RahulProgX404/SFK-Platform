@@ -1,0 +1,12 @@
+# HTTPS in front of the app (docker/aws/compose.yml). Caddy gets and renews the Let's Encrypt certificate for
+# SFK_DOMAIN by itself — the domain's DNS must point at the server's Elastic IP and ports 80 and 443 must be open.
+{$SFK_DOMAIN} {
+	encode zstd gzip
+
+	# the app's nginx sets its own security headers; uploads up to 55 MB as in nginx
+	request_body {
+		max_size 55MB
+	}
+
+	reverse_proxy app:8080
+}

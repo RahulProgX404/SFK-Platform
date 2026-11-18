@@ -32,6 +32,7 @@ use Illuminate\Support\Facades\Schema as DatabaseSchema;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Js;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Renderless;
 use Livewire\Attributes\Session;
 use Livewire\Attributes\Url;
 use Livewire\Livewire;
@@ -94,7 +95,8 @@ abstract class AppListRecords extends ListRecords
     /** 表示件数 choices; blank = DEFAULT_PAGE_SIZE */
     public const PAGE_SIZES = [20, 40, 60, 80, 100, 200, 300];
 
-    public const DEFAULT_PAGE_SIZE = 100;
+    /** 60 (user 2026-11-18; was 100): a 100-row list took ~2.5× the server and browser time of a short one (docs/performance.md) */
+    public const DEFAULT_PAGE_SIZE = 60;
 
     /** Most records drawn on one calendar month. */
     public const CALENDAR_LIMIT = 1000;
@@ -729,10 +731,13 @@ abstract class AppListRecords extends ListRecords
     }
 
     /**
-     * Static data of the 絞り込む dialog (core::filament.app-filter).
+     * Static data of the 絞り込む dialog (core::filament.app-filter). Renderless: opening the dialog changes nothing on
+     * the page — without it, the whole list was drawn again and sent back with the data (~1 MB, as long as a reload of a
+     * 100-row list; docs/performance.md).
      *
      * @return array{fields: list<array<string, mixed>>, sortable: list<array{name: string, label: string}>, canSave: bool}
      */
+    #[Renderless]
     public function filterDialog(): array
     {
         return [

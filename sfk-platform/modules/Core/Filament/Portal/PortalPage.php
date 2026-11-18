@@ -20,6 +20,7 @@ use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Renderless;
 use Livewire\Attributes\Url;
 use Modules\Core\Access\AppAccess;
 use Modules\Core\Application\Apps\AppLifecycle;
@@ -350,6 +351,7 @@ final class PortalPage extends Dashboard
      *
      * @param  list<int|string>  $ids
      */
+    #[Renderless]
     public function saveAppOrder(array $ids): void
     {
         $user = self::actor();
@@ -368,6 +370,7 @@ final class PortalPage extends Dashboard
      *
      * @param  list<int|string>  $ids
      */
+    #[Renderless]
     public function saveMyAppOrder(array $ids): void
     {
         $user = self::actor();

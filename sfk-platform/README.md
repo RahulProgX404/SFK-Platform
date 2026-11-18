@@ -81,6 +81,12 @@ On every deploy: `composer install --no-dev --classmap-authoritative`, `php arti
 `php artisan optimize` (config, routes, events, views and modules cached), `php artisan filament:cache-components`,
 then reload PHP-FPM. OPcache with `opcache.validate_timestamps=0` (as in `docker/php/php.ini`).
 
+### AWS (EC2 + RDS + S3)
+
+Step by step in [docs/deploy-aws.md](docs/deploy-aws.md): one EC2 server (Docker: Caddy HTTPS, the production image,
+Redis), RDS PostgreSQL 17, S3 uploads, SES mail; deploys from GitHub Actions (`.github/workflows/deploy-aws.yml` at the
+repository root) through ECR and SSM Run Command, without stored AWS keys. Server files: `docker/aws/`.
+
 ### Laravel Cloud (production host)
 
 Region Tokyo. Resources: Serverless Postgres 17 (same region; `CREATE EXTENSION pg_trgm` must work — list search),

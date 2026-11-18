@@ -9,6 +9,7 @@ use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Livewire\Attributes\Renderless;
 use Livewire\Attributes\Url;
 use LogicException;
 use Modules\Core\Access\AppAccess;
@@ -172,6 +173,7 @@ abstract class AppListViewSettings extends Page
     }
 
     /** @param  list<int|string>  $ids  the stored views in their new order */
+    #[Renderless]
     public function reorderViews(array $ids): void
     {
         abort_unless(static::canAccess(), 403);

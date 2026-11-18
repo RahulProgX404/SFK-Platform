@@ -20,6 +20,7 @@ use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 use LogicException;
 use Modules\Core\Application\Files\Uploads;
 use Modules\Core\Domain\Money\RoundingMode;
@@ -92,6 +93,9 @@ final class OrderForm
     /** @var array<int, RoundingMode> 端数区分 of the customers looked up in this request */
     private static array $roundings = [];
 
+    /** @var \WeakMap<Request, array<string, array<string, int|string>>>|null JobCosting::totals() per form state (totalsKey()), per HTTP request */
+    private static ?\WeakMap $totalsMemo = null;
+
     public static function configure(Schema $schema): Schema
     {
         $superAdmin = auth()->user() instanceof User && auth()->user()->isSuperAdmin();
@@ -122,9 +126,18 @@ final class OrderForm
      */
     public static function totals(Get $get, mixed $livewire): array
     {
+        // the 13 calculated fields of the form each ask for the totals: work them out once per form state (the inputs are
+        // read through the schema, which was the slow part — 13 × per render, docs/performance.md)
+        $key = self::totalsKey($livewire);
+        self::$totalsMemo ??= new \WeakMap;
+        $memo = self::$totalsMemo[request()] ?? [];
+        if ($key !== null && isset($memo[$key])) {
+            return $memo[$key];
+        }
+
         $rows = fn (string $table): array => array_values(array_filter((array) $get($table), 'is_array'));
 
-        return JobCosting::totals(
+        $totals = JobCosting::totals(
             [...self::orderState($get), 'bag_manual_amount' => self::isFlagged($get('bag_manual'), '手動') ? $get('bag_manual_amount') : null],
             array_map(fn (array $row): array => [
                 ...$row,
@@ -135,6 +148,28 @@ final class OrderForm
             array_map(fn (array $row): array => [...$row, 'manual_amount' => self::isFlagged($row['manual'] ?? null, '手動') ? ($row['manual_amount'] ?? null) : null], $rows('finishings')),
             self::rounding($get('customer_id'), $livewire),
         );
+
+        if ($key !== null) {
+            $memo[$key] = $totals;
+            self::$totalsMemo[request()] = $memo;
+        }
+
+        return $totals;
+    }
+
+    /** The form's identity and state (component, record, data) — a changed input is a new key. */
+    private static function totalsKey(mixed $livewire): ?string
+    {
+        if (! is_object($livewire) || ! property_exists($livewire, 'data') || ! is_array($livewire->data)) {
+            return null;
+        }
+        $record = $livewire instanceof EditRecord ? $livewire->getRecord()->getKey() : null;
+
+        try {
+            return spl_object_id($livewire).':'.$record.':'.md5(serialize($livewire->data));
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private static function input(string $name): ?Component
@@ -292,16 +327,58 @@ final class OrderForm
         ]);
     }
 
-    /** 仕入先 of a table row: a native list (not cut off by the table), suppliers newest first (BR-MD-02). */
+    /**
+     * 仕入先 of a table row: a native list (not cut off by the table), suppliers newest first (BR-MD-02). Every row offers
+     * the same suppliers: they are read once per request (supplierChoices()), not once per row — with the visibility
+     * subquery that was most of the time of the form (docs/performance.md). The relationship stays for the label.
+     */
     private static function rowSupplier(): Select
     {
         return Select::make('supplier_id')
             ->hiddenLabel()
             ->native()
             ->placeholder('-----')
-            ->relationship('supplier', 'name', fn (Builder $query): Builder => PartnerResource::visibleOr($query->where('is_supplier', true), self::keptPartners())->orderByDesc('id'))
+            ->relationship('supplier', 'name', fn (Builder $query): Builder => self::supplierQuery($query))
+            ->options(fn (): array => self::supplierChoices())
             ->preload()
             ->live();
+    }
+
+    /**
+     * Suppliers the user may choose (01. 取引先マスタ visibility, plus those their 受注 already use), newest first.
+     *
+     * @param  Builder<Partner>  $query
+     * @return Builder<Partner>
+     */
+    private static function supplierQuery(Builder $query): Builder
+    {
+        return PartnerResource::visibleOr($query->where('is_supplier', true), self::keptPartners())->orderByDesc('id');
+    }
+
+    /** @return array<int|string, string> id => name, once per request and user (the query follows their visibility) */
+    private static function supplierChoices(): array
+    {
+        return self::supplierChoicesOf((int) auth()->id());
+    }
+
+    /**
+     * @param  int  $userId  part of the once() key: a request that changes user never sees another user's choices
+     * @return array<int|string, string>
+     */
+    private static function supplierChoicesOf(int $userId): array
+    {
+        return once(fn (): array => self::supplierQuery(Partner::query())->pluck('name', 'id')->all());
+    }
+
+    /** A supplier of a table row (得意先ID / 略名 next to it), once per supplier, user and request. */
+    private static function rowSupplierRecord(int $id): ?Partner
+    {
+        return self::rowSupplierRecordOf($id, (int) auth()->id());
+    }
+
+    private static function rowSupplierRecordOf(int $id, int $userId): ?Partner
+    {
+        return once(fn (): ?Partner => PartnerResource::visibleOr(Partner::query(), self::keptPartners())->find($id));
     }
 
     /** @param  list<string>  $choices */
@@ -313,7 +390,7 @@ final class OrderForm
     /** @return list<TextEntry> 得意先ID and 略名 of the chosen supplier (legacy lookup copies) */
     private static function supplierInfo(): array
     {
-        $supplier = fn (Get $get): ?Partner => is_numeric($get('supplier_id')) ? PartnerResource::visibleOr(Partner::query(), self::keptPartners())->find((int) $get('supplier_id')) : null;
+        $supplier = fn (Get $get): ?Partner => is_numeric($get('supplier_id')) ? self::rowSupplierRecord((int) $get('supplier_id')) : null;
 
         return [
             TextEntry::make('supplier_partner_id')->hiddenLabel()->placeholder('')->state(fn (Get $get): ?string => ($partner = $supplier($get)) !== null ? (string) $partner->id : null),

@@ -10,6 +10,7 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Illuminate\Support\Carbon;
+use Livewire\Attributes\Renderless;
 use Livewire\Livewire;
 use Modules\Core\Application\Apps\AppDiscovery;
 use Modules\Core\Application\Apps\FieldPermissionService;
@@ -20,11 +21,14 @@ use Modules\Core\Domain\Apps\AppStatus;
 use Modules\Core\Domain\Apps\PermissionSubject;
 use Modules\Core\Domain\People\EmploymentStatus;
 use Modules\Core\Filament\AppPages\AppListRecords;
+use Modules\Core\Filament\AppPages\AppListViewSettings;
 use Modules\Core\Filament\AppPages\AppViewRecord;
 use Modules\Core\Filament\DashboardSettings\Resources\AppSettings\Pages\EditFieldPermissions;
 use Modules\Core\Filament\DashboardSettings\Resources\AppSettings\Pages\EditRecordPermissions;
+use Modules\Core\Filament\Portal\PortalPage;
 use Modules\Core\Filament\Support\ThemeAssets;
 use Modules\Core\Filament\Support\UserPopup;
+use Modules\Core\Filament\Tables\RecordLink;
 use Modules\Core\Models\BusinessApp;
 use Modules\Core\Models\RecordComment;
 use Modules\Core\Models\RecordVersion;
@@ -421,18 +425,18 @@ it('shows no column of the list in bold, 取引先名 included', function () {
         ->and(compactCss(themeCss()))->toContain(compactCss('.fi-ta-table>tbody td, .fi-ta-table>tbody td * { font-weight: 400 !important; }'));
 });
 
-it('pages through the list 100 records at a time', function () {
-    foreach (range(1, 101) as $number) {
+it('pages through the list 60 records at a time (the default 表示件数, user 2026-11-18)', function () {
+    foreach (range(1, 61) as $number) {
         makePartner(['name' => "取引先{$number}"]);
     }
     $this->actingAs($this->admin);
 
     Livewire::test(ListPartners::class)
-        ->assertSee('1 - 100（101件中）')
+        ->assertSee('1 - 60（61件中）')
         ->call('nextAppPage')
-        ->assertSee('101 - 101（101件中）')
+        ->assertSee('61 - 61（61件中）')
         ->call('previousAppPage')
-        ->assertSee('1 - 100（101件中）');
+        ->assertSee('1 - 60（61件中）');
 });
 
 it('puts キャンセル and 保存 in the footer of the form, with the tabs above the fields', function () {
@@ -1443,4 +1447,41 @@ it('edits the レコード / フィールド アクセス権 on their settings p
 
 it('lists the 表示件数 choices one per line (radio groups without inline())', function () {
     expect(compactCss(themeCss()))->toContain(compactCss('.fi-fo-radio.fi-grid-direction-col:not(.fi-inline) > .fi-fo-radio-label { display: flex; }'));
+});
+
+it('links the rows to their record without a wire:navigate on every cell (docs/performance.md, 2026-11-18)', function () {
+    makePartner();
+    $this->actingAs($this->admin);
+
+    $html = $this->get(PartnerResource::getUrl('index'))->assertOk()->getContent();
+
+    // the cells are plain links the page's one click listener opens in place: no Alpine root and hover prefetch each
+    expect($html)->toContain('data-sfk-navigate')
+        ->and(preg_match('/<a\s[^>]*wire:navigate[^>]*class="fi-ta-col/', $html))->toBe(0)
+        ->and(ThemeAssets::bundle()['js'])->toContain('sfkTableLinks')->toContain('Alpine.navigate(link.getAttribute');
+
+    // the calls of Filament's table view that RecordLink swaps are still there — a Filament update shows up here
+    $view = (string) file_get_contents(base_path('vendor/filament/tables/resources/views/index.blade.php'));
+    foreach (array_keys(RecordLink::REPLACEMENTS) as $call) {
+        expect($view)->toContain($call);
+    }
+});
+
+it('opens 絞り込む and saves a dragged order without drawing the page again (Renderless)', function () {
+    foreach ([[AppListRecords::class, 'filterDialog'], [AppListViewSettings::class, 'reorderViews'], [PortalPage::class, 'saveAppOrder'], [PortalPage::class, 'saveMyAppOrder']] as [$class, $method]) {
+        expect((new ReflectionMethod($class, $method))->getAttributes(Renderless::class))->not->toBeEmpty();
+    }
+});
+
+it('shows 60 rows to users who never chose a 表示件数, and keeps a size they chose (user 2026-11-18)', function () {
+    for ($i = 1; $i <= 65; $i++) {
+        makePartner(['name' => "件数商事{$i}", 'short_name' => "件{$i}", 'phone' => sprintf('03-1000-%04d', $i)]);
+    }
+    $this->actingAs($this->admin);
+    expect($this->admin->list_page_size)->toBeNull();
+
+    Livewire::test(ListPartners::class)->assertSee('1 - 60（65件中）')->assertCountTableRecords(65);
+
+    $this->admin->forceFill(['list_page_size' => 100])->save();
+    Livewire::test(ListPartners::class)->assertSee('1 - 65（65件中）');
 });

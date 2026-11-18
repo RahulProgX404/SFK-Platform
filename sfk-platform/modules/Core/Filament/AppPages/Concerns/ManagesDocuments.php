@@ -20,6 +20,7 @@ use Filament\Support\Exceptions\Halt;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Livewire\Attributes\Renderless;
 use Livewire\Attributes\Url;
 use Modules\Core\Application\Documents\AppDocuments;
 use Modules\Core\Application\Documents\DocumentSettings;
@@ -343,6 +344,7 @@ trait ManagesDocuments
     }
 
     /** @param  list<int|string>  $ids  the 出力設定 in their new order */
+    #[Renderless]
     public function reorderOutputs(array $ids): void
     {
         abort_unless(static::canAccess(), 403);

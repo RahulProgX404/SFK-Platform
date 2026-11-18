@@ -13,6 +13,12 @@ return [
     // (Modules\Core\Application\Cache\ReferenceCache); off in the tests (phpunit*.xml).
     'reference_cache' => (bool) env('SFK_REFERENCE_CACHE', true),
 
+    // Measurement (Modules\Core\Http\Middleware\ServerTiming, docs/performance.md): a Server-Timing header with the app
+    // time, the database time and the number of queries on every response; _log adds a line per request to
+    // storage/logs/server-timing.log. Development and benchmarks only — never on in production.
+    'server_timing' => (bool) env('SFK_SERVER_TIMING', false),
+    'server_timing_log' => (bool) env('SFK_SERVER_TIMING_LOG', false),
+
     /*
     |--------------------------------------------------------------------------
     | Document number sequences

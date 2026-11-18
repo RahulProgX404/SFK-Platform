@@ -1,15 +1,19 @@
-# Production image for Render (render.yaml at the repository root): nginx and PHP-FPM in one container — a Render web
-# service runs one container, and the free plan has no separate worker — with the code, the Composer packages without
-# the development tools, and the PHP settings of docker/php. docker/render/start.sh migrates, caches and starts it.
+# Production image — Render (render.yaml at the repository root) and AWS EC2 (docker/aws, docs/deploy-aws.md): nginx
+# and PHP-FPM in one container — a Render web service runs one container, and the free plan has no separate worker —
+# with the code, the Composer packages without the development tools, and the PHP settings of docker/php.
+# docker/render/start.sh migrates, caches and starts it.
 FROM php:8.4-fpm-bookworm
 
-# qpdf (Apache-2.0): rewrites uploaded 帳票 background PDFs (optional: the code works without it); gettext-base: envsubst
+# qpdf (Apache-2.0): rewrites uploaded 帳票 background PDFs (optional: the code works without it); gettext-base: envsubst;
+# redis (phpredis): cache, sessions and the queue on AWS (Render keeps them in PostgreSQL)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         nginx gettext-base git unzip libpq-dev libicu-dev libzip-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev qpdf \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j"$(nproc)" pdo_pgsql intl bcmath zip gd opcache pcntl exif \
-    && apt-get clean && rm -rf /var/lib/apt/lists/* \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/pear \
     && rm -f /etc/nginx/sites-enabled/default
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

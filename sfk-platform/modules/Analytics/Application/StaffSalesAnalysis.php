@@ -6,7 +6,6 @@ namespace Modules\Analytics\Application;
 
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Facades\DB;
 use Modules\Analytics\Domain\FiscalYear;
 use Modules\Analytics\Models\SalesForecast;
@@ -152,11 +151,10 @@ final class StaffSalesAnalysis
      */
     private function sales(): Builder
     {
+        // the first 担当者 of each sale (FirstStaff: found once for all sales, not per sale)
         return SaleResource::onlyVisible(Sale::query())
-            ->join('sale_user as first_staff', function (JoinClause $join): void {
-                $join->on('first_staff.sale_id', '=', 'sales.id')
-                    ->whereRaw('first_staff.id = (select min(staff.id) from sale_user as staff where staff.sale_id = sales.id)');
-            })
+            ->joinSub(FirstStaff::rows(), 'first_staff_row', 'first_staff_row.sale_id', '=', 'sales.id')
+            ->join('sale_user as first_staff', 'first_staff.id', '=', 'first_staff_row.id')
             ->when($this->staffId !== null, fn (Builder $query) => $query->where('first_staff.user_id', $this->staffId));
     }
 

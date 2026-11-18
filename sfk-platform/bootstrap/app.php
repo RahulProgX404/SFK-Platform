@@ -7,6 +7,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Middleware\EnsureAccountIsActive;
 use Modules\Core\Http\Middleware\SecurityHeaders;
+use Modules\Core\Http\Middleware\ServerTiming;
 use Modules\Core\Http\Middleware\StripHtmlIndentation;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -16,6 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // measurement only (SFK_SERVER_TIMING, off by default): outermost, so it sees the whole request
+        $middleware->prepend(ServerTiming::class);
         // browser protections on every response (CSP, framing, HSTS over HTTPS …)
         $middleware->append(SecurityHeaders::class);
         // pages without the indentation of their HTML: about two thirds smaller (Modules\Core\Http\HtmlIndentation)
