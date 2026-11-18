@@ -1,5 +1,6 @@
 {{-- 最近のアクティビティ (Modules\Analytics\Filament\Widgets\RecentActivityCard): a timeline, in two columns on wide screens;
-     the card is as high as its entries (is-fit), each entry with its time on one line --}}
+     the card keeps the height of all its entries (ghost rows; user 2026-11-17), each entry one line of title with its time
+     and one of text (the whole text on hover) --}}
 @php
     $kinds = [
         'notice' => ['tone' => 'blue', 'icon' => 'heroicon-o-bell'],
@@ -23,11 +24,11 @@
         .sfk-activity-icon { position: relative; z-index: 1; display: grid; place-items: center; width: 32px; height: 32px; flex: none; border-radius: 9999px; background: var(--sfk-tone); color: #fff; }
         .sfk-activity-icon .fi-icon { width: 16px; height: 16px; }
         .sfk-activity-text { flex: 1; min-width: 0; padding-top: 4px; }
-        .sfk-activity-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px var(--sfk-space-3); }
-        .sfk-activity-head strong { min-width: 0; color: var(--sfk-ink); font-size: var(--sfk-fs-label); font-weight: var(--sfk-fw-semibold); overflow-wrap: anywhere; }
+        .sfk-activity-head { display: flex; align-items: baseline; justify-content: space-between; gap: 2px var(--sfk-space-3); }
+        .sfk-activity-head strong { flex: 1; min-width: 0; overflow: hidden; color: var(--sfk-ink); font-size: var(--sfk-fs-label); font-weight: var(--sfk-fw-semibold); text-overflow: ellipsis; white-space: nowrap; }
         .sfk-activity-head time { display: flex; flex: none; align-items: baseline; margin-left: auto; gap: 6px; color: var(--sfk-text); font-size: var(--sfk-fs-badge); line-height: 1.35; white-space: nowrap; }
         .sfk-activity-head time small { color: var(--sfk-muted); font-size: var(--sfk-fs-badge); font-variant-numeric: tabular-nums; }
-        .sfk-activity-body { display: block; margin-top: 2px; color: var(--sfk-text); font-size: var(--sfk-fs-small); overflow-wrap: anywhere; }
+        .sfk-activity-body { display: block; margin-top: 2px; overflow: hidden; color: var(--sfk-text); font-size: var(--sfk-fs-small); text-overflow: ellipsis; white-space: nowrap; }
         a.sfk-activity-text { color: inherit; text-decoration: none; }
         a.sfk-activity-text:hover strong { color: var(--sfk-primary); }
         .sfk-activity.is-single { grid-template-columns: minmax(0, 1fr); }
@@ -40,38 +41,40 @@
             <h2 class="sfk-dash-card-title" id="sfk-activity-title">最近のアクティビティ</h2>
         </header>
 
-        @if ($items === [])
-            <p class="sfk-dash-empty">まだアクティビティはありません。</p>
-        @else
-            <div @class(['sfk-activity', 'is-single' => $single])>
-                @foreach ($columns as $column)
-                    <ol>
-                        @foreach ($column as $item)
-                            @php($kind = $kinds[$item['kind']] ?? $kinds['notice'])
-                            <li class="sfk-activity-item sfk-tone-{{ $kind['tone'] }}">
-                                <span class="sfk-activity-icon" aria-hidden="true"><x-filament::icon :icon="$kind['icon']" /></span>
-                                @if (filled($item['url']))
-                                    <a href="{{ $item['url'] }}" class="sfk-activity-text">
-                                @else
-                                    <div class="sfk-activity-text">
-                                @endif
-                                    <span class="sfk-activity-head">
-                                        <strong>{{ $item['title'] }}</strong>
-                                        <time datetime="{{ $item['at']->toIso8601String() }}">{{ $item['at']->locale('ja')->diffForHumans() }}<small>{{ $item['at']->format('n/j H:i') }}</small></time>
-                                    </span>
-                                    @if (filled($item['body']))
-                                        <span class="sfk-activity-body">{{ $item['body'] }}</span>
+        <div class="sfk-dash-stack">
+            @include('analytics::widgets.partials.ghost', ['kind' => 'activity', 'rows' => \Modules\Analytics\Filament\Widgets\RecentActivityCard::LIMIT, 'columns' => $single ? 1 : 2])
+            @if ($items === [])
+                <p class="sfk-dash-empty">まだアクティビティはありません。</p>
+            @else
+                <div @class(['sfk-activity', 'is-single' => $single])>
+                    @foreach ($columns as $column)
+                        <ol>
+                            @foreach ($column as $item)
+                                @php($kind = $kinds[$item['kind']] ?? $kinds['notice'])
+                                <li class="sfk-activity-item sfk-tone-{{ $kind['tone'] }}">
+                                    <span class="sfk-activity-icon" aria-hidden="true"><x-filament::icon :icon="$kind['icon']" /></span>
+                                    @if (filled($item['url']))
+                                        <a href="{{ $item['url'] }}" class="sfk-activity-text">
+                                    @else
+                                        <div class="sfk-activity-text">
                                     @endif
-                                @if (filled($item['url']))
-                                    </a>
-                                @else
-                                    </div>
-                                @endif
-                            </li>
-                        @endforeach
-                    </ol>
-                @endforeach
-            </div>
-        @endif
+                                        <span class="sfk-activity-head">
+                                            <strong title="{{ $item['title'] }}">{{ $item['title'] }}</strong>
+                                            <time datetime="{{ $item['at']->toIso8601String() }}">{{ $item['at']->locale('ja')->diffForHumans() }}<small>{{ $item['at']->format('n/j H:i') }}</small></time>
+                                        </span>
+                                        {{-- always there (empty: a space), so every entry has the same height --}}
+                                        <span class="sfk-activity-body" @if (filled($item['body'])) title="{{ $item['body'] }}" @endif>{!! filled($item['body']) ? e($item['body']) : '&nbsp;' !!}</span>
+                                    @if (filled($item['url']))
+                                        </a>
+                                    @else
+                                        </div>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ol>
+                    @endforeach
+                </div>
+            @endif
+        </div>
     </section>
 </div>

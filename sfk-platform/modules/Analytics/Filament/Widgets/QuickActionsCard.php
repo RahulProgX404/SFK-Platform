@@ -20,7 +20,7 @@ use Modules\Purchasing\Application\PurchasingActionNotAllowed;
 /**
  * クイックアクション (row 3, every user; design_ref quick-actions.png): what waits for this user and is done with one
  * click — the next step of 16. 申請管理 and 20. 消耗品発注 (TeamDashboard::pendingActions()). When nothing waits
- * (bug.md 2026-11-06): the five apps the user opened last (AppUsageLog), each with the record last opened in it —
+ * (bug.md 2026-11-06): the six apps the user opened last (user 2026-11-18; was five) (AppUsageLog), each with the record last opened in it —
  * a click opens that record (the app's list when no record was opened or it cannot be opened any more); the card is then
  * called 最近表示した項目.
  */
@@ -60,6 +60,9 @@ final class QuickActionsCard extends DashboardCard
         Notification::make()->success()->title($message)->send();
     }
 
+    /** recently viewed apps listed; the card keeps the height of all of them in every state (ghost rows) */
+    public const RECENT = 6;
+
     /** @return array<string, mixed> */
     protected function getViewData(): array
     {
@@ -81,7 +84,7 @@ final class QuickActionsCard extends DashboardCard
      *
      * @return list<array{code: string, app: string, icon: string, record: int|null, title: string|null, url: string, at: string}>
      */
-    public static function recentRecords(User $user, int $limit = 5): array
+    public static function recentRecords(User $user, int $limit = self::RECENT): array
     {
         $usages = app(AppUsageLog::class)->recent($user, $limit * 3);
         // from the cache (DataCache) for these visits: the visits are written without model events, so they are the key

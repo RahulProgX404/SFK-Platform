@@ -1,7 +1,7 @@
 #!/bin/sh
 # Start of the Render container (docker/render/Dockerfile). Render's free plan has no pre-deploy step and no worker, so
 # every start: caches the app, migrates the database, keeps the super admin and the app registry in step with the
-# environment and the code, then runs PHP-FPM, the queue worker and the scheduler (while the service is awake) and
+# environment and the code, then runs PHP-FPM, the queue worker, the scheduler, Reverb (while the service is awake) and
 # nginx in front. The artisan commands run as www-data, the user of PHP-FPM, so the files they write stay writable.
 set -e
 cd /var/www/html
@@ -25,5 +25,9 @@ php-fpm -D
 # no free background worker on Render: the queue and the scheduler run in this container while it is awake
 runuser -u www-data -- php artisan queue:work --tries=3 --timeout=300 --sleep=3 &
 runuser -u www-data -- php artisan schedule:work &
+# WebSockets (Laravel Reverb, docs/realtime.md): nginx forwards the browsers' /app to it; the app publishes to 127.0.0.1
+if [ "${BROADCAST_CONNECTION:-}" = "reverb" ]; then
+    runuser -u www-data -- php artisan reverb:start --host=127.0.0.1 --port=8080 &
+fi
 
 exec nginx -g 'daemon off;'

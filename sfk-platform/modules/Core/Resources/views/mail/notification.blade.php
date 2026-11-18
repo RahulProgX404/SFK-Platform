@@ -10,7 +10,7 @@
 
 @if (filled($url))
 <x-mail::button :url="$url">
-レコードを開く
+{{ $openLabel ?? 'レコードを開く' }}
 </x-mail::button>
 
 <span class="break-all">[{{ $url }}]({{ $url }})</span>

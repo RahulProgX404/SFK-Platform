@@ -56,9 +56,14 @@
         .sp-today-status { display: flex; align-items: flex-start; gap: 12px; }
         .sp-today-status > svg { width: 20px; height: 20px; flex: none; margin-top: 1px; color: #16a34a; }
         .sp-today-status.has-unread > svg { color: #d97706; }
+        .sp-today-status > svg.is-unread, .sp-today-status.has-unread > svg.is-clear { display: none; }
+        .sp-today-status.has-unread > svg.is-unread { display: block; }
         .sp-today-status p { margin: 0 0 6px; font-size: 13px; color: var(--sfk-text); }
-        .sp-badge { display: inline-block; padding: 1px 10px; border-radius: 6px; background: #e7f6ec; color: #15803d; font-size: 12px; font-weight: 600; }
-        .sp-today-status.has-unread .sp-badge { background: #fef3dc; color: #b45309; }
+        .sp-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+        .sp-badge { display: inline-block; padding: 1px 10px; border-radius: 6px; background: #e7f6ec; color: #15803d; font-size: 12px; font-weight: 600; text-decoration: none; }
+        .sp-badge[hidden] { display: none; }
+        .sp-badge.is-unread { background: #fef3dc; color: #b45309; }
+        a.sp-badge.is-unread:hover { background: #fde7b8; }
 
         /* 利用可能なシステム: a card per dashboard — two side by side, more wrap onto further columns / rows */
         .sp-systems { margin-bottom: 28px; }
@@ -221,21 +226,25 @@
                 <time id="sp-clock">{{ $now->format('H:i') }}</time>
             </p>
             <hr>
-            {{-- the bell's 通知 (not the お知らせ below): how many are unread --}}
-            <div @class(['sp-today-status', 'has-unread' => $unread > 0])>
-                @if ($unread > 0)
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 2a6 6 0 0 0-6 6c0 1.887-.454 3.665-1.257 5.234a.75.75 0 0 0 .515 1.076 32.91 32.91 0 0 0 3.256.508 3.5 3.5 0 0 0 6.972 0 32.903 32.903 0 0 0 3.256-.508.75.75 0 0 0 .515-1.076A11.448 11.448 0 0 1 16 8a6 6 0 0 0-6-6ZM8.05 14.943a33.54 33.54 0 0 0 3.9 0 2 2 0 0 1-3.9 0Z" clip-rule="evenodd" /></svg>
-                    <div>
-                        <p>未読の通知があります</p>
-                        <span class="sp-badge">未読の通知 {{ number_format($unread) }}件</span>
-                    </div>
-                @else
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd" /></svg>
-                    <div>
-                        <p>未読の通知はありません</p>
-                        <span class="sp-badge">未読の通知なし</span>
-                    </div>
-                @endif
+            {{-- the bell's 通知 (not the お知らせ below) and the unread メッセージ (UnreadCounters): how many are unread —
+                 kept in step while the page is open (script below) --}}
+            @php($unreadTotal = array_sum(array_column($unread, 'count')))
+            <div @class(['sp-today-status', 'has-unread' => $unreadTotal > 0]) data-sp-unread data-url="{{ route('core.portal.unread') }}" data-pulse="{{ $pulseUrl }}" aria-live="polite">
+                <svg class="is-unread" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 2a6 6 0 0 0-6 6c0 1.887-.454 3.665-1.257 5.234a.75.75 0 0 0 .515 1.076 32.91 32.91 0 0 0 3.256.508 3.5 3.5 0 0 0 6.972 0 32.903 32.903 0 0 0 3.256-.508.75.75 0 0 0 .515-1.076A11.448 11.448 0 0 1 16 8a6 6 0 0 0-6-6ZM8.05 14.943a33.54 33.54 0 0 0 3.9 0 2 2 0 0 1-3.9 0Z" clip-rule="evenodd" /></svg>
+                <svg class="is-clear" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd" /></svg>
+                <div>
+                    <p data-sp-unread-title>{{ $unreadTotal > 0 ? '未読の通知があります' : '未読の通知はありません' }}</p>
+                    <span class="sp-badges">
+                        @foreach ($unread as $item)
+                            @if ($item['url'] !== null)
+                                <a href="{{ $item['url'] }}" class="sp-badge is-unread" data-sp-unread-item="{{ $item['key'] }}" @if ($item['count'] === 0) hidden @endif>未読の{{ $item['label'] }} <span>{{ number_format($item['count']) }}</span>件</a>
+                            @else
+                                <span class="sp-badge is-unread" data-sp-unread-item="{{ $item['key'] }}" @if ($item['count'] === 0) hidden @endif>未読の{{ $item['label'] }} <span>{{ number_format($item['count']) }}</span>件</span>
+                            @endif
+                        @endforeach
+                        <span class="sp-badge" data-sp-unread-none @if ($unreadTotal > 0) hidden @endif>未読の通知なし</span>
+                    </span>
+                </div>
             </div>
         </section>
     </div>
@@ -315,6 +324,73 @@
             const tick = () => { const d = new Date(); clock.textContent = pad(d.getHours()) + ':' + pad(d.getMinutes()) }
             setInterval(tick, 15000)
         })()
+    </script>
+
+    {{-- 今日 in step with the bell and the messenger: while in view the page asks the user's pulse every 4 s (a cache read,
+         no session, no database — core::filament.notification-pulse-script does the same in the dashboards); when it
+         changed (a new 通知, a message, something read in the messenger) and when the tab comes back (read in another
+         tab), it asks the counts once (GET /portal/unread). Every statement ends with ";". --}}
+    <script>
+        (() => {
+            const box = document.querySelector('[data-sp-unread]');
+            if (!box) return;
+            const state = { pulse: null, busy: false };
+
+            const draw = (items) => {
+                let total = 0;
+                items.forEach((item) => {
+                    const badge = box.querySelector('[data-sp-unread-item="' + item.key + '"]');
+                    const count = Math.max(0, Number(item.count) || 0);
+                    total += count;
+                    if (badge) {
+                        badge.querySelector('span').textContent = count.toLocaleString('ja-JP');
+                        badge.hidden = count === 0;
+                    }
+                });
+                box.classList.toggle('has-unread', total > 0);
+                box.querySelector('[data-sp-unread-title]').textContent = total > 0 ? '未読の通知があります' : '未読の通知はありません';
+                box.querySelector('[data-sp-unread-none]').hidden = total > 0;
+            };
+
+            const counts = async () => {
+                if (state.busy) return;
+                state.busy = true;
+                try {
+                    const response = await fetch(box.dataset.url, { cache: 'no-store', credentials: 'same-origin', headers: { Accept: 'application/json' } });
+                    if (response.ok) {
+                        draw((await response.json()).items || []);
+                    }
+                } catch (error) {
+                    /* offline: the next change tries again */
+                } finally {
+                    state.busy = false;
+                }
+            };
+
+            const pulse = async () => {
+                if (document.visibilityState !== 'visible') return;
+                try {
+                    const response = await fetch(box.dataset.pulse, { cache: 'no-store', credentials: 'omit', headers: { Accept: 'application/json' } });
+                    if (!response.ok) return;
+                    const data = await response.json();
+                    const version = String(data.v || '') + '|' + JSON.stringify(data.x || {});
+                    if (state.pulse !== null && version !== state.pulse) {
+                        counts();
+                    }
+                    state.pulse = version;
+                } catch (error) {
+                    /* offline: the next turn tries again */
+                }
+            };
+
+            setInterval(pulse, 4000);
+            pulse();
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') { counts(); pulse(); }
+            });
+            /* back to the portal with the browser's back button (page from the bfcache) */
+            window.addEventListener('pageshow', (event) => { if (event.persisted) { counts(); } });
+        })();
     </script>
 
     @if ($keyboardUrl !== null)

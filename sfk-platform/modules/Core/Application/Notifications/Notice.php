@@ -28,6 +28,8 @@ final class Notice
 
     private ?string $once = null;
 
+    private ?string $openLabel = null;
+
     private function __construct(public readonly string $kind) {}
 
     public static function make(string $kind): self
@@ -65,6 +67,19 @@ final class Notice
         $this->url = $url;
 
         return $this;
+    }
+
+    /** The label of the link's button (bell, toast, e-mail); レコードを開く unless said (e.g. トークを開く). */
+    public function openLabel(string $label): self
+    {
+        $this->openLabel = $label;
+
+        return $this;
+    }
+
+    public function openLabelText(): string
+    {
+        return $this->openLabel ?? 'レコードを開く';
     }
 
     /** Sent once per user and key: a user who already has a 通知 with this key (read or not) does not get it again. */

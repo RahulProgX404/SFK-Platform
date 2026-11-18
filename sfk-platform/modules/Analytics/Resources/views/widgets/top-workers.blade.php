@@ -20,25 +20,28 @@
             @endif
         </header>
 
-        @forelse ($workers as $index => $worker)
-            @if ($loop->first)
-                <ol class="sfk-dash-ranking sfk-workers">
-            @endif
-            @php($tip = DashboardTips::ranking($worker['name'], $worker['share'], [['日報', number_format($worker['reports']).'件']]))
-            <li @class(['sfk-workers-row', 'is-'.($index + 1), 'is-me' => $worker['user_id'] === $me]) @if ($worker['user_id'] === $me) aria-current="true" @endif tabindex="0" data-sfk-tip x-tooltip="{{ $tip->x() }}">
-                <span @class(['sfk-dash-rankno', 'is-'.($index + 1)])>{{ $index + 1 }}</span>
-                <span class="sfk-dash-ranking-name">
-                    <strong>{{ $worker['name'] }}</strong>
-                    <small>{{ $worker['share'] }}%・{{ rtrim(rtrim(number_format($worker['total_hours'], 1), '0'), '.') }}時間</small>
-                </span>
-                <span class="sfk-dash-ranking-figure"><strong>{{ AppFormat::yen($worker['total']) }}</strong></span>
-                <span class="sfk-dash-meter" aria-hidden="true"><i style="width: {{ max(2, (int) round($worker['total'] / $topTotal * 100)) }}%"></i></span>
-            </li>
-            @if ($loop->last)
-                </ol>
-            @endif
-        @empty
-            <p class="sfk-dash-empty">この期間の日報はありません。</p>
-        @endforelse
+        <div class="sfk-dash-stack">
+            @include('analytics::widgets.partials.ghost', ['kind' => 'ranking', 'rows' => \Modules\Analytics\Filament\Widgets\TopWorkersCard::ROWS, 'class' => 'sfk-workers'])
+            @forelse ($workers as $index => $worker)
+                @if ($loop->first)
+                    <ol class="sfk-dash-ranking sfk-workers">
+                @endif
+                @php($tip = DashboardTips::ranking($worker['name'], $worker['share'], [['日報', number_format($worker['reports']).'件']]))
+                <li @class(['sfk-workers-row', 'is-'.($index + 1), 'is-me' => $worker['user_id'] === $me]) @if ($worker['user_id'] === $me) aria-current="true" @endif tabindex="0" data-sfk-tip x-tooltip="{{ $tip->x() }}">
+                    <span @class(['sfk-dash-rankno', 'is-'.($index + 1)])>{{ $index + 1 }}</span>
+                    <span class="sfk-dash-ranking-name">
+                        <strong>{{ $worker['name'] }}</strong>
+                        <small>{{ $worker['share'] }}%・{{ rtrim(rtrim(number_format($worker['total_hours'], 1), '0'), '.') }}時間</small>
+                    </span>
+                    <span class="sfk-dash-ranking-figure"><strong>{{ AppFormat::yen($worker['total']) }}</strong></span>
+                    <span class="sfk-dash-meter" aria-hidden="true"><i style="width: {{ max(2, (int) round($worker['total'] / $topTotal * 100)) }}%"></i></span>
+                </li>
+                @if ($loop->last)
+                    </ol>
+                @endif
+            @empty
+                <p class="sfk-dash-empty">この期間の日報はありません。</p>
+            @endforelse
+        </div>
     </section>
 </div>

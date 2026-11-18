@@ -51,9 +51,10 @@ use Modules\Core\Models\RecordVersion;
  * A record of an app, in the legacy layout: app frame; toolbar with the pencil (レコードを編集する), 再利用
  * (レコードを再利用する, その他の設定) and the 「…」 menu (印刷する, 削除する) on the left, gear and ‹ › to the previous /
  * next record (in the app's list order, recordNavigationColumn()) on the right; the panel on the right of the record
- * (collapsed to a bar of icons when the record opens) with the tabs コメント (records implementing HasRecordComments, その他の設定): 宛先 + text → 書き込む, comments newest
- * first with 返信する / 削除する (own comments); and 変更履歴 (records implementing HasRecordHistory, その他の設定):
- * versions newest first with 更新内容を表示 (changed fields in green) / このバージョンに戻す, and 最新の内容を表示.
+ * (collapsed to a bar of icons when the record opens) with the tabs コメント (records implementing HasRecordComments, その他の設定): 宛先 (全員 or users) + text → 書き込む, comment
+ * cards newest first (comment-design.png) with their replies under them, 返信 and, on one's own, 編集 / 削除; and 変更履歴
+ * (records implementing HasRecordHistory, その他の設定): version cards newest first with 更新内容を表示 (changed fields
+ * in green) / このバージョンに戻す, and 最新の内容を表示.
  * 印刷する opens the print view (?print=1): the record without header, menus, comments and history, with 印刷 / 閉じる.
  *
  * @property-read Schema $commentForm
@@ -70,8 +71,22 @@ abstract class AppViewRecord extends ViewRecord
     #[Url(as: 'version')]
     public ?int $historyVersion = null;
 
-    /** @var array<string, mixed>|null コメント being written: body, mentions (宛先) */
+    /** @var array<string, mixed>|null コメント being written: body, mentions (宛先; 「全員」 = COMMENT_TO_EVERYONE) */
     public ?array $commentData = [];
+
+    /** 返信する: the comment the one being written answers */
+    public ?int $commentReplyTo = null;
+
+    /** 編集する: the own comment being edited, and its text */
+    public ?int $editingComment = null;
+
+    public string $editingCommentBody = '';
+
+    /** 宛先 「全員」 */
+    public const COMMENT_TO_EVERYONE = 'all';
+
+    /** @var Collection<int, RecordComment>|null the comment threads, read once per request */
+    private ?Collection $commentThreads = null;
 
     private ?Model $versionPreview = null;
 
@@ -168,7 +183,7 @@ abstract class AppViewRecord extends ViewRecord
         return $this->historyVersion !== null && $this->showsHistory();
     }
 
-    /** 宛先 + コメント → 書き込む */
+    /** 宛先 (「全員」 first, then the users who may sign in) + コメント → 書き込む */
     public function commentForm(Schema $schema): Schema
     {
         return $schema
@@ -178,14 +193,23 @@ abstract class AppViewRecord extends ViewRecord
                     ->label('宛先')
                     ->multiple()
                     ->searchable()
-                    ->options(fn (): array => User::query()
+                    // the option list closes once a 宛先 is chosen (user, 2026-11-16); a click opens it again for the next
+                    // one. Filament keeps a multiple select open, so its Alpine component (`select`, `state`) is told here —
+                    // two frames later, after Filament placed the list for the new chips: closed before that, the list kept a
+                    // position measured while hidden and the next opening scrolled the page to it
+                    ->extraAlpineAttributes(['x-init' => "\$watch('state', () => requestAnimationFrame(() => requestAnimationFrame(() => { if (select?.isOpen) { select.closeDropdown(); select.selectButton?.focus({ preventScroll: true }); } })))"])
+                    // `+` keeps the user ids as keys (a spread would number them anew)
+                    ->options(fn (): array => [self::COMMENT_TO_EVERYONE => '全員'] + User::query()
                         ->whereIn('employment_status', array_map(
                             fn (EmploymentStatus $status): string => $status->value,
                             array_filter(EmploymentStatus::cases(), fn (EmploymentStatus $status): bool => $status->canSignIn()),
                         ))
                         ->orderBy('name')
                         ->pluck('name', 'id')
-                        ->all()),
+                        ->all())
+                    // the choices go with the page: opening the list asks the server nothing (a closure would make Filament
+                    // fetch them again on every opening — a round trip each time the list is reopened for the next 宛先)
+                    ->dynamicOptions(false),
                 Textarea::make('body')
                     ->label('コメント')
                     ->hiddenLabel()
@@ -197,10 +221,42 @@ abstract class AppViewRecord extends ViewRecord
             ]);
     }
 
-    /** @return Collection<int, RecordComment> newest first */
+    /** @return Collection<int, RecordComment> the comment threads: newest first, each with its replies oldest first */
     public function recordComments(): Collection
     {
-        return $this->showsComments() ? app(RecordComments::class)->comments($this->record) : new Collection;
+        if (! $this->showsComments()) {
+            return new Collection;
+        }
+
+        return $this->commentThreads ??= app(RecordComments::class)->threads($this->record);
+    }
+
+    /** Comments and replies (the count on the collapsed panel). */
+    public function recordCommentCount(): int
+    {
+        return $this->recordComments()->sum(fn (RecordComment $comment): int => 1 + $comment->replies()->count());
+    }
+
+    /** A comment or reply of the record. */
+    public function recordComment(int $commentId): ?RecordComment
+    {
+        foreach ($this->recordComments() as $comment) {
+            if ($comment->id === $commentId) {
+                return $comment;
+            }
+            $reply = $comment->replies()->firstWhere('id', $commentId);
+            if ($reply !== null) {
+                return $reply;
+            }
+        }
+
+        return null;
+    }
+
+    /** The comment the one being written answers (返信する), while it is there. */
+    public function commentReplyTarget(): ?RecordComment
+    {
+        return $this->commentReplyTo !== null ? $this->recordComment($this->commentReplyTo) : null;
     }
 
     public function postComment(): void
@@ -211,43 +267,94 @@ abstract class AppViewRecord extends ViewRecord
         }
 
         $data = $this->commentForm->getState();
+        $mentions = array_map('strval', (array) ($data['mentions'] ?? []));
         app(RecordComments::class)->post(
             $this->record,
             $user,
             trim((string) $data['body']),
-            array_map('intval', (array) ($data['mentions'] ?? [])),
+            array_map('intval', array_values(array_filter($mentions, fn (string $id): bool => ctype_digit($id)))),
             $this->appResource()::displayName().': '.$this->getRecordTitle(),
             static::getResource()::getUrl('view', ['record' => $this->record]),
+            toEveryone: in_array(self::COMMENT_TO_EVERYONE, $mentions, true),
+            replyTo: $this->commentReplyTarget()?->id,
         );
 
+        $this->commentReplyTo = null;
+        $this->commentThreads = null;
         $this->commentForm->fill();
     }
 
-    /** 返信する: addresses the comment being written to the writer of the given one. */
+    /** 返信する: the comment being written answers the given one and is addressed to its writer. */
     public function replyToComment(int $commentId): void
     {
-        $comment = $this->recordComments()->firstWhere('id', $commentId);
+        $comment = $this->recordComment($commentId);
         if ($comment === null) {
             return;
         }
 
-        $mentions = array_map('intval', (array) ($this->commentData['mentions'] ?? []));
+        $mentions = array_map('strval', (array) ($this->commentData['mentions'] ?? []));
         if ($comment->user_id !== null && $comment->user_id !== auth()->id()) {
-            $mentions = [$comment->user_id];
+            $mentions = [(string) $comment->user_id];
         }
 
+        $this->commentReplyTo = $comment->id;
         $this->commentForm->fill(['body' => $this->commentData['body'] ?? '', 'mentions' => $mentions]);
         $this->dispatch('sfk-comment-reply');
+    }
+
+    public function cancelCommentReply(): void
+    {
+        $this->commentReplyTo = null;
+    }
+
+    /** 編集する: one's own comment, edited in place. */
+    public function editComment(int $commentId): void
+    {
+        $comment = $this->recordComment($commentId);
+        if ($comment === null || $comment->user_id === null || $comment->user_id !== auth()->id()) {
+            return;
+        }
+
+        $this->editingComment = $comment->id;
+        $this->editingCommentBody = $comment->body;
+        $this->resetValidation('editingCommentBody');
+    }
+
+    public function cancelCommentEdit(): void
+    {
+        $this->editingComment = null;
+        $this->editingCommentBody = '';
+        $this->resetValidation('editingCommentBody');
+    }
+
+    public function saveCommentEdit(): void
+    {
+        $user = auth()->user();
+        if (! $user instanceof User || ! $this->showsComments() || $this->editingComment === null) {
+            return;
+        }
+
+        $this->validate(
+            ['editingCommentBody' => ['required', 'string', 'max:'.RecordComments::MAX_LENGTH]],
+            attributes: ['editingCommentBody' => 'コメント'],
+        );
+
+        app(RecordComments::class)->update($this->record, $this->editingComment, $user, trim($this->editingCommentBody));
+        $this->commentThreads = null;
+        $this->cancelCommentEdit();
     }
 
     public function deleteCommentAction(): Action
     {
         return Action::make('deleteComment')
-            ->label('削除する')
+            ->label('削除')
+            ->icon(Heroicon::Trash)
+            ->extraAttributes(['class' => 'sfk-comment-action is-danger'])
             ->link()
-            ->color('gray')
+            ->color('danger')
             ->visible(fn (array $arguments): bool => $this->showsComments()
-                && $this->recordComments()->firstWhere('id', (int) ($arguments['comment'] ?? 0))?->user_id === auth()->id())
+                && ($writer = $this->recordComment((int) ($arguments['comment'] ?? 0))?->user_id) !== null
+                && $writer === auth()->id())
             ->modalIcon(Heroicon::OutlinedTrash)
             ->modalIconColor('danger')
             ->modalWidth('md')
@@ -257,7 +364,15 @@ abstract class AppViewRecord extends ViewRecord
             ->action(function (array $arguments): void {
                 $user = auth()->user();
                 if ($user instanceof User) {
-                    app(RecordComments::class)->delete($this->record, (int) ($arguments['comment'] ?? 0), $user);
+                    $id = (int) ($arguments['comment'] ?? 0);
+                    app(RecordComments::class)->delete($this->record, $id, $user);
+                    $this->commentThreads = null;
+                    if ($this->commentReplyTo === $id) {
+                        $this->commentReplyTo = null;
+                    }
+                    if ($this->editingComment === $id) {
+                        $this->cancelCommentEdit();
+                    }
                 }
             });
     }
@@ -328,6 +443,8 @@ abstract class AppViewRecord extends ViewRecord
     {
         return Action::make('restoreVersion')
             ->label(fn (array $arguments): string => (int) ($arguments['version'] ?? 0) === 1 ? '初版に戻す' : 'このバージョンに戻す')
+            ->icon(Heroicon::ArrowUturnLeft)
+            ->extraAttributes(['class' => 'sfk-comment-action'])
             ->link()
             ->color('gray')
             ->visible(fn (): bool => $this->showsHistory() && static::getResource()::canEdit($this->record))

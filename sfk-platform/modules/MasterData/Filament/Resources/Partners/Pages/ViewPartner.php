@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace Modules\MasterData\Filament\Resources\Partners\Pages;
 
 use App\Models\User;
+use Filament\Actions\Action;
+use Filament\Facades\Filament;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\View as ViewComponent;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 use Livewire\Attributes\Url;
 use Modules\Core\Access\FieldAccess;
 use Modules\Core\Filament\AppPages\AppViewRecord;
+use Modules\Core\Filament\AppResource;
 use Modules\Core\Filament\Records\RecordTabs;
 use Modules\MasterData\Domain\Partners\PartnerFields;
 use Modules\MasterData\Domain\Partners\PartnerRole;
@@ -21,7 +25,7 @@ use Modules\MasterData\Models\Partner;
  * A 取引先 (design_ref/customer-overview.png … customer-statements.png): the partner's head — initial, 取引先コード, name,
  * 取引先カテゴリ, contact details and the summary cards — then the tabs: 概要 (the record with コメント | 変更履歴) and the
  * lists the other modules add (受注, 見積, 売上, 納品書, 請求書, 入金, 売掛明細, 仕入, 支払; Core RecordTabs page
- * 'master-data.partners'), each read through its app's rights.
+ * 'master-data.partners'), each read through its app's rights. Under the name: 受注入力 (legacy app action).
  *
  * @property Partner $record
  */
@@ -100,6 +104,26 @@ final class ViewPartner extends AppViewRecord
             'cards' => app(RecordTabs::class)->cardsFor(self::TABS, $partner),
             'tabs' => $this->tabs(),
             'active' => $this->recordTab,
+        ];
+    }
+
+    /**
+     * 受注入力 (legacy app action of APP_01, under the name): a new order of 04. 受注入力 with this partner as
+     * 得意先(受注先) (?customer=<id>, CreateOrder). Only for partners an order may name (得意先 / その他) and while the
+     * user may add orders; the app is reached by its code, as MasterData cannot depend on Orders.
+     */
+    protected function menuActions(): array
+    {
+        $url = fn (): ?string => ($panel = Filament::getCurrentPanel()) === null || ! ($this->record->is_customer || $this->record->is_other)
+            ? null
+            : AppResource::createUrlForApp('order-entry', $panel, ['customer' => $this->record->getKey()]);
+
+        return [
+            Action::make('enterOrder')
+                ->label('受注入力')
+                ->icon(Heroicon::OutlinedClipboardDocumentCheck)
+                ->url($url)
+                ->visible(fn (): bool => $url() !== null),
         ];
     }
 

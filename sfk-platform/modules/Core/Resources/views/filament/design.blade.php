@@ -352,6 +352,24 @@
         color: #ffffff;
     }
 
+    /* a 通知 arrived while the sidebar (and its bell) was closed: a red dot until it is opened (notification-pulse-script) */
+    .sfk-has-new-notice .fi-layout-sidebar-toggle-btn-ctn .fi-icon-btn {
+        position: relative;
+        overflow: visible;
+    }
+
+    .sfk-has-new-notice .fi-layout-sidebar-toggle-btn-ctn .fi-icon-btn::after {
+        content: "";
+        position: absolute;
+        top: 1px;
+        right: 1px;
+        width: 12px;
+        height: 12px;
+        border-radius: 9999px;
+        background: var(--sfk-danger);
+        box-shadow: 0 0 0 2px #ffffff;
+    }
+
     /* ---- buttons: one height, medium weight; primary filled, secondary white with a hairline ----------------------- */
     .fi-btn {
         gap: 6px;

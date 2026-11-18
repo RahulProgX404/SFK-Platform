@@ -8,8 +8,10 @@
  */
 
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Repeater;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -22,6 +24,7 @@ use Modules\Core\Models\AppListView;
 use Modules\Core\Models\BusinessApp;
 use Modules\Core\Models\RecordVersion;
 use Modules\Core\Models\Space;
+use Modules\MasterData\Filament\Resources\Partners\Pages\ViewPartner;
 use Modules\MasterData\Models\Partner;
 use Modules\Orders\Application\FaxImport\FaxDocument;
 use Modules\Orders\Application\FaxImport\FaxOrderReader;
@@ -452,6 +455,51 @@ it('has the record features: 再利用 with the table rows, コメント, 変更
 
     $order->delete();
     expect(RecordVersion::query()->where('record_id', $order->id)->where('record_type', $order->getMorphClass())->count())->toBe(0);
+});
+
+it('starts an order of a partner from 受注入力 on its 01 record (legacy app action)', function () {
+    publishedOrderApp();
+    $customer = orderPartner('株式会社受注先');
+    $supplier = orderPartner('紙商事', ['is_customer' => false, 'is_supplier' => true]);
+    $this->actingAs($this->admin);
+
+    Livewire::test(ViewPartner::class, ['record' => $customer->getRouteKey()])
+        ->assertActionVisible(TestAction::make('enterOrder'))
+        ->assertActionHasUrl(TestAction::make('enterOrder'), OrderResource::getUrl('create', ['customer' => $customer->id]));
+    // an order names only 得意先 / その他
+    Livewire::test(ViewPartner::class, ['record' => $supplier->getRouteKey()])
+        ->assertActionHidden(TestAction::make('enterOrder'));
+
+    Livewire::withQueryParams(['customer' => (string) $customer->id])->test(CreateOrder::class)
+        ->assertSchemaStateSet(['customer_id' => $customer->id])
+        ->fillForm(['quantity' => '500'])
+        ->call('create')
+        ->assertHasNoFormErrors();
+    expect(Order::query()->sole()->customer_id)->toBe($customer->id);
+
+    Livewire::withQueryParams(['customer' => (string) $supplier->id])->test(CreateOrder::class)
+        ->assertSchemaStateSet(['customer_id' => null]);
+});
+
+it('offers 受注入力 only to users who may add orders, and fills only a partner they may see', function () {
+    $customer = orderPartner('株式会社非公開');
+    $employee = orderEmployeeWith([AppAbility::View]);
+    $partners = BusinessApp::query()->firstOrNew(['code' => 'partner-master'], ['name' => '01. 取引先マスタ']);
+    $partners->forceFill(['status' => AppStatus::Published])->save();
+    $partners->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true]);
+    $partners->spaces()->syncWithoutDetaching([Space::query()->where('name', '営業スペース')->sole()->id]);
+    $this->actingAs($employee);
+
+    Livewire::test(ViewPartner::class, ['record' => $customer->getRouteKey()])
+        ->assertActionHidden(TestAction::make('enterOrder'));
+
+    // may add orders but no longer see 01. 取引先マスタ: no partner through ?customer=
+    BusinessApp::query()->where('code', 'order-entry')->sole()->permissions()->sole()->update([AppAbility::Create->column() => true]);
+    $partners->permissions()->sole()->delete();
+    // the rights are kept for the request (AppAccess): the next screen is a new request
+    app()->instance('request', Request::create('/erp'));
+    Livewire::withQueryParams(['customer' => (string) $customer->id])->test(CreateOrder::class)
+        ->assertSchemaStateSet(['customer_id' => null]);
 });
 
 it('limits employees to what the app permissions allow', function () {

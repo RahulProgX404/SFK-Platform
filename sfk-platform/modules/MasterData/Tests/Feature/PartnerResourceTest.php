@@ -8,6 +8,7 @@
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Select;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 use Modules\Core\Application\Apps\AppDiscovery;
@@ -17,7 +18,9 @@ use Modules\Core\Application\Comments\RecordComments;
 use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\AppStatus;
 use Modules\Core\Domain\Apps\PermissionSubject;
+use Modules\Core\Domain\People\EmploymentStatus;
 use Modules\Core\Filament\AppPages\AppListRecords;
+use Modules\Core\Filament\AppPages\AppViewRecord;
 use Modules\Core\Filament\DashboardSettings\Resources\AppSettings\Pages\EditFieldPermissions;
 use Modules\Core\Filament\DashboardSettings\Resources\AppSettings\Pages\EditRecordPermissions;
 use Modules\Core\Filament\Support\ThemeAssets;
@@ -1162,8 +1165,9 @@ it('takes コメント with 宛先 on the record and notifies them, 作成者 an
         ->assertHasNoErrors()
         ->assertSet('commentData.body', null);
 
+    // a card: writer, あなた on one's own, how long ago, 返信 / 削除 / 編集, then @宛先 before the text
     Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
-        ->assertSeeInOrder(['&quot;n&quot;:&quot;管理者&quot;', '@宛先 花子', '納期を確認してください。<br />', '明日まで', '返信する', '削除する'], false);
+        ->assertSeeInOrder(['sfk-comment-card is-own', '&quot;n&quot;:&quot;管理者&quot;', 'あなた', '前</time>', '返信', '削除', '編集', '@宛先 花子', '納期を確認してください。<br />', '明日まで'], false);
 
     $comment = RecordComment::query()->sole();
     expect($comment->user_id)->toBe($this->admin->id)
@@ -1180,9 +1184,13 @@ it('takes コメント with 宛先 on the record and notifies them, 作成者 an
     // 返信する addresses the writer; only the writer deletes a comment
     $this->actingAs($addressee);
     Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
+        ->assertDontSee('sfk-comment-card is-own', false)
         ->call('replyToComment', $comment->id)
-        ->assertSet('commentData.mentions', [$this->admin->id])
-        ->assertActionHidden('deleteComment', ['comment' => $comment->id]);
+        ->assertSet('commentData.mentions', [(string) $this->admin->id])
+        ->assertSet('commentReplyTo', $comment->id)
+        ->assertActionHidden('deleteComment', ['comment' => $comment->id])
+        ->call('editComment', $comment->id)
+        ->assertSet('editingComment', null);
     app(RecordComments::class)->delete($partner, $comment->id, $addressee);
     expect(RecordComment::query()->count())->toBe(1);
 
@@ -1192,6 +1200,118 @@ it('takes コメント with 宛先 on the record and notifies them, 作成者 an
         ->callAction('deleteComment', arguments: ['comment' => $comment->id])
         ->assertSee('コメントはありません。');
     expect(RecordComment::query()->count())->toBe(0);
+});
+
+it('puts a reply under the comment it answers, with a reply to a reply in the same thread (comment-design.png)', function () {
+    publishedPartnerApp();
+    $colleague = User::factory()->admin()->create(['name' => '同僚 次郎']);
+    $partner = makePartner(['name' => 'スレッド取引先']);
+    $this->actingAs($this->admin);
+    Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])->set('commentData.body', '最初のコメント')->call('postComment');
+    $first = RecordComment::query()->sole();
+
+    $this->actingAs($colleague);
+    Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
+        ->call('replyToComment', $first->id)
+        ->assertSee('管理者 への返信')
+        ->set('commentData.body', '返信です')
+        ->call('postComment')
+        ->assertHasNoErrors()
+        ->assertSet('commentReplyTo', null);
+    $reply = RecordComment::query()->whereKeyNot($first->id)->sole();
+    expect($reply->parent_id)->toBe($first->id)
+        ->and($reply->mentions)->toBe([$this->admin->id])
+        ->and($this->admin->notifications()->count())->toBe(1);
+
+    $this->actingAs($this->admin);
+    Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
+        ->call('replyToComment', $reply->id)
+        ->set('commentData.body', '返信への返信')
+        ->call('postComment');
+    expect(RecordComment::query()->where('body', '返信への返信')->sole()->parent_id)->toBe($first->id);
+
+    // newer comments first; the replies under their comment, oldest first; the count has them all
+    Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])->set('commentData.body', '新しいコメント')->call('postComment');
+    Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
+        ->assertSeeInOrder(['新しいコメント', '最初のコメント', 'sfk-comment-replies', '@管理者', '返信です', '返信への返信'], false);
+    $this->get(ViewPartnerUrl($partner))->assertSeeInOrder(['sfk-sidebar-rail-count', '4'], false);
+
+    // a deleted comment leaves its replies as comments of their own
+    Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])->callAction('deleteComment', arguments: ['comment' => $first->id]);
+    expect($reply->fresh()?->parent_id)->toBeNull();
+    Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
+        ->assertSee('返信です')
+        ->assertDontSee('sfk-comment-replies', false);
+});
+
+it('lets only the writer edit a comment in place (編集), marked 編集済み without a new 通知', function () {
+    publishedPartnerApp();
+    $addressee = User::factory()->admin()->create(['name' => '宛先 三郎']);
+    $partner = makePartner(['name' => '編集取引先']);
+    $this->actingAs($this->admin);
+    Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
+        ->set('commentData.mentions', [(string) $addressee->id])
+        ->set('commentData.body', '誤字あり')
+        ->call('postComment');
+    $comment = RecordComment::query()->sole();
+
+    Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])
+        ->call('editComment', $comment->id)
+        ->assertSet('editingCommentBody', '誤字あり')
+        ->assertSee('sfk-comment-edit-input', false)
+        ->set('editingCommentBody', '')
+        ->call('saveCommentEdit')
+        ->assertHasErrors(['editingCommentBody' => 'required'])
+        ->set('editingCommentBody', '修正しました')
+        ->call('saveCommentEdit')
+        ->assertHasNoErrors()
+        ->assertSet('editingComment', null)
+        ->assertSee('修正しました')
+        ->assertSee('編集済み');
+
+    expect($comment->fresh()?->body)->toBe('修正しました')
+        ->and($comment->fresh()?->edited_at)->not->toBeNull()
+        ->and($addressee->notifications()->count())->toBe(1);
+
+    // someone else cannot
+    expect(app(RecordComments::class)->update($partner, $comment->id, $addressee, '書き換え'))->toBeFalse()
+        ->and($comment->fresh()?->body)->toBe('修正しました');
+});
+
+it('addresses a comment to 全員: everyone who may open the record is notified, shown as @全員', function () {
+    $viewer = employeeWith([AppAbility::View]);
+    $outsider = grantDashboards(User::factory()->create(['name' => '部外 者']), 'erp');
+    $retired = User::factory()->admin()->create(['name' => '退職 済', 'employment_status' => EmploymentStatus::Retired]);
+    $partner = makePartner(['name' => '全員取引先']);
+    $this->actingAs($this->admin);
+
+    $page = Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()]);
+    $mentions = $page->instance()->commentForm->getFlatFields()['mentions'];
+    expect($mentions)->toBeInstanceOf(Select::class);
+    // the list closes after each choice (opened again by a click) and its choices go with the page (no server call)
+    expect($mentions->getExtraAlpineAttributes()['x-init'] ?? '')->toContain('select.closeDropdown()')
+        ->and($mentions->hasDynamicOptions())->toBeFalse();
+    $options = $mentions->getOptions();
+    // 全員 first, then the users who may sign in, by their ids
+    expect(array_key_first($options))->toBe(AppViewRecord::COMMENT_TO_EVERYONE)
+        ->and($options[AppViewRecord::COMMENT_TO_EVERYONE])->toBe('全員')
+        ->and($options[$viewer->id] ?? null)->toBe($viewer->name)
+        ->and($options)->not->toHaveKey($retired->id);
+
+    $page->set('commentData.mentions', [AppViewRecord::COMMENT_TO_EVERYONE])
+        ->set('commentData.body', 'みなさんへ')
+        ->call('postComment')
+        ->assertHasNoErrors();
+
+    $comment = RecordComment::query()->sole();
+    expect($comment->mentions_all)->toBeTrue()
+        ->and($comment->mentions)->toBe([])
+        ->and($viewer->notifications()->count())->toBe(1)
+        ->and($outsider->notifications()->count())->toBe(0)
+        ->and($retired->notifications()->count())->toBe(0)
+        ->and($this->admin->notifications()->count())->toBe(0);
+
+    Livewire::test(ViewPartner::class, ['record' => $partner->getRouteKey()])->assertSeeInOrder(['@全員', 'みなさんへ']);
 });
 
 it('opens the record with the コメント / 変更履歴 panel collapsed to its icons', function () {

@@ -19,6 +19,9 @@ final class AbsencesCard extends DashboardCard
 
     protected string $view = 'analytics::widgets.absences';
 
+    /** people of room a day: the card keeps that height with fewer or none (ghost rows); more scroll inside the day */
+    public const ROWS_PER_DAY = 4;
+
     /** @return array<string, mixed> */
     protected function getViewData(): array
     {

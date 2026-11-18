@@ -7,9 +7,12 @@ namespace Modules\Core\Http\Controllers;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\RichEditor\RichContentRenderer;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Modules\Core\Application\Notifications\NotificationPulse;
+use Modules\Core\Application\Notifications\UnreadCounters;
 use Modules\Core\Filament\Portal\PortalPage;
 use Modules\Core\Http\Portal\DashboardDirectory;
 use Modules\Core\Http\Portal\DashboardEntry;
@@ -42,9 +45,25 @@ final class PortalController
             'user' => $user,
             'dashboards' => $entries,
             'notices' => $notices,
-            'unread' => $user->unreadNotifications()->count(),
+            // 今日: unread 通知 and the modules' unread (メッセージ), kept in step by the page (pulse → unread())
+            'unread' => UnreadCounters::for($user),
+            'pulseUrl' => NotificationPulse::url($user->id),
             'keyboardUrl' => $this->keyboardUrl($entries),
         ]);
+    }
+
+    /**
+     * GET /portal/unread: the counts of the 今日 card, asked by the open portal when the user's pulse changed (a new
+     * 通知 or message, something read in the messenger) and when its tab comes back (read elsewhere).
+     */
+    public function unread(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User, 401);
+
+        return response()
+            ->json(['items' => array_map(fn (array $item): array => ['key' => $item['key'], 'count' => $item['count']], UnreadCounters::for($user))])
+            ->header('Cache-Control', 'no-store, private');
     }
 
     /**

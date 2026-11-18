@@ -19,59 +19,65 @@
         </header>
 
         @if ($latest !== null)
-            @forelse ($latest as $index => $sale)
-                @if ($loop->first)
-                    <ul class="sfk-dash-people">
-                @endif
-                <li wire:key="latest-sale-{{ $sale['id'] }}">
-                    <span class="sfk-dash-avatar is-solid is-{{ $index + 1 }}">{{ DashboardCard::initials($sale['customer']) }}</span>
-                    @if ($sale['url'] !== null)
-                        <a href="{{ $sale['url'] }}" class="sfk-dash-people-text">
-                    @else
-                        <span class="sfk-dash-people-text">
+            <div class="sfk-dash-stack">
+                @include('analytics::widgets.partials.ghost', ['kind' => 'people', 'rows' => \Modules\Analytics\Filament\Widgets\StaffSalesCard::ROWS])
+                @forelse ($latest as $index => $sale)
+                    @if ($loop->first)
+                        <ul class="sfk-dash-people">
                     @endif
-                        <strong>{{ $sale['customer'] }}</strong>
-                        <small>{{ $sale['sold_on'] }}{{ filled($sale['product']) ? '・'.$sale['product'] : '' }}</small>
-                    @if ($sale['url'] !== null)
-                        </a>
-                    @else
+                    <li wire:key="latest-sale-{{ $sale['id'] }}">
+                        <span class="sfk-dash-avatar is-solid is-{{ $index + 1 }}">{{ DashboardCard::initials($sale['customer']) }}</span>
+                        @if ($sale['url'] !== null)
+                            <a href="{{ $sale['url'] }}" class="sfk-dash-people-text">
+                        @else
+                            <span class="sfk-dash-people-text">
+                        @endif
+                            <strong>{{ $sale['customer'] }}</strong>
+                            <small>{{ $sale['sold_on'] }}{{ filled($sale['product']) ? '・'.$sale['product'] : '' }}</small>
+                        @if ($sale['url'] !== null)
+                            </a>
+                        @else
+                            </span>
+                        @endif
+                        <span class="sfk-dash-people-figure">
+                            <small>売上金額</small>
+                            <strong>{{ AppFormat::yen($sale['amount']) }}</strong>
                         </span>
+                    </li>
+                    @if ($loop->last)
+                        </ul>
                     @endif
-                    <span class="sfk-dash-people-figure">
-                        <small>売上金額</small>
-                        <strong>{{ AppFormat::yen($sale['amount']) }}</strong>
-                    </span>
-                </li>
-                @if ($loop->last)
-                    </ul>
-                @endif
-            @empty
-                <p class="sfk-dash-empty">この期間の売上はありません。</p>
-            @endforelse
+                @empty
+                    <p class="sfk-dash-empty">この期間の売上はありません。</p>
+                @endforelse
+            </div>
         @else
             @php
                 $topAmount = max(1, (int) ($staff[0]['amount'] ?? 0));
             @endphp
-            @forelse ($staff as $index => $person)
-                @if ($loop->first)
-                    <ol class="sfk-dash-ranking">
-                @endif
-                @php($tip = DashboardTips::ranking($person['name'], DashboardTips::share($person['amount'], $whole)))
-                <li tabindex="0" data-sfk-tip x-tooltip="{{ $tip->x() }}">
-                    <span @class(['sfk-dash-rankno', 'is-'.($index + 1)])>{{ $index + 1 }}</span>
-                    <span class="sfk-dash-ranking-name">
-                        <strong>{{ $person['name'] }}</strong>
-                        <small>売上件数 {{ number_format($person['count']) }}件</small>
-                    </span>
-                    <span class="sfk-dash-ranking-figure"><strong>{{ AppFormat::yen($person['amount']) }}</strong></span>
-                    <span class="sfk-dash-meter" aria-hidden="true"><i style="width: {{ max(2, (int) round($person['amount'] / $topAmount * 100)) }}%"></i></span>
-                </li>
-                @if ($loop->last)
-                    </ol>
-                @endif
-            @empty
-                <p class="sfk-dash-empty">この期間の売上はありません。</p>
-            @endforelse
+            <div class="sfk-dash-stack">
+                @include('analytics::widgets.partials.ghost', ['kind' => 'ranking', 'rows' => \Modules\Analytics\Filament\Widgets\StaffSalesCard::ROWS])
+                @forelse ($staff as $index => $person)
+                    @if ($loop->first)
+                        <ol class="sfk-dash-ranking">
+                    @endif
+                    @php($tip = DashboardTips::ranking($person['name'], DashboardTips::share($person['amount'], $whole)))
+                    <li tabindex="0" data-sfk-tip x-tooltip="{{ $tip->x() }}">
+                        <span @class(['sfk-dash-rankno', 'is-'.($index + 1)])>{{ $index + 1 }}</span>
+                        <span class="sfk-dash-ranking-name">
+                            <strong>{{ $person['name'] }}</strong>
+                            <small>売上件数 {{ number_format($person['count']) }}件</small>
+                        </span>
+                        <span class="sfk-dash-ranking-figure"><strong>{{ AppFormat::yen($person['amount']) }}</strong></span>
+                        <span class="sfk-dash-meter" aria-hidden="true"><i style="width: {{ max(2, (int) round($person['amount'] / $topAmount * 100)) }}%"></i></span>
+                    </li>
+                    @if ($loop->last)
+                        </ol>
+                    @endif
+                @empty
+                    <p class="sfk-dash-empty">この期間の売上はありません。</p>
+                @endforelse
+            </div>
         @endif
     </section>
 </div>

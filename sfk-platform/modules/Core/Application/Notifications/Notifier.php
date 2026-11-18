@@ -55,14 +55,14 @@ final class Notifier
             ->body($notice->bodyText())
             ->icon($kind->icon)
             ->iconColor($kind->color)
-            ->actions($url !== null ? [Action::make('open')->label('レコードを開く')->url($url)->markAsRead()] : []);
+            ->actions($url !== null ? [Action::make('open')->label($notice->openLabelText())->url($url)->markAsRead()] : []);
         $data = [...$notification->getDatabaseMessage(), 'kind' => $kind->key, 'once' => $notice->onceKey()];
 
         $mail = $this->settings($users, $kind->key)->filter(fn (NotificationSetting $setting): bool => $setting->mail)->keys()->all();
         foreach ($users as $user) {
             $user->notifyNow(new SystemNotification($data), ['database']);
             if (in_array($user->id, $mail, true) && $user->notificationEmail() !== null) {
-                $user->notify(new SystemNotificationMail($title, $notice->bodyText(), $url));
+                $user->notify(new SystemNotificationMail($title, $notice->bodyText(), $url, $notice->openLabelText()));
             }
         }
 

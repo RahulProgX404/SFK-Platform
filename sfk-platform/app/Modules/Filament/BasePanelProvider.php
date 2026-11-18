@@ -102,6 +102,9 @@ abstract class BasePanelProvider extends PanelProvider
             ->userMenu(position: UserMenuPosition::Sidebar)
             // 通知 (bell), sent through Modules\Core\Application\Notifications\Notifier (docs/notifications.md)
             ->databaseNotifications(position: DatabaseNotificationsPosition::Sidebar)
+            // no polling of the bell (two database queries every 30 s per open page): Core's NotificationPulse refreshes
+            // it the moment a 通知 arrives (core::filament.notification-pulse-script)
+            ->databaseNotificationsPolling(null)
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

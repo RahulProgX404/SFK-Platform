@@ -13,7 +13,7 @@
         'history' => $page->showsHistory() ? ['変更履歴', Heroicon::OutlinedClock, 'sfk-history-title'] : null,
     ]);
     $open = $page->sidebarStartsOpen();
-    $commentCount = isset($tabs['comments']) ? $page->recordComments()->count() : 0;
+    $commentCount = isset($tabs['comments']) ? $page->recordCommentCount() : 0;
 @endphp
 
 <aside

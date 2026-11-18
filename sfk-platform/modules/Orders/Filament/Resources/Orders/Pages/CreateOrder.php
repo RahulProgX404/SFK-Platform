@@ -9,20 +9,26 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Url;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Modules\Core\Filament\AppPages\AppCreateRecord;
+use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
+use Modules\MasterData\Models\Partner;
 use Modules\Orders\Application\FaxImport\FaxDocument;
 use Modules\Orders\Application\FaxImport\FaxImportFailed;
 use Modules\Orders\Application\FaxImport\FaxOrderImport;
 use Modules\Orders\Domain\FaxImport\FaxImportRules;
 use Modules\Orders\Domain\FaxImport\FaxOrderMapper;
 use Modules\Orders\Filament\Resources\Orders\OrderResource;
+use Modules\Orders\Filament\Resources\Orders\Schemas\OrderForm;
 use Modules\Orders\Models\Order;
 
 /**
- * New order of 04. 受注入力. 注番 is numbered on save (BR-OR-01). 「…受注書を読み込む」 (legacy create-screen button)
+ * New order of 04. 受注入力. 注番 is numbered on save (BR-OR-01). ?customer=<id> (button 受注入力 on a 01. 取引先マスタ
+ * record) starts it with that 得意先(受注先). 「…受注書を読み込む」 (legacy create-screen button)
  * reads an uploaded purchase order of the configured issuer (Application FaxOrderImport) and, after
  * 「フォームに反映する内容を確認」, fills the form with it; nothing is saved until 保存.
  */
@@ -34,6 +40,26 @@ final class CreateOrder extends AppCreateRecord
 
     /** @var array<string, mixed>|null the purchase order just read (FaxImportResult::toArray()) */
     public ?array $faxImport = null;
+
+    /** ?customer=<id>: 受注入力 on a 01. 取引先マスタ record (legacy app action, 取引先名 → 得意先(受注先)). */
+    #[Url(as: 'customer')]
+    public ?string $fromCustomer = null;
+
+    protected function afterFill(): void
+    {
+        if ($this->duplicate !== null || ! is_string($this->fromCustomer) || preg_match('/^\d+$/', $this->fromCustomer) !== 1) {
+            return;
+        }
+
+        // only a 得意先 the 得意先(受注先) drop-down offers the user (security review 2026-11-14: no partner read through ?customer=)
+        $customer = PartnerResource::visibleOr(
+            Partner::query()->where(fn (Builder $q) => $q->where('is_customer', true)->orWhere('is_other', true)),
+            OrderForm::keptPartners(),
+        )->find((int) $this->fromCustomer);
+        if ($customer instanceof Partner) {
+            $this->form->fill([...$this->form->getRawState(), 'customer_id' => $customer->getKey()]);
+        }
+    }
 
     protected function getHeaderActions(): array
     {

@@ -2251,7 +2251,7 @@
 
     /* 変更履歴 (core::filament.record-history): panel on the right of the record; changed fields in green */
     .sfk-history {
-        width: 340px;
+        width: 380px;
         max-width: 100%;
         align-self: flex-start;
         background: #ffffff;
@@ -2321,80 +2321,203 @@
         color: var(--kt-muted);
     }
 
+    /*
+     * コメント | 変更履歴 as cards (comment-design.png, 2026-11-16): white cards on the page grey, the writer's avatar
+     * and name, how long ago, the links with an icon in the brand colour (削除 red); a reply under its comment behind a
+     * thread line. The 変更履歴 versions use the same card.
+     */
+    .sfk-comment-list,
     .sfk-history-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sfk-space-3, 12px);
         max-height: calc(100vh - 220px);
         margin: 0;
-        padding: 0;
+        padding: var(--sfk-space-3, 12px);
         overflow-y: auto;
         list-style: none;
+        background: var(--sfk-page, #f5f7fa);
     }
 
-    .sfk-history-item {
-        padding: 10px 12px;
-        border-bottom: 1px solid var(--kt-border);
-        font-size: .875rem;
+    .sfk-comment-card {
+        padding: var(--sfk-space-3, 12px) var(--sfk-space-4, 16px);
+        border-radius: var(--sfk-radius-lg, 10px);
+        background: var(--sfk-surface, #ffffff);
+        box-shadow: var(--sfk-ring), var(--sfk-shadow);
+        font-size: var(--sfk-fs-body, .875rem);
     }
 
-    .sfk-history-item.is-shown {
-        background: #f1f9f3;
-        box-shadow: inset 3px 0 0 #3c9a5f;
+    .sfk-comment-card.is-editing {
+        box-shadow: 0 0 0 1px var(--sfk-primary), var(--sfk-focus);
     }
 
-    .sfk-history-item-head {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: 8px;
-    }
-
-    .sfk-history-version {
-        font-weight: 700;
-    }
-
-    .sfk-history-date {
-        color: var(--kt-muted);
-        font-size: .8125rem;
-    }
-
-    .sfk-history-who {
+    .sfk-comment-head {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
+        justify-content: space-between;
+        gap: var(--sfk-space-1, 4px) var(--sfk-space-3, 12px);
+    }
+
+    .sfk-comment-author {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--sfk-space-2, 8px);
+        min-width: 0;
+    }
+
+    .sfk-comment-author .sfk-user-name {
+        gap: var(--sfk-space-2, 8px);
+        color: var(--sfk-ink);
+        font-weight: var(--sfk-fw-semibold, 600);
+    }
+
+    .sfk-comment-author .sfk-user-avatar-sm {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        font-size: var(--sfk-fs-small, .8125rem);
+    }
+
+    .sfk-comment-you {
+        padding: 0 var(--sfk-space-2, 8px);
+        border-radius: 4px;
+        background: var(--sfk-primary);
+        color: #ffffff;
+        font-size: var(--sfk-fs-badge, .75rem);
+        font-weight: var(--sfk-fw-medium, 500);
+        line-height: 20px;
+    }
+
+    .sfk-comment-time {
+        color: var(--sfk-muted);
+        font-size: var(--sfk-fs-small, .8125rem);
+        white-space: nowrap;
+    }
+
+    .sfk-comment-actions,
+    .sfk-history-actions {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--sfk-space-1, 4px) var(--sfk-space-4, 16px);
+        margin-left: auto;
+    }
+
+    .sfk-history-actions {
+        display: flex;
+        margin-top: var(--sfk-space-3, 12px);
+        margin-left: 0;
+    }
+
+    .sfk-comment-action,
+    .sfk-comment-actions .fi-link,
+    .sfk-history-actions .fi-link {
+        display: inline-flex;
+        align-items: center;
         gap: 6px;
-        margin: 4px 0 0;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: var(--sfk-primary) !important;
+        font-size: var(--sfk-fs-label, .875rem);
+        font-weight: var(--sfk-fw-semibold, 600);
+        cursor: pointer;
+        white-space: nowrap;
+    }
+
+    .sfk-comment-action:hover,
+    .sfk-comment-actions .fi-link:hover,
+    .sfk-history-actions .fi-link:hover {
+        opacity: .7;
+        text-decoration: none;
+    }
+
+    .sfk-comment-action:focus-visible {
+        outline: 1px solid var(--sfk-primary);
+        outline-offset: 2px;
+    }
+
+    .sfk-comment-actions .fi-link.fi-color-danger,
+    .sfk-comment-action.is-danger {
+        color: var(--sfk-danger) !important;
+    }
+
+    .sfk-comment-action-icon,
+    .sfk-comment-actions .fi-link .fi-icon,
+    .sfk-history-actions .fi-link .fi-icon {
+        width: 16px;
+        height: 16px;
+        color: inherit;
+    }
+
+    .sfk-comment-replies {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sfk-space-3, 12px);
+        margin: var(--sfk-space-3, 12px) 0 0 var(--sfk-space-4, 16px);
+        padding: 0 0 0 var(--sfk-space-4, 16px);
+        border-left: 2px solid var(--sfk-line);
+        list-style: none;
+    }
+
+    .sfk-comment-thread {
+        list-style: none;
+    }
+
+    .sfk-history-item.is-shown {
+        box-shadow: 0 0 0 1px var(--sfk-success), 0 0 0 3px var(--sfk-success-soft);
+    }
+
+    .sfk-history-meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--sfk-space-2, 8px);
+        margin: var(--sfk-space-2, 8px) 0 0;
+    }
+
+    .sfk-history-version {
+        color: var(--sfk-ink);
+        font-weight: var(--sfk-fw-semibold, 600);
     }
 
     .sfk-history-event {
-        color: var(--kt-muted);
+        padding: 0 var(--sfk-space-2, 8px);
+        border-radius: 4px;
+        background: var(--sfk-primary-soft);
+        color: var(--sfk-primary);
+        font-size: var(--sfk-fs-badge, .75rem);
+        font-weight: var(--sfk-fw-medium, 500);
+        line-height: 20px;
+    }
+
+    .sfk-history-event.is-created {
+        background: var(--sfk-success-soft);
+        color: var(--sfk-success);
+    }
+
+    .sfk-history-event.is-restored {
+        background: var(--sfk-warning-soft);
+        color: var(--sfk-warning);
     }
 
     .sfk-history-fields {
         display: flex;
         flex-wrap: wrap;
-        gap: 4px;
-        margin: 6px 0 0;
+        gap: var(--sfk-space-1, 4px);
+        margin: var(--sfk-space-2, 8px) 0 0;
         padding: 0;
         list-style: none;
     }
 
     .sfk-history-fields li {
-        padding: 1px 6px;
-        background: #e6f4ea;
-        color: #276b40;
-        font-size: .8125rem;
-    }
-
-    .sfk-history-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px 14px;
-        margin-top: 6px;
-    }
-
-    .sfk-history-actions .fi-link {
-        font-size: .875rem;
-        font-weight: 400;
-        color: var(--kt-blue) !important;
+        padding: 1px var(--sfk-space-2, 8px);
+        border-radius: 4px;
+        background: var(--sfk-success-soft);
+        color: var(--sfk-success);
+        font-size: var(--sfk-fs-small, .8125rem);
     }
 
     /* インライン編集 of a list row */
@@ -2570,9 +2693,9 @@
         display: flex;
         flex-direction: column;
         gap: 10px;
-        padding: 12px;
+        padding: var(--sfk-space-3, 12px);
         border-bottom: 1px solid var(--kt-border);
-        background: #fafbfc;
+        background: var(--sfk-surface, #ffffff);
     }
 
     .sfk-comment-form .fi-sc {
@@ -2590,37 +2713,100 @@
         font-size: .875rem;
     }
 
-    .sfk-comment-who {
-        margin: 0;
-    }
-
-    .sfk-comment-mentions {
+    .sfk-comment-replying {
         display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
-        margin: 6px 0 0;
+        align-items: center;
+        gap: var(--sfk-space-2, 8px);
+        padding: var(--sfk-space-1, 4px) var(--sfk-space-1, 4px) var(--sfk-space-1, 4px) var(--sfk-space-3, 12px);
+        border-radius: var(--sfk-radius, 6px);
+        background: var(--sfk-primary-soft);
+        color: var(--sfk-primary);
+        font-size: var(--sfk-fs-small, .8125rem);
+        font-weight: var(--sfk-fw-medium, 500);
     }
 
-    .sfk-comment-mention {
-        padding: 1px 6px;
-        background: var(--kt-blue-soft);
-        color: var(--kt-blue-dark);
-        font-size: .8125rem;
+    .sfk-comment-replying-text {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .sfk-comment-replying-cancel {
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 4px;
+        color: var(--sfk-primary);
+    }
+
+    .sfk-comment-replying-cancel:hover {
+        background: var(--sfk-primary-soft-strong);
     }
 
     .sfk-comment-body {
-        margin: 6px 0 0;
+        margin: var(--sfk-space-2, 8px) 0 0;
+        color: var(--sfk-muted);
         white-space: normal;
         overflow-wrap: anywhere;
-        line-height: 1.6;
+        line-height: var(--sfk-lh-body, 1.6);
     }
 
-    .sfk-history-actions .fi-link.fi-color-danger {
-        color: var(--kt-muted) !important;
+    .sfk-comment-mention {
+        margin-right: 2px;
+        color: var(--sfk-primary);
+        font-weight: var(--sfk-fw-semibold, 600);
     }
 
-    .sfk-history-actions .fi-link.fi-color-danger:hover {
-        color: var(--kt-red) !important;
+    .sfk-comment-edited {
+        margin: var(--sfk-space-1, 4px) 0 0;
+        color: var(--sfk-subtle);
+        font-size: var(--sfk-fs-badge, .75rem);
+    }
+
+    .sfk-comment-edit {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sfk-space-2, 8px);
+        margin-top: var(--sfk-space-3, 12px);
+    }
+
+    .sfk-comment-edit-input {
+        width: 100%;
+        min-height: 72px;
+        padding: var(--sfk-space-2, 8px) var(--sfk-space-3, 12px);
+        border: 1px solid var(--sfk-line-strong);
+        border-radius: var(--sfk-radius, 6px);
+        background: var(--sfk-surface, #ffffff);
+        color: var(--sfk-text);
+        font-size: var(--sfk-fs-body, .875rem);
+        line-height: var(--sfk-lh-body, 1.6);
+        resize: vertical;
+    }
+
+    .sfk-comment-edit-input:focus {
+        outline: none;
+        border-color: var(--sfk-primary);
+        box-shadow: var(--sfk-focus);
+    }
+
+    .sfk-comment-edit-error {
+        margin: 0;
+        color: var(--sfk-danger-text);
+        font-size: var(--sfk-fs-small, .8125rem);
+    }
+
+    .sfk-comment-edit-foot {
+        display: flex;
+        justify-content: flex-end;
+        gap: var(--sfk-space-2, 8px);
+    }
+
+    .sfk-comment-edit-foot .sfk-filter-btn {
+        min-width: 88px;
+        height: var(--sfk-control, 36px);
     }
 
     .fi-in-entry.sfk-history-changed .fi-in-entry-content {

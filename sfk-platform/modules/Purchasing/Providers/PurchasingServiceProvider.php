@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Application\Legacy\LegacyImporter;
 use Modules\Core\Application\Notifications\NotificationKind;
 use Modules\Core\Application\Notifications\NotificationKinds;
+use Modules\Core\Application\Records\RecordCards;
 use Modules\Core\Filament\Records\RecordTabs;
 use Modules\Core\Filament\Records\RelatedLists;
 use Modules\MasterData\Filament\Resources\Partners\Pages\ViewPartner;
@@ -48,6 +49,14 @@ final class PurchasingServiceProvider extends ModuleServiceProvider
 
     protected function bootModule(): void
     {
+        // 社内メッセージ: a purchase shared in a message is drawn as a card (Core RecordCards, the viewer's rights apply)
+        RecordCards::register('purchase-entry', fn (Purchase $purchase): array => [
+            ['field' => 'purchase_number', 'label' => '仕入番号', 'value' => $purchase->purchase_number],
+            ['field' => 'supplier_id', 'label' => '仕入先', 'value' => $purchase->supplier->name],
+            ['field' => 'product_name', 'label' => '品名', 'value' => $purchase->product_name],
+            ['field' => 'total', 'label' => '合計', 'value' => '¥'.number_format((int) $purchase->total)],
+        ]);
+
         // the tabs and cards of a 取引先 on its 01. 取引先マスタ record (design_ref/customer-*.png)
         PartnerTabs::register($this->app->make(RecordTabs::class), ViewPartner::TABS);
 

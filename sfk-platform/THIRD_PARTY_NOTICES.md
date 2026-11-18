@@ -81,6 +81,21 @@ Japanese text in the generated PDFs uses the standard Japanese CID fonts by name
 |---|---|---|
 | symfony/polyfill-time 1.42 (Symfony) | MIT | Composer, with symfony/clock 8.1 |
 
+## Real time over WebSockets (2026-11-17, docs/realtime.md)
+
+`composer require laravel/reverb` — the WebSocket server of 通知 and 社内メッセージ. All new packages are MIT. The
+browser side is our own small client of the Pusher protocol (`core::filament.realtime-script`): no pusher-js or
+laravel-echo.
+
+| Component | License | Where |
+|---|---|---|
+| laravel/reverb 1.13 (Laravel) | MIT | Composer — the WebSocket server (`php artisan reverb:start`) and the app's publisher |
+| pusher/pusher-php-server 7 (Pusher Ltd) | MIT | Composer, with the above — the HTTP publisher of the broadcaster |
+| ratchet/rfc6455 (Chris Boden, Matt Bonneau) | MIT | Composer, with the above — the WebSocket protocol |
+| react/event-loop, socket, stream, dns, cache, promise, promise-timer (ReactPHP) | MIT | Composer, with the above |
+| evenement/evenement (Igor Wiedler) | MIT | Composer, with the above |
+| clue/redis-protocol, clue/redis-react (Christian Lück) | MIT | Composer, with the above — only for several Reverb servers (scaling) |
+
 ## Dependency license review (2026-10-22)
 
 PHP (Composer, production — `composer licenses --no-dev`, 118 packages): all permissive.

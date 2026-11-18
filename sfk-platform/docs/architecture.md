@@ -109,6 +109,8 @@ modules/Sales/
 | Background work | Laravel queues (Redis) for bulk invoicing, month opening, imports; scheduler for periodic jobs |
 | PDF documents   | 帳票出力 (Core, every app): uploaded PDF forms + fields placed in a designer, FPDF/FPDI renderer — see [documents.md](documents.md) |
 | Notifications   | 通知 in the bell + optional e-mail through Core `Notifier` (kinds, 通知設定, visibility, daily checks) — see [notifications.md](notifications.md) |
+| Messaging       | 社内メッセージ (Messaging module): conversations, files, mentions, 全社アナウンス — see [messaging.md](messaging.md) |
+| Real time       | Cache-pulse polling for 通知 and messages (production: no WebSocket server / add-on); Laravel Reverb push optional — see [realtime.md](realtime.md) |
 | Locale/time     | `ja`, `Asia/Tokyo` by default                                                                  |
 
 ## 8. Decisions

@@ -11,6 +11,9 @@ final class TopProductsCard extends DashboardCard
 {
     protected static ?int $sort = 6;
 
+    /** rows of the full list: the card keeps their height with fewer or none (ghost rows) */
+    public const ROWS = 3;
+
     protected string $view = 'analytics::widgets.top-products';
 
     public static function canView(): bool
@@ -27,7 +30,7 @@ final class TopProductsCard extends DashboardCard
     /** @return array<string, mixed> */
     protected function getViewData(): array
     {
-        $products = $this->salesData()->topProducts($this->period());
+        $products = $this->salesData()->topProducts($this->period(), self::ROWS);
 
         return [
             'products' => $products,

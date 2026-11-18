@@ -5,6 +5,7 @@
 #   (after changing composer.lock: docker compose exec app composer install — vendor/ is a Docker volume)
 # App:      http://localhost:8080        (ERP panel at /erp)
 # Mail UI:  http://localhost:8025        (Mailpit)
+# WebSocket: ws://localhost:8080/app       (Reverb, through nginx)
 # Postgres: localhost:5433  (user/pass/db from .env)
 
 x-app: &app
@@ -62,6 +63,14 @@ services:
   scheduler:
     <<: *app
     command: php artisan schedule:work
+
+  # Optional WebSockets (Laravel Reverb, docs/realtime.md) — off by default: production polls (no paid add-on), so dev
+  # does too. To try pushes: BROADCAST_CONNECTION=reverb + REVERB_* in .env, then `docker compose --profile realtime up -d`.
+  # The app publishes to it at reverb:8080; browsers reach it through nginx (/app on the app's own address).
+  reverb:
+    <<: *app
+    profiles: ["realtime"]
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
 
   pgsql:
     image: postgres:17-alpine

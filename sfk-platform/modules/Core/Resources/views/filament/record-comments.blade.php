@@ -1,18 +1,29 @@
 {{--
-    コメント tab of the record panel (core::filament.record-sidebar), legacy layout: 宛先 and the text with 書き込む,
-    then the comments newest first (who with the ユーザー情報 popup, when, 宛先, text) with 返信する and, for the
-    writer, 削除する.
+    コメント tab of the record panel (core::filament.record-sidebar; comment-design.png): 宛先 (全員 or users) and the
+    text with 書き込む — while answering a comment, 「…への返信」 with × above it — then the comments newest first as
+    cards (core::filament.record-comment), each with its replies under it, oldest first, behind a thread line.
 --}}
 @php
-    use Modules\Core\Filament\Support\UserPopup;
+    use Filament\Support\Icons\Heroicon;
 
     $page = $getLivewire();
     $comments = $page->recordComments();
+    $replyTarget = $page->commentReplyTarget();
 @endphp
 
 <div class="sfk-comments">
     <form class="sfk-comment-form" wire:submit="postComment"
           x-on:sfk-comment-reply.window="$nextTick(() => $el.querySelector('[data-sfk-comment-body]')?.focus())">
+        @if ($replyTarget !== null)
+            <div class="sfk-comment-replying">
+                <x-filament::icon :icon="Heroicon::ArrowUturnLeft" class="sfk-comment-action-icon" />
+                <span class="sfk-comment-replying-text">{{ ($replyTarget->user?->name ?? '—').' への返信' }}</span>
+                <button type="button" class="sfk-comment-replying-cancel" title="返信をやめる" wire:click="cancelCommentReply">
+                    <x-filament::icon :icon="Heroicon::XMark" class="sfk-comment-action-icon" />
+                    <span class="fi-sr-only">返信をやめる</span>
+                </button>
+            </div>
+        @endif
         {{ $page->commentForm }}
         <div class="sfk-comment-form-foot">
             <button type="submit" class="sfk-filter-btn sfk-filter-btn-submit sfk-comment-submit" wire:loading.attr="disabled" wire:target="postComment">書き込む</button>
@@ -22,34 +33,19 @@
     @if ($comments->isEmpty())
         <p class="sfk-history-empty">コメントはありません。</p>
     @else
-        <ol class="sfk-history-list sfk-comment-list">
+        <ol class="sfk-comment-list">
             @foreach ($comments as $comment)
-                <li class="sfk-history-item sfk-comment" wire:key="comment-{{ $comment->id }}">
-                    <div class="sfk-history-item-head">
-                        <span class="sfk-history-who sfk-comment-who">
-                            @if ($comment->user !== null)
-                                {{ UserPopup::html($comment->user) }}
-                            @else
-                                <span class="sfk-history-unknown">—</span>
-                            @endif
-                        </span>
-                        <time datetime="{{ $comment->created_at?->toIso8601String() }}" class="sfk-history-date">{{ $comment->created_at?->format('Y-m-d H:i') }}</time>
-                    </div>
-                    @if ($comment->mentions !== [])
-                        <p class="sfk-comment-mentions">
-                            @foreach ($comment->mentionedUsers() as $mentioned)
-                                <span class="sfk-comment-mention">{{ '@'.$mentioned->name }}</span>
+                <li class="sfk-comment-thread" wire:key="thread-{{ $comment->id }}">
+                    @include('core::filament.record-comment', ['comment' => $comment])
+                    @if ($comment->replies()->isNotEmpty())
+                        <ol class="sfk-comment-replies">
+                            @foreach ($comment->replies() as $reply)
+                                <li wire:key="reply-{{ $reply->id }}">
+                                    @include('core::filament.record-comment', ['comment' => $reply])
+                                </li>
                             @endforeach
-                        </p>
+                        </ol>
                     @endif
-                    <p class="sfk-comment-body">{!! nl2br(e($comment->body)) !!}</p>
-                    <div class="sfk-history-actions">
-                        <button type="button" class="sfk-filter-link" wire:click="replyToComment({{ $comment->id }})">返信する</button>
-                        {{-- only on one's own comments (an action drawn here would show disabled when hidden) --}}
-                        @if (($delete = ($page->deleteCommentAction)(['comment' => $comment->id]))->isVisible())
-                            {{ $delete }}
-                        @endif
-                    </div>
                 </li>
             @endforeach
         </ol>

@@ -8,7 +8,8 @@
     $top = max(1, (int) ($customers[0]['amount'] ?? 0));
 @endphp
 
-<div class="sfk-dash-cell sfk-dash-span-30p is-fit">
+{{-- not is-fit: as high as 売上の推移 and 売れ筋 TOP3 of the same row (user 2026-11-18) --}}
+<div class="sfk-dash-cell sfk-dash-span-30p">
     <section class="sfk-dash-card" aria-labelledby="sfk-top-customers-title">
         <header class="sfk-dash-card-head">
             <div class="sfk-dash-card-titles">
@@ -20,25 +21,28 @@
             @endif
         </header>
 
-        @forelse ($customers as $index => $customer)
-            @if ($loop->first)
-                <ol class="sfk-dash-ranking">
-            @endif
-            @php($tip = DashboardTips::ranking(($customer['code'] ? $customer['code'].' ' : '').$customer['name'], DashboardTips::share($customer['amount'], $whole)))
-            <li tabindex="0" data-sfk-tip x-tooltip="{{ $tip->x() }}">
-                <span @class(['sfk-dash-rankno', 'is-'.($index + 1)])>{{ $index + 1 }}</span>
-                <span class="sfk-dash-ranking-name">
-                    <strong>{{ $customer['name'] }}</strong>
-                    <small>{{ number_format($customer['count']) }}件</small>
-                </span>
-                <span class="sfk-dash-ranking-figure"><strong>{{ AppFormat::yen($customer['amount']) }}</strong></span>
-                <span class="sfk-dash-meter" aria-hidden="true"><i style="width: {{ max(2, (int) round($customer['amount'] / $top * 100)) }}%"></i></span>
-            </li>
-            @if ($loop->last)
-                </ol>
-            @endif
-        @empty
-            <p class="sfk-dash-empty">この期間の売上はありません。</p>
-        @endforelse
+        <div class="sfk-dash-stack">
+            @include('analytics::widgets.partials.ghost', ['kind' => 'ranking', 'rows' => \Modules\Analytics\Filament\Widgets\TopCustomersCard::ROWS])
+            @forelse ($customers as $index => $customer)
+                @if ($loop->first)
+                    <ol class="sfk-dash-ranking">
+                @endif
+                @php($tip = DashboardTips::ranking(($customer['code'] ? $customer['code'].' ' : '').$customer['name'], DashboardTips::share($customer['amount'], $whole)))
+                <li tabindex="0" data-sfk-tip x-tooltip="{{ $tip->x() }}">
+                    <span @class(['sfk-dash-rankno', 'is-'.($index + 1)])>{{ $index + 1 }}</span>
+                    <span class="sfk-dash-ranking-name">
+                        <strong>{{ $customer['name'] }}</strong>
+                        <small>{{ number_format($customer['count']) }}件</small>
+                    </span>
+                    <span class="sfk-dash-ranking-figure"><strong>{{ AppFormat::yen($customer['amount']) }}</strong></span>
+                    <span class="sfk-dash-meter" aria-hidden="true"><i style="width: {{ max(2, (int) round($customer['amount'] / $top * 100)) }}%"></i></span>
+                </li>
+                @if ($loop->last)
+                    </ol>
+                @endif
+            @empty
+                <p class="sfk-dash-empty">この期間の売上はありません。</p>
+            @endforelse
+        </div>
     </section>
 </div>

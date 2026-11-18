@@ -1,5 +1,6 @@
 {{-- クイックアクション (Modules\Analytics\Filament\Widgets\QuickActionsCard): one coloured row per waiting step; a click runs it.
-     Nothing waiting: the apps the user opened last ($recent), each with the record last opened in it (a click opens it) --}}
+     Nothing waiting: the apps the user opened last ($recent), each with the record last opened in it (a click opens it).
+     Every state keeps the height of the six recent apps (ghost rows, user 2026-11-17). --}}
 @php
     $tones = ['is-blue', 'is-teal', 'is-green', 'is-orange', 'is-dark', 'is-purple'];
 @endphp
@@ -23,7 +24,7 @@
         .sfk-quick-run { flex: none; display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 12px; border-radius: 9999px; background: rgba(255, 255, 255, .2); color: #fff; font-size: var(--sfk-fs-badge); font-weight: var(--sfk-fw-semibold); white-space: nowrap; }
         .sfk-quick-run:hover { background: rgba(255, 255, 255, .32); }
         .sfk-quick-run .fi-icon { width: 14px; height: 14px; }
-        .sfk-quick-done { display: flex; flex-direction: column; align-items: center; gap: var(--sfk-space-2); padding: var(--sfk-space-6) var(--sfk-space-4); color: var(--sfk-muted); font-size: var(--sfk-fs-small); text-align: center; }
+        .sfk-quick-done { display: flex; flex-direction: column; align-items: center; align-self: center; gap: var(--sfk-space-2); padding: var(--sfk-space-6) var(--sfk-space-4); color: var(--sfk-muted); font-size: var(--sfk-fs-small); text-align: center; }
         .sfk-quick-done .fi-icon { width: 36px; height: 36px; color: #16956b; }
         .sfk-recent { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
         .sfk-recent li + li { border-top: 1px solid var(--sfk-line-soft); }
@@ -45,50 +46,53 @@
             <h2 class="sfk-dash-card-title" id="sfk-quick-title">{{ $actions === [] && $recent !== [] ? '最近表示した項目' : 'クイックアクション' }}</h2>
         </header>
 
-        @if ($actions === [] && $recent !== [])
-            <ul class="sfk-recent" aria-label="最近開いたアプリ">
-                @foreach ($recent as $item)
-                    <li wire:key="recent-{{ $item['code'] }}">
-                        <a href="{{ $item['url'] }}" class="sfk-recent-link">
-                            <span class="sfk-recent-icon" aria-hidden="true">{{ $item['icon'] }}</span>
-                            <span class="sfk-recent-text">
-                                <strong>{{ $item['app'] }}</strong>
-                                <small>{{ $item['title'] ?? ($item['record'] !== null ? 'レコード番号 '.$item['record'] : '一覧') }}{{ $item['at'] !== '' ? '・'.$item['at'] : '' }}</small>
+        <div class="sfk-dash-stack">
+            @include('analytics::widgets.partials.ghost', ['kind' => 'recent', 'rows' => \Modules\Analytics\Filament\Widgets\QuickActionsCard::RECENT])
+            @if ($actions === [] && $recent !== [])
+                <ul class="sfk-recent" aria-label="最近開いたアプリ">
+                    @foreach ($recent as $item)
+                        <li wire:key="recent-{{ $item['code'] }}">
+                            <a href="{{ $item['url'] }}" class="sfk-recent-link">
+                                <span class="sfk-recent-icon" aria-hidden="true">{{ $item['icon'] }}</span>
+                                <span class="sfk-recent-text">
+                                    <strong>{{ $item['app'] }}</strong>
+                                    <small>{{ $item['title'] ?? ($item['record'] !== null ? 'レコード番号 '.$item['record'] : '一覧') }}{{ $item['at'] !== '' ? '・'.$item['at'] : '' }}</small>
+                                </span>
+                                @if ($item['record'] !== null)
+                                    <span class="sfk-recent-id">#{{ $item['record'] }}</span>
+                                @endif
+                                <x-filament::icon icon="heroicon-m-chevron-right" class="sfk-recent-arrow" />
+                            </a>
+                        </li>
+                    @endforeach
+                </ul>
+            @elseif ($actions === [])
+                <div class="sfk-quick-done">
+                    <x-filament::icon icon="heroicon-o-check-circle" />
+                    対応が必要な作業はありません。
+                </div>
+            @else
+                <ul class="sfk-quick">
+                    @foreach ($actions as $index => $action)
+                        <li class="sfk-quick-row {{ $tones[$index % count($tones)] }}" wire:key="quick-{{ $action['key'] }}">
+                            <span class="sfk-quick-icon" aria-hidden="true">
+                                <x-filament::icon :icon="$action['kind'] === 'leave' ? 'heroicon-o-calendar-days' : 'heroicon-o-shopping-cart'" />
                             </span>
-                            @if ($item['record'] !== null)
-                                <span class="sfk-recent-id">#{{ $item['record'] }}</span>
-                            @endif
-                            <x-filament::icon icon="heroicon-m-chevron-right" class="sfk-recent-arrow" />
-                        </a>
-                    </li>
-                @endforeach
-            </ul>
-        @elseif ($actions === [])
-            <div class="sfk-quick-done">
-                <x-filament::icon icon="heroicon-o-check-circle" />
-                対応が必要な作業はありません。
-            </div>
-        @else
-            <ul class="sfk-quick">
-                @foreach ($actions as $index => $action)
-                    <li class="sfk-quick-row {{ $tones[$index % count($tones)] }}" wire:key="quick-{{ $action['key'] }}">
-                        <span class="sfk-quick-icon" aria-hidden="true">
-                            <x-filament::icon :icon="$action['kind'] === 'leave' ? 'heroicon-o-calendar-days' : 'heroicon-o-shopping-cart'" />
-                        </span>
-                        <a href="{{ $action['url'] }}" class="sfk-quick-text">
-                            <strong>{{ $action['title'] }}</strong>
-                            <small>{{ $action['subtitle'] }}</small>
-                        </a>
-                        <button type="button" class="sfk-quick-run" wire:click="runAction(@js($action['key']))" wire:loading.attr="disabled">
-                            {{ $action['action'] }}
-                            <x-filament::icon icon="heroicon-m-arrow-right" />
-                        </button>
-                    </li>
-                @endforeach
-            </ul>
-            @if ($more > 0)
-                <p class="sfk-quick-more">ほか {{ $more }} 件</p>
+                            <a href="{{ $action['url'] }}" class="sfk-quick-text">
+                                <strong>{{ $action['title'] }}</strong>
+                                <small>{{ $action['subtitle'] }}</small>
+                            </a>
+                            <button type="button" class="sfk-quick-run" wire:click="runAction(@js($action['key']))" wire:loading.attr="disabled">
+                                {{ $action['action'] }}
+                                <x-filament::icon icon="heroicon-m-arrow-right" />
+                            </button>
+                        </li>
+                    @endforeach
+                </ul>
+                @if ($more > 0)
+                    <p class="sfk-quick-more">ほか {{ $more }} 件</p>
+                @endif
             @endif
-        @endif
+        </div>
     </section>
 </div>

@@ -9,6 +9,7 @@ use Filament\Support\Icons\Heroicon;
 use Modules\Core\Application\Legacy\LegacyImporter;
 use Modules\Core\Application\Notifications\NotificationKind;
 use Modules\Core\Application\Notifications\NotificationKinds;
+use Modules\Core\Application\Records\RecordCards;
 use Modules\MasterData\Application\Consumables\ReorderAlert;
 use Modules\MasterData\Application\Legacy\LegacyConsumableImport;
 use Modules\MasterData\Application\Legacy\LegacyEmployeeImport;
@@ -17,6 +18,7 @@ use Modules\MasterData\Application\Legacy\LegacyPartnerImporter;
 use Modules\MasterData\Application\Legacy\LegacyStockImport;
 use Modules\MasterData\Models\Consumable;
 use Modules\MasterData\Models\ConsumableStockMovement;
+use Modules\MasterData\Models\Partner;
 
 final class MasterDataServiceProvider extends ModuleServiceProvider
 {
@@ -36,6 +38,13 @@ final class MasterDataServiceProvider extends ModuleServiceProvider
 
     protected function bootModule(): void
     {
+        // 社内メッセージ: a partner shared in a message is drawn as a card (Core RecordCards, the viewer's rights apply)
+        RecordCards::register('partner-master', fn (Partner $partner): array => [
+            ['field' => 'code', 'label' => 'コード', 'value' => $partner->code],
+            ['field' => 'name', 'label' => '名称', 'value' => $partner->name],
+            ['field' => 'short_name', 'label' => '略称', 'value' => $partner->short_name],
+        ]);
+
         // 要発注 of 19. 消耗品マスタ → administrators (BR-MD-05): when the stock or the 発注点 changes, and daily
         $this->app->make(NotificationKinds::class)->register(new NotificationKind(
             key: ReorderAlert::NOTIFICATION,

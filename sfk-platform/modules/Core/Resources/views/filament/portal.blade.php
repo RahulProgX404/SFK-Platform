@@ -298,9 +298,32 @@
             min-width: 0;
         }
 
-        /* lists (rankings, people, activity): as high as their rows, not stretched to the tallest card of the row */
+        /* lists (rankings, people, activity): not stretched to the tallest card of the row */
         .sfk-dash-cell.is-fit {
             align-self: start;
+        }
+
+        /* …but always as high as their full list (user 2026-11-17: the same height with all rows, fewer or none): an
+           invisible copy of the full list (analytics::widgets.partials.ghost) and the real content share one grid cell, so
+           the cell keeps the full height; the real rows fill it from the top, 「…はありません」 sits in its middle */
+        .sfk-dash-stack {
+            display: grid;
+        }
+
+        .sfk-dash-stack>* {
+            grid-area: 1 / 1;
+            min-width: 0;
+        }
+
+        .sfk-dash-ghost {
+            visibility: hidden;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        .sfk-dash-stack>.sfk-dash-empty {
+            align-self: center;
+            margin: 0;
         }
 
         .sfk-dash-card {

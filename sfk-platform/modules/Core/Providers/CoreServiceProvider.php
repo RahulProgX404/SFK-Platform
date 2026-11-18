@@ -26,6 +26,7 @@ use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Events\ConnectionEstablished;
 use Illuminate\Database\Events\MigrationsEnded;
+use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Support\Facades\DB;
@@ -34,15 +35,19 @@ use Livewire\ComponentHookRegistry;
 use Modules\Core\Access\DashboardAccess;
 use Modules\Core\Application\Apps\AppDiscovery;
 use Modules\Core\Application\Cache\DataCache;
+use Modules\Core\Application\Cache\OutsideDataCache;
 use Modules\Core\Application\Cache\ReferenceCache;
 use Modules\Core\Application\Comments\RecordComments;
 use Modules\Core\Application\Legacy\LegacyPartners;
 use Modules\Core\Application\Legacy\LegacyUsers;
 use Modules\Core\Application\Notifications\NotificationKind;
 use Modules\Core\Application\Notifications\NotificationKinds;
+use Modules\Core\Application\Notifications\NotificationPulse;
 use Modules\Core\Application\Notifications\Notifier;
 use Modules\Core\Application\Notifications\RecordDirectory;
+use Modules\Core\Application\Notifications\SystemNotification;
 use Modules\Core\Application\Numbering\DocumentNumberGenerator;
+use Modules\Core\Application\Realtime\Realtime;
 use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Console\ImportLegacyDataCommand;
 use Modules\Core\Console\PruneNotificationsCommand;
@@ -123,7 +128,11 @@ final class CoreServiceProvider extends ModuleServiceProvider
         // new or changed columns (ReferenceCache 'columns:<table>')
         Event::listen(MigrationsEnded::class, fn () => ReferenceCache::bump());
         // any record saved or deleted: the dashboard's figures are added up afresh (DataCache), throttled, flushed at the end
-        Event::listen(['eloquent.saved: *', 'eloquent.deleted: *'], fn () => DataCache::changed());
+        Event::listen(['eloquent.saved: *', 'eloquent.deleted: *'], function (string $event, array $payload): void {
+            if (! ($payload[0] ?? null) instanceof OutsideDataCache) {
+                DataCache::changed();
+            }
+        });
         Event::listen([JobProcessed::class, JobFailed::class, CommandFinished::class], fn () => DataCache::flush());
         $this->app->terminating(fn () => DataCache::flush());
 
@@ -145,6 +154,21 @@ final class CoreServiceProvider extends ModuleServiceProvider
                 session()->forget(AppListRecords::SEARCH_COLUMNS_SESSION);
             }
         });
+
+        // 通知 in real time (NotificationPulse): a stored 通知 changes its user's pulse once its transaction committed
+        // (a rolled-back one is never announced); every panel page names its user's pulse in <head> for
+        // core::filament.notification-pulse-script
+        Event::listen(NotificationSent::class, function (NotificationSent $event): void {
+            if ($event->channel === 'database' && $event->notifiable instanceof User && $event->notification instanceof SystemNotification) {
+                $userId = (int) $event->notifiable->getKey();
+                $data = $event->notification->data;
+                DB::afterCommit(fn () => NotificationPulse::bump($userId, $data));
+            }
+        });
+        FilamentView::registerRenderHook(PanelsRenderHook::HEAD_END, fn (): string => self::notificationPulseTag().self::realtimeTag());
+
+        // WebSockets (Realtime, docs/realtime.md): a user's own channel carries their 通知 and inbox
+        Realtime::channel('sfk.user.{id}', fn (User $user, int|string $id): bool => (int) $id === $user->id);
 
         // The dashboard name (sidebar header and topbar) leads to the dashboard's ポータル; the first menu group
         // ダッシュボード切替 lists the dashboards the user may open. Registered once, globally, so they
@@ -189,6 +213,29 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
         // Drop-downs search shortly after typing stops (Filament waits a full second).
         Select::configureUsing(fn (Select $select): Select => $select->searchDebounce(300));
+    }
+
+    /** <meta> naming the signed-in user's 通知 pulse and its version when the page was made (one cache read). */
+    private static function notificationPulseTag(): string
+    {
+        $user = auth()->user();
+        if (! $user instanceof User || ! (Filament::getCurrentPanel()?->hasDatabaseNotifications() ?? false)) {
+            return '';
+        }
+
+        return '<meta name="sfk-notification-pulse" content="'.e(NotificationPulse::url($user->id)).'" data-version="'.e(NotificationPulse::version($user->id)).'">';
+    }
+
+    /** <meta> telling theme.js where to open the WebSocket (Realtime::clientConfig()), for a signed-in user; nothing when off. */
+    private static function realtimeTag(): string
+    {
+        $user = auth()->user();
+        $config = Realtime::clientConfig();
+        if (! $user instanceof User || $config === null) {
+            return '';
+        }
+
+        return '<meta name="sfk-realtime" content="'.e((string) json_encode([...$config, 'user' => $user->id, 'auth' => route('core.broadcasting.auth')])).'">';
     }
 
     private static function dashboardSwitcher(string $place): string

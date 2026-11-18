@@ -1,7 +1,14 @@
 # 通知 (notifications)
 
-Users learn what concerns them through the **bell** in the top bar of every dashboard (Filament database
-notifications, polled every 30 s) and, when they ask for it, by **e-mail**. Every 通知 is sent through one Core
+Users learn what concerns them through the **bell** of every dashboard (Filament database notifications) and, when
+they ask for it, by **e-mail**. New 通知 reach the open pages through the cache pulse below (production: no WebSocket
+server, [realtime.md](realtime.md)); with the optional Laravel Reverb push (`BROADCAST_CONNECTION=reverb`) the stored
+通知 also goes to the user's channel `sfk.user.<id>` after the commit and the pulse is then asked only every minute. A stored 通知
+changes its user's pulse in the cache after the commit (`NotificationPulse`, listener on `NotificationSent` in
+CoreServiceProvider); each open page asks `GET /core/pulse/{user}/{key}` (signed per user, outside the web middleware:
+no session, no database — one cache read) every 4 s while it is in view and at once when the tab comes back
+(`core::filament.notification-pulse-script`). A change refreshes the bell, shows the 通知 as a toast with its button (レコードを開く, or the `Notice::openLabel()` it was sent with, e.g. トークを開く; a page showing what it links to may keep it quiet through `window.sfkNoticeShown(url)`)
+and puts a red dot on the floating button of the closed sidebar. The bell itself no longer polls the database. Every 通知 is sent through one Core
 service, `Modules\Core\Application\Notifications\Notifier` — never `Filament\Notifications\Notification::sendToDatabase()`
 (that is for toasts only, `->send()`).
 

@@ -20,6 +20,22 @@ final class AppSidebarState
 {
     public const SAVED_KEY = 'sfk-sidebar-outside-apps';
 
+    /** @var list<class-string> more pages that open with the sidebar collapsed (the modules', e.g. メッセージ) */
+    private static array $collapsedPages = [];
+
+    /**
+     * A module's page that opens with the sidebar collapsed as well (メッセージ, user 2026-11-18: the messenger uses the whole
+     * width; its 🏠 goes back to the dashboard).
+     *
+     * @param  class-string  $page
+     */
+    public static function collapseOn(string $page): void
+    {
+        if (! in_array($page, self::$collapsedPages, true)) {
+            self::$collapsedPages[] = $page;
+        }
+    }
+
     /** @param  array<int, string>  $scopes  the render hook scopes of the page (its class and its resource's) */
     public static function script(array $scopes): string
     {
@@ -36,10 +52,12 @@ final class AppSidebarState
         return "<script>(()=>{try{const s=window.localStorage;{$body};{$store}}catch(e){}})()</script>";
     }
 
-    /** @param  array<int, string>  $scopes  an app's screen or the dashboard's home */
+    /** @param  array<int, string>  $scopes  an app's screen, the dashboard's home or a page registered with collapseOn() */
     public static function opensCollapsed(array $scopes): bool
     {
-        return in_array(PortalPage::class, $scopes, true) || self::isAppScreen($scopes);
+        return in_array(PortalPage::class, $scopes, true)
+            || array_intersect(self::$collapsedPages, $scopes) !== []
+            || self::isAppScreen($scopes);
     }
 
     /** @param  array<int, string>  $scopes */

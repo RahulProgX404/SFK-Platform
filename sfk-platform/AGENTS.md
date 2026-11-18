@@ -219,6 +219,14 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   with a kind the module registers in `NotificationKinds` (it then appears in プロフィール → 通知設定); `Notice::about($record)`
   so only users who may open the record get it. Never `Notification::sendToDatabase()` directly (toasts: `->send()`).
   Conditions found by looking (dates, thresholds) are daily `NotificationCheck`s with `once()` keys.
+- Real time (`docs/realtime.md`): production has **no WebSocket server** (no paid Laravel Cloud add-on,
+  `BROADCAST_CONNECTION=null`) — pages poll session-less cache pulses, so every real-time feature must work by polling
+  alone (cache reads only, no database). Optional Laravel Reverb push: Core `Realtime::send()` (private channels only,
+  after the commit, never failing the request), subscribers via `Realtime::channel()`; pushes carry signals / ids only.
+- 社内メッセージ (Messaging module, `docs/messaging.md`): every read / write / download asks `MessagingAccess` (404 for
+  ids that are not the user's); real time = cache pulses (`Signals`), optionally pushed through Realtime; models that change no
+  dashboard figure implement Core `Cache\OutsideDataCache`; a module adds to every page's script only through
+  `ThemeAssets::extend()` (small) and to the page pulse through `PulseChannels` (cache reads only).
 - A Filament action put straight into a Blade view (`{{ $this->fooAction }}`, `{{ ($page->fooAction)([...]) }}`) is drawn
   even when it is hidden — disabled, but visible. Wrap it: `@if (($a = ($this->fooAction)([...]))->isVisible()) {{ $a }} @endif`.
 - プロフィール: employees see only 一般設定 (their own 氏名 / 住所・連絡先); 通知設定, 従業員マスタ情報, パスワード設定 and
@@ -255,8 +263,12 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   entered — stale after 14 days without one): days outside it are no data, never ¥0 — no percentage when a compared period
   reaches past it (the card says 「売上データは…まで」), chart months without data are not drawn or bridged
   (「データなし」), the month the data ends in is dotted with a ring, and 売上の推移's 前年同期比 compares the same days of
-  both years that have data. List cards (rankings, 最近表示した項目, 休暇・勤怠予定, 最近のアクティビティ) are as high as their
-  rows (`sfk-dash-cell is-fit`); on tablets (768–1279 px) cards pair up two per row (`sfk-dash-t-half` / `-t-full` say
+  both years that have data. List cards (rankings, 最近表示した項目, 休暇・勤怠予定, 最近のアクティビティ) are not stretched to
+  their row (`sfk-dash-cell is-fit`; except 上位の売上先 and 売れ筋 TOP3, which take the height of their row with 売上の推移,
+  user 2026-11-18) but always keep the height of their full list — with fewer rows or none too (user
+  2026-11-17): the content lies in `.sfk-dash-stack` over an invisible copy of the full list
+  (`analytics::widgets.partials.ghost`, rows from the widget's `ROWS` constant; 休暇・勤怠予定 4 people a day, more scroll;
+  activity entries one line each); 「…はありません」 sits in the middle. On tablets (768–1279 px) cards pair up two per row (`sfk-dash-t-half` / `-t-full` say
   when a card's desktop width does not decide it). Tooltips (user 2026-11-14): ONE tooltip on every screen — the light card of
   `core::filament.ui` (all tippy boxes: Filament's `->tooltip()`, `x-tooltip="{{ $tip->x() }}"` built with Core
   `Filament\Support\Tip`, and browser `title`s, which `window.sfkTipTitle` turns into the same tooltip on first hover);

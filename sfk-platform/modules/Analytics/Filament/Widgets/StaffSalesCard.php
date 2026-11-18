@@ -29,6 +29,9 @@ final class StaffSalesCard extends DashboardCard
         return ! $personal;
     }
 
+    /** rows of the full list: the card keeps their height with fewer or none (ghost rows) */
+    public const ROWS = 5;
+
     /** @return array<string, mixed> */
     protected function getViewData(): array
     {
@@ -36,8 +39,8 @@ final class StaffSalesCard extends DashboardCard
 
         return [
             // 個人: the user's own newest sales in place of the ranking of everyone
-            'staff' => $service->isPersonal() ? [] : $service->topStaff($this->period()),
-            'latest' => $service->isPersonal() ? $service->latestSales($this->period()) : null,
+            'staff' => $service->isPersonal() ? [] : $service->topStaff($this->period(), self::ROWS),
+            'latest' => $service->isPersonal() ? $service->latestSales($this->period(), self::ROWS) : null,
             // 構成比 of the tooltips: the period's 売上合計 (from the cache, as 売上合計)
             'whole' => $service->isPersonal() ? 0 : $service->totals($this->period())['amount'],
             'analysisUrl' => SalesAnalysis::canAccess() ? SalesAnalysis::getUrl() : null,

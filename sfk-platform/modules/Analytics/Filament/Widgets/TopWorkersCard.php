@@ -17,6 +17,9 @@ final class TopWorkersCard extends DashboardCard
 {
     protected static ?int $sort = 8;
 
+    /** rows of the full list: the card keeps their height with fewer or none (ghost rows) */
+    public const ROWS = 5;
+
     protected string $view = 'analytics::widgets.top-workers';
 
     /** Only for users who see everyone's money (財務分析の範囲 全体; bug.md 2026-11-07). */
@@ -42,7 +45,7 @@ final class TopWorkersCard extends DashboardCard
             'workers' => array_map(fn (array $worker): array => [
                 ...$worker,
                 'share' => $total > 0 ? (int) round($worker['total'] / $total * 100) : 0,
-            ], array_slice($everyone, 0, 5)),
+            ], array_slice($everyone, 0, self::ROWS)),
             'analysisUrl' => DailyReportAnalysis::canAccess() ? DailyReportAnalysis::getUrl() : null,
             'me' => self::actor()?->id,
         ];

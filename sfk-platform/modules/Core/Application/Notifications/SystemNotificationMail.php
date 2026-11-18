@@ -22,6 +22,7 @@ final class SystemNotificationMail extends Notification implements ShouldQueue
         public readonly string $title,
         public readonly ?string $body,
         public readonly ?string $url,
+        public readonly string $openLabel = 'レコードを開く',
     ) {
         $this->afterCommit();
     }
@@ -41,6 +42,7 @@ final class SystemNotificationMail extends Notification implements ShouldQueue
                 'title' => $this->title,
                 'body' => $this->body,
                 'url' => $this->url,
+                'openLabel' => $this->openLabel,
             ]);
     }
 }

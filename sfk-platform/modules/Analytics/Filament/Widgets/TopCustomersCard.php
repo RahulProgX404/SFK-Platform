@@ -11,6 +11,9 @@ final class TopCustomersCard extends DashboardCard
 {
     protected static ?int $sort = 5;
 
+    /** rows of the full list: the card keeps their height with fewer or none (ghost rows) */
+    public const ROWS = 5;
+
     protected string $view = 'analytics::widgets.top-customers';
 
     public static function canView(): bool
@@ -28,7 +31,7 @@ final class TopCustomersCard extends DashboardCard
     protected function getViewData(): array
     {
         return [
-            'customers' => $this->salesData()->topCustomers($this->period()),
+            'customers' => $this->salesData()->topCustomers($this->period(), self::ROWS),
             // 構成比 of the tooltips: the period's 売上合計 (the figure 売上合計 has already added up, from the cache)
             'whole' => $this->salesData()->totals($this->period())['amount'],
             'salesUrl' => self::appUrl('sales-entry'),

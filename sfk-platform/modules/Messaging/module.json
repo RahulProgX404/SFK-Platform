@@ -1,0 +1,13 @@
+{
+    "name": "Messaging",
+    "slug": "messaging",
+    "type": "business",
+    "description": "社内メッセージ: direct and group conversations, attachments, reactions, mentions, announcements (LINE / Messenger style)",
+    "version": "0.1.0",
+    "provider": "Modules\\Messaging\\Providers\\MessagingServiceProvider",
+    "filament_plugin": "Modules\\Messaging\\Filament\\MessagingPlugin",
+    "panel": "erp",
+    "depends_on": ["core", "erp"],
+    "enabled": true,
+    "order": 100
+}
