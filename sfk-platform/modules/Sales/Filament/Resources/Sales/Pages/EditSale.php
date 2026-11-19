@@ -74,6 +74,7 @@ final class EditSale extends AppEditRecord
 
     protected function beforeSave(): void
     {
+        parent::beforeSave();
         $this->checkSale($this->record->id);
     }
 

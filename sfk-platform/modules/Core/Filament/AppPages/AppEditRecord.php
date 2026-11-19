@@ -10,9 +10,11 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Exceptions\Halt;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
 use Modules\Core\Application\History\HasRecordHistory;
 use Modules\Core\Application\History\RecordHistory;
 use Modules\Core\Application\Records\RecordValidator;
+use Modules\Core\Application\Records\RecordVersion;
 use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
 
 /**
@@ -21,11 +23,30 @@ use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
  * the record adds a version to its 変更履歴 (subclasses with their own afterSave() call parent::afterSave()). The app's
  * RecordRules (AppResource::recordRules(): required fields, values that must differ or be unique) are checked on the form
  * with the record's other values, together with the inputs' own rules; an error of a field the form does not offer stops
- * the save with a message.
+ * the save with a message. A record someone else saved after the form was opened is not overwritten (RecordVersion).
  */
 abstract class AppEditRecord extends EditRecord
 {
     use HasAppChrome;
+
+    /** 更新日時 of the record when the form was opened (RecordVersion) */
+    #[Locked]
+    public ?string $recordVersion = null;
+
+    protected function afterFill(): void
+    {
+        $this->recordVersion = RecordVersion::of($this->record);
+    }
+
+    /** Optimistic locking: refuse to overwrite a version saved by someone else meanwhile. */
+    protected function beforeSave(): void
+    {
+        if (! RecordVersion::unchanged($this->record, $this->recordVersion)) {
+            Notification::make()->danger()->persistent()->title(RecordVersion::CONFLICT)->send();
+
+            throw new Halt;
+        }
+    }
 
     public function appPageKind(): string
     {
@@ -80,6 +101,7 @@ abstract class AppEditRecord extends EditRecord
 
     protected function afterSave(): void
     {
+        $this->recordVersion = RecordVersion::of($this->record);
         $app = $this->appResource()::app();
 
         if ($this->record instanceof HasRecordHistory && ($app === null || $app->record_history_enabled)) {

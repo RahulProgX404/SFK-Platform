@@ -120,9 +120,9 @@ it('creates one delivery note per customer with tax per rate on the note, then o
     $invoices = app(InvoiceIssuer::class)->issue(Sale::query()->whereNotNull('delivery_note_id')->where('customer_id', $customer->id)->get());
     $invoice = $invoices[0];
     expect($invoice->number)->toBe('0000001')
-        ->and($invoice->invoiced_on->toDateString())->toBe('2026-11-20') // 20日締: that day of the current month (BR-SA-10)
+        ->and($invoice->invoiced_on->toDateString())->toBe('2026-10-20') // 20日締: the closing date of the sales' 月度 2026-10, not of today
         ->and($invoice->closing_day)->toBe('20日')
-        ->and($invoice->billing_month)->toBe('2026-11')
+        ->and($invoice->billing_month)->toBe('2026-10') // the 月度 whose balances it carries
         ->and($invoice->previous_amount)->toBe(55000) // cycle 2026-10: 前月売掛残 = September 50,000 + tax 5,000
         ->and($invoice->received_amount)->toBe(55000) // 54,000 + 660 + 340 (BR-AR-04)
         ->and($invoice->carried_amount)->toBe(0)

@@ -8,9 +8,12 @@ use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\View as ViewComponent;
+use Filament\Schemas\Schema;
 use Filament\Support\Exceptions\Cancel;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
+use Livewire\Attributes\Url;
 use Modules\Core\Domain\Billing\ClosingDay;
 use Modules\Core\Domain\Calendar\YearMonth;
 use Modules\Core\Filament\AppPages\AppListRecords;
@@ -32,9 +35,15 @@ use Modules\Sales\Models\ReceivableMonth;
  *   and 当月未作成一括登録 / 前月未作成一括登録 — the month's missing records created for every customer with a ledger
  *   (23 pages 4 / 5, 23-2 pages 6 / 7 for the customers of a chosen 締日). The ledger creates the months while a balance is
  *   open (BR-AR-05) whenever a sale or receipt is saved; these actions catch up the months nothing was saved in;
+ * - 基準月 (`?base=YYYY-MM`, default the current month) above the table, with ‹ › and 当月: the month lists (対象月 当月 / 前月 /
+ *   前々月) are relative to it, and the heading names the month shown — 「先月売掛一覧（2026年10月）」 (defect 7).
  */
 abstract class ListReceivableMonths extends AppListRecords
 {
+    /** 基準月 (YYYY-MM); blank = the current month */
+    #[Url(as: 'base')]
+    public string $baseMonth = '';
+
     /** The sums shown, in order. */
     private const TOTALS = ['previous_balance', 'received', 'net_balance', 'sales_amount', 'tax_amount', 'month_total', 'closing_balance'];
 
@@ -51,7 +60,78 @@ abstract class ListReceivableMonths extends AppListRecords
 
     public function filterFields(): array
     {
-        return ReceivablesTable::filterFields($this->basis());
+        return ReceivablesTable::filterFields($this->basis(), $this->baseMonth());
+    }
+
+    /** 基準月 of the month lists: `?base=` when valid, else the current month. */
+    public function baseMonth(): YearMonth
+    {
+        return self::isMonthKey($this->baseMonth) ? YearMonth::parse($this->baseMonth) : YearMonth::fromDate(CarbonImmutable::now());
+    }
+
+    public function isCurrentBaseMonth(): bool
+    {
+        return $this->baseMonth()->equals(YearMonth::fromDate(CarbonImmutable::now()));
+    }
+
+    public function setBaseMonth(string $month): void
+    {
+        $this->baseMonth = self::isMonthKey($month) ? $month : '';
+        $this->baseMonthChanged();
+    }
+
+    public function shiftBaseMonth(int $months): void
+    {
+        $this->baseMonth = $this->baseMonth()->addMonths(max(-1200, min(1200, $months)))->key();
+        $this->baseMonthChanged();
+    }
+
+    public function resetBaseMonth(): void
+    {
+        $this->baseMonth = '';
+        $this->baseMonthChanged();
+    }
+
+    /** The month the list shows by its 対象月 condition (view or 適用 filter), null when it is not one month. */
+    public function shownMonth(): ?YearMonth
+    {
+        return ReceivablesTable::shownMonth($this->activeFilter(), $this->baseMonth());
+    }
+
+    /** 「先月売掛一覧（2026年10月）」: the 一覧 with the month it shows. */
+    public function listHeading(): string
+    {
+        $month = $this->shownMonth();
+
+        return $this->currentView()->name.($month === null ? '' : '（'.$month->label().'）');
+    }
+
+    /** The period rule of the list's 年月 (tooltip of the heading). */
+    public function basisRule(): string
+    {
+        return $this->basis()->rule();
+    }
+
+    /** The 基準月 bar above the table. */
+    public function content(Schema $schema): Schema
+    {
+        $components = parent::content($schema)->getComponents(withHidden: true);
+
+        return $schema->components([
+            ViewComponent::make('sales::filament.receivables-month-bar')->visible(fn (): bool => $this->currentView()->isTable()),
+            ...$components,
+        ]);
+    }
+
+    private static function isMonthKey(string $value): bool
+    {
+        return preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $value) === 1;
+    }
+
+    private function baseMonthChanged(): void
+    {
+        $this->cancelInlineEdit();
+        $this->resetPage();
     }
 
     public function inlineFields(): array

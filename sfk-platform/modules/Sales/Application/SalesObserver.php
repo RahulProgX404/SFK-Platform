@@ -6,6 +6,7 @@ namespace Modules\Sales\Application;
 
 use Illuminate\Database\Eloquent\Model;
 use Modules\Sales\Application\Receivables\ReceivableLedger;
+use Modules\Sales\Application\Sales\SaleDeletion;
 use Modules\Sales\Application\Sales\SaleOrderTotals;
 use Modules\Sales\Models\DeliveryNoteLine;
 use Modules\Sales\Models\InvoiceLine;
@@ -27,6 +28,14 @@ final class SalesObserver
     public function saved(Model $model): void
     {
         $this->changed($model);
+    }
+
+    /** A sale takes its rows off its documents and deletes the documents it empties (SaleDeletion). */
+    public function deleting(Model $model): void
+    {
+        if ($model instanceof Sale) {
+            app(SaleDeletion::class)->cascade($model);
+        }
     }
 
     public function deleted(Model $model): void

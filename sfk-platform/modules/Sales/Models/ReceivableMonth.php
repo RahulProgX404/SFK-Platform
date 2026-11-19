@@ -20,8 +20,10 @@ use Modules\Sales\Domain\Receivables\ReceivableBasis;
 /**
  * 売掛 of a customer for one month (SYSTEM_BRAIN APP_23 売掛管理 = calendar basis, APP_23-2 売掛管理(締日別) = cycle
  * basis). Every figure is recalculated from the sales and receipts by ReceivableLedger (ReceivableRoll, BR-AR-03) — only
- * 消費税端数調整 (`tax_adjustment`) is entered by hand, which recalculates the month and the months after it. 年月 is
- * `year_month` (YYYY-MM; shown 「YYYY年MM月」), 締日 the customer's closing day as of the recalculation (cycle basis).
+ * 消費税端数調整 (`tax_adjustment`) is entered by hand, which recalculates the month and the months after it. The key is
+ * (basis, customer_id FK, year_month), unique: 年月 is `year_month` (ISO "YYYY-MM", the machine key — never the label
+ * 「YYYY年MM月」, which is formatted for screens only) with `month_start` the same month as a DATE on the 1st (checked by
+ * the database on PostgreSQL). 締日 is the customer's closing day as of the recalculation (cycle basis).
  *
  * @property int $id
  * @property ReceivableBasis $basis
@@ -77,10 +79,13 @@ final class ReceivableMonth extends Model implements HasRecordComments, HasRecor
         return YearMonth::parse($this->year_month)->label();
     }
 
-    /** 次月分判定: 「要作成」 while the balance is open (BR-AR-05). */
+    /**
+     * 次月分判定: 「要作成」 while the balance is not 0 — a credit carries like a debt (BR-AR-05; the legacy > 0 lost credits,
+     * docs/receivables.md defect 1). Computed from 当月売掛残, never stored (the legacy text field went stale, defect 2).
+     */
     public function carriesForward(): string
     {
-        return $this->closing_balance > 0 ? '要作成' : '';
+        return $this->closing_balance !== 0 ? '要作成' : '';
     }
 
     /**

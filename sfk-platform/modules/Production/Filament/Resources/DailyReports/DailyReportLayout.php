@@ -32,6 +32,7 @@ use Modules\Orders\Domain\Orders\OrderChoices;
 use Modules\Orders\Filament\Resources\Orders\OrderResource;
 use Modules\Orders\Models\Order;
 use Modules\Production\Application\DailyReports\BoxUsage;
+use Modules\Production\Application\DailyReports\OvertimeRate;
 use Modules\Production\Domain\DailyReports\TaskCosting;
 use Modules\Production\Domain\ProductionChoices;
 use Modules\Production\Domain\ProductionFields;
@@ -181,7 +182,9 @@ final class DailyReportLayout
             'day_type' => Radio::make($name)->label($label)->inline()->options(ProductionChoices::options(ProductionChoices::DAY_TYPES))
                 ->default(ProductionChoices::DAY_TYPES[0])->required(),
             'work_type' => Radio::make($name)->label($label)->inline()->options(ProductionChoices::options(ProductionChoices::WORK_TYPES))
-                ->default(ProductionChoices::WORK_TYPES[0])->required()->live(),
+                ->default(ProductionChoices::WORK_TYPES[0])->required()->live()
+                // 残業 needs the worker's 残業単価 (OvertimeRate, item 3.1)
+                ->rules(fn (Get $get, ?Model $record): array => [OvertimeRate::rule(fn (): mixed => $get('user_id'), $record instanceof DailyReport ? $record : null)]),
             'quality_checks' => CheckboxList::make($name)->label($label)->options(ProductionChoices::options(ProductionChoices::QUALITY_CHECKS))->columns(3)->required(),
             'gloves' => self::flag($name, ProductionChoices::GLOVES),
             'current_status' => $shown(fn (Get $get): ?string => $order($get)?->status),

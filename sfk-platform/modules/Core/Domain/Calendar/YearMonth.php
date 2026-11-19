@@ -51,6 +51,14 @@ final readonly class YearMonth implements Stringable
         return $this->month === 1 ? new self($this->year - 1, 12) : new self($this->year, $this->month - 1);
     }
 
+    /** The month `$months` later (negative: earlier). */
+    public function addMonths(int $months): self
+    {
+        $index = $this->year * 12 + ($this->month - 1) + $months;
+
+        return new self(intdiv($index, 12), $index % 12 + 1);
+    }
+
     public function firstDay(): CarbonImmutable
     {
         return CarbonImmutable::create($this->year, $this->month, 1)->startOfDay();

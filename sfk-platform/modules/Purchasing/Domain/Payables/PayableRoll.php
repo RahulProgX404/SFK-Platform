@@ -18,8 +18,10 @@ use Modules\Core\Domain\Tax\TaxMode;
  *   当月合計金額 = 仕入額 (+ 消費税額 for 外)
  *   当月買掛残   = 差引残高 + 当月合計金額
  *
- * A month without activity still gets a row while the balance is open (> 0), up to `$until` (the legacy 当月 / 前月
- * 未作成レコード作成 buttons).
+ * A month without activity still gets a row while the balance is not 0 — a credit (overpayment, a payment before the
+ * purchase) carries like a debt — up to `$until` (the legacy 当月 / 前月未作成レコード作成 buttons, which carried > 0 only, so
+ * credits vanished: docs/receivables.md defect 1, same rule as 売掛). Only a balance of exactly 0 without further
+ * activity stops the rows; later activity starts again from 0.
  */
 final class PayableRoll
 {
@@ -41,16 +43,12 @@ final class PayableRoll
         sort($active);
 
         $month = YearMonth::parse($active[0]);
-        $last = $active[array_key_last($active)];
+        $end = max($active[array_key_last($active)], $until->key());
         $rows = [];
         $balance = 0;
 
-        while (true) {
+        while ($month->key() <= $end) {
             $key = $month->key();
-            if ($key > $last && ($balance <= 0 || $key > $until->key())) {
-                break;
-            }
-
             $hasActivity = isset($purchases[$key]) || isset($payments[$key]) || isset($adjustments[$key]);
             if ($hasActivity || $balance !== 0) {
                 $figures = $purchases[$key] ?? [];

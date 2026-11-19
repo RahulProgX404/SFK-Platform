@@ -160,20 +160,10 @@ final class Sale extends Model implements DeletesWith, HasRecordComments, HasRec
             }
         });
 
-        // the rows copied to delivery notes and invoices go with the sale
-        self::deleting(function (self $sale): void {
-            // the rows of deletesWith()
-            DB::transaction(function () use ($sale): void {
-                foreach ([DeliveryNoteLine::class => DeliveryNote::class, InvoiceLine::class => Invoice::class] as $line => $document) {
-                    $documentIds = $line::query()->where('sale_id', $sale->id)->pluck(str($document)->classBasename()->snake()->append('_id')->toString())->unique()->all();
-                    $line::query()->where('sale_id', $sale->id)->delete();
-                    $document::query()->whereKey($documentIds)->get()->each(fn (Model $doc) => $doc->refreshTotals());
-                }
-            });
-        });
+        // the rows copied to delivery notes and invoices go with the sale: SalesObserver::deleting() (SaleDeletion)
     }
 
-    /** Deleting a sale takes its rows off the delivery notes and invoices (booted(), legacy 削除 of 06_SalesEntry.bundle.js). */
+    /** Deleting a sale takes its rows off the delivery notes and invoices (SaleDeletion, legacy 削除 of 06_SalesEntry.bundle.js). */
     public static function deletesWith(): array
     {
         return ['delivery_note_lines' => 'sale_id', 'invoice_lines' => 'sale_id'];

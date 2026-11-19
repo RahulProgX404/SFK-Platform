@@ -96,7 +96,9 @@ final class ListSales extends AppListRecords
 
         $withTax = $sums['amount'] + $sums['tax'];
         $actualCost = (int) $orders->sum('actual_cost_total');
-        $gross = $withTax - $actualCost;
+        // 粗利 without tax, as 利益 of 04 (JobCosting, D-04-2): the legacy summary took 売上金額(税込) − 実原価合計, so the tax
+        // counted as profit (open question to the business — docs/legacy-customizations.md)
+        $gross = $sums['amount'] - $actualCost;
 
         return [
             'count' => $sums['count'],
@@ -110,7 +112,7 @@ final class ListSales extends AppListRecords
                 ['売上金額（税込）', 'yen', $withTax],
                 ['実原価合計', 'yen', $actualCost],
                 ['粗利', 'signed', $gross],
-                ['粗利率', 'percent', $withTax !== 0 ? round($gross / $withTax * 100, 1) : null],
+                ['粗利率', 'percent', $sums['amount'] !== 0 ? round($gross / $sums['amount'] * 100, 1) : null],
             ],
         ];
     }

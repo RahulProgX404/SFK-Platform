@@ -105,6 +105,19 @@ final class Receipt extends Model implements HasRecordComments, HasRecordHistory
     }
 
     /**
+     * 入金判定 of the invoice: 不足 (less received than billed), 過入金 (more) or 済 — paid = 入金 + 手数料 + 歩引き of all
+     * rows, whatever their dates (a payment may come before the invoice; BR-AR-04, BR-AR-07).
+     */
+    public function paymentStatus(): string
+    {
+        return match (true) {
+            $this->settled_amount < $this->billed_amount => '不足',
+            $this->settled_amount > $this->billed_amount => '過入金',
+            default => '済',
+        };
+    }
+
+    /**
      * Invoices a receipt can be entered for (legacy lookup: 入金判定 「不足」 → here: invoices without a receipt yet).
      *
      * @return Builder<Invoice>

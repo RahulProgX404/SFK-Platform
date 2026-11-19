@@ -26,6 +26,7 @@ use Modules\Core\Models\Space;
 use Modules\MasterData\Models\Partner;
 use Modules\Production\Models\DailyReport;
 use Modules\Sales\Models\Sale;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 beforeEach(function () {
     Filament::setCurrentPanel('erp');
@@ -198,4 +199,33 @@ it('shows a 個人のみ user only their own sales, 予想 and 売上先 on 売�
         ->assertDontSee(['営業 一郎', '¥100,000', '¥900,000']);
     expect((new SalesAnalysis)->canEditForecast($this->second->id))->toBeTrue()
         ->and((new SalesAnalysis)->canEditForecast($this->first->id))->toBeFalse();
+});
+
+it('ranks ties by the lower user id, puts January–April in the year before and follows an edited old report (docs/legacy-customizations.md item 4)', function () {
+    $later = User::factory()->create(['name' => 'あ 先の名前']); // a name sorting first must not decide a tie
+    $earlier = User::factory()->create(['name' => 'ん 後の名前']);
+    [$earlier, $later] = $earlier->id < $later->id ? [$earlier, $later] : [$later, $earlier];
+    DailyReport::query()->create(['worked_on' => '2026-06-01', 'user_id' => $later->id, 'produced' => '100', 'processing_rate' => '1']);
+    DailyReport::query()->create(['worked_on' => '2026-06-01', 'user_id' => $earlier->id, 'produced' => '100', 'processing_rate' => '1']);
+    $old = DailyReport::query()->create(['worked_on' => '2026-01-15', 'user_id' => $earlier->id, 'produced' => '10', 'processing_rate' => '1.99']);
+    $this->actingAs($this->admin);
+
+    expect(array_column(app(DailyReportRanking::class)->ranking(2026), 'user_id'))->toBe([$earlier->id, $later->id])
+        ->and(app(DailyReportRanking::class)->ranking(2025)[0]['months'][1])->toBe(19); // 19.9 cut, January → business year 2025
+
+    $old->update(['produced' => '20']);
+    expect(app(DailyReportRanking::class)->ranking(2025)[0]['total'])->toBe(39);
+});
+
+it('never changes the actuals by saving 予想 / 仕掛, and refuses another 担当者 row to an employee at the server (item 5)', function () {
+    $this->actingAs($this->admin);
+    $actuals = app(StaffSalesAnalysis::class)->actuals([2026]);
+    Livewire::test(SalesAnalysis::class)->call('saveForecast', $this->first->id, 'forecast', 5, '999999');
+    expect(app(StaffSalesAnalysis::class)->actuals([2026]))->toBe($actuals)
+        ->and((int) Sale::query()->sum('amount'))->toBe(250000);
+
+    // the Livewire method itself refuses (not only the hidden input)
+    $this->actingAs($this->second);
+    expect(fn () => (new SalesAnalysis)->saveForecast($this->first->id, 'forecast', 6, '1'))->toThrow(HttpException::class)
+        ->and(SalesForecast::query()->sole()->months('forecast')[6])->toBe(0);
 });

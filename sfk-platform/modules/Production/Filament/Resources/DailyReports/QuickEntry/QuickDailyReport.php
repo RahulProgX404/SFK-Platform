@@ -27,6 +27,7 @@ use Modules\MasterData\Models\Machine;
 use Modules\Orders\Domain\Orders\OrderChoices;
 use Modules\Orders\Filament\Resources\Orders\OrderResource;
 use Modules\Orders\Models\Order;
+use Modules\Production\Application\DailyReports\OvertimeRate;
 use Modules\Production\Domain\DailyReports\TaskCosting;
 use Modules\Production\Domain\ProductionChoices;
 use Modules\Production\Filament\Resources\DailyReports\DailyReportLayout;
@@ -516,7 +517,7 @@ final class QuickDailyReport extends Component
             'data.ended_at' => ['required', 'date_format:H:i', $this->afterStart(...)],
             'data.break_time' => ['nullable', 'date_format:H:i'],
             'data.day_type' => ['required', Rule::in(ProductionChoices::DAY_TYPES)],
-            'data.work_type' => ['required', Rule::in(ProductionChoices::WORK_TYPES)],
+            'data.work_type' => ['required', Rule::in(ProductionChoices::WORK_TYPES), OvertimeRate::rule(fn (): mixed => $this->data['user_id'] ?? null)],
             'data.produced' => $required,
             'data.crew' => ['required', 'numeric', 'decimal:0,4', 'min:1', 'max:999999999999'],
             'data.changeover_count' => $number,

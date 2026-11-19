@@ -9,7 +9,9 @@ use Modules\Core\Application\Legacy\LegacyExport;
 use Modules\Core\Application\Legacy\LegacyImporter;
 use Modules\Core\Application\Legacy\LegacyImportLog;
 use Modules\Core\Application\Legacy\LegacyPartners;
+use Modules\Core\Domain\Calendar\YearMonth;
 use Modules\Sales\Application\Receivables\ReceivableLedger;
+use Modules\Sales\Domain\Receivables\LegacyLedgerCheck;
 use Modules\Sales\Domain\Receivables\ReceivableBasis;
 use Modules\Sales\Models\ReceivableMonth;
 
@@ -18,7 +20,9 @@ use Modules\Sales\Models\ReceivableMonth;
  * are not copied, they are derived from the sales (06) and receipts (21) taken over before (ReceivableLedger). Only
  * 消費税端数調整 (entered by hand) is taken over. Then every customer's months are recalculated and compared with the
  * legacy ones: a 当月売掛残 that differs is reported (reconciliation, roadmap Phase 5) — e.g. a balance carried from
- * before the legacy system, which the new ledger does not hold.
+ * before the legacy system, which the new ledger does not hold. Before that, the legacy months themselves are checked
+ * (LegacyLedgerCheck, docs/receivables.md "Migration"): holes, 前月売掛残 not matching the month before, and balances —
+ * credits above all — that were not carried to the end of the export are reported per customer, not copied.
  */
 abstract class LegacyReceivables implements LegacyImporter
 {
@@ -31,10 +35,12 @@ abstract class LegacyReceivables implements LegacyImporter
 
     public function import(LegacyExport $export, LegacyImportLog $log): void
     {
-        /** @var array<int, array<string, array{balance: int|null, label: string}>> $legacy customer => month => 当月売掛残 */
+        /** @var array<int, array<string, array{balance: int|null, opening: int|null, label: string}>> $legacy customer => month => 当月売掛残 */
         $legacy = [];
+        /** @var array<int, string> $names customer => 得意先名 */
+        $names = [];
 
-        DB::transaction(function () use ($export, $log, &$legacy): void {
+        DB::transaction(function () use ($export, $log, &$legacy, &$names): void {
             foreach ($export->records() as $record) {
                 $label = 'レコード番号 '.$record->id();
                 $customerId = $this->partners->find($record->int('得意先ID'), $record->exactText('得意先名'));
@@ -46,7 +52,8 @@ abstract class LegacyReceivables implements LegacyImporter
                 }
 
                 $month = substr($date, 0, 7);
-                $legacy[$customerId][$month] = ['balance' => $record->int('当月売掛残'), 'label' => $record->text('得意先名').' '.$month];
+                $legacy[$customerId][$month] = ['balance' => $record->int('当月売掛残'), 'opening' => $record->int('前月売掛残'), 'label' => $record->text('得意先名').' '.$month];
+                $names[$customerId] = $record->text('得意先名');
 
                 // 消費税端数調整 (entered by hand): kept by the ledger on recalculation
                 $adjustment = $record->int('消費税端数調整') ?? 0;
@@ -64,6 +71,21 @@ abstract class LegacyReceivables implements LegacyImporter
                 }
             }
         });
+
+        // the legacy months as they were: gaps, wrong 前月売掛残 and balances not carried forward (reported, not copied)
+        $months = [];
+        foreach ($legacy as $rows) {
+            $months = [...$months, ...array_keys($rows)];
+        }
+        if ($months !== []) {
+            $until = YearMonth::parse(max($months));
+            foreach ($legacy as $customerId => $rows) {
+                $issues = LegacyLedgerCheck::issues(array_map(fn (array $row): array => ['opening' => $row['opening'], 'closing' => $row['balance']], $rows), $until);
+                foreach ($issues as $issue) {
+                    $log->warn(($names[$customerId] ?? '得意先ID '.$customerId).": 旧システムの売掛: {$issue}");
+                }
+            }
+        }
 
         // every customer with sales or receipts, and those of the legacy ledger (both bases are recalculated)
         $customers = DB::table('sales')->distinct()->pluck('customer_id')

@@ -5,18 +5,23 @@ declare(strict_types=1);
 namespace Modules\Sales\Application\Receivables;
 
 use Illuminate\Database\Eloquent\Collection;
+use Modules\Core\Domain\Calendar\YearMonth;
 use Modules\Sales\Application\SalesActionNotAllowed;
 use Modules\Sales\Domain\Receivables\ReceivableBasis;
+use Modules\Sales\Domain\Receivables\ReceivableGap;
 use Modules\Sales\Models\Invoice;
 use Modules\Sales\Models\ReceivableMonth;
 
 /**
  * 請求書更新 of 23-2. 売掛管理(締日別) (legacy Customine 23-2 page 9, BR-SA-12): the balances of a cycle month go into one
- * of the customer's invoices of that 月度 (締日売掛連携キー) — 前月御請求額 = 前月売掛残, ご入金額 = 当月入金額; 繰越金額
+ * of the customer's invoices of that 月度 (締日売掛連携キー) — 前月御請求額 = 前月売掛残 (ReceivableLedger::openingBalance()),
+ * ご入金額 = 当月入金額; 繰越金額
  * and 御請求額 follow on save (BR-SA-11).
  */
 final class InvoiceBalances
 {
+    public function __construct(private readonly ReceivableLedger $ledger) {}
+
     /** @return Collection<int, Invoice> the customer's invoices of the month, newest first */
     public function invoicesFor(ReceivableMonth $month): Collection
     {
@@ -37,7 +42,11 @@ final class InvoiceBalances
             throw new SalesActionNotAllowed('この売掛レコードの得意先・月度の請求書ではありません。');
         }
 
-        $invoice->previous_amount = $month->previous_balance;
+        try {
+            $invoice->previous_amount = $this->ledger->openingBalance($month->customer_id, ReceivableBasis::Cycle, YearMonth::parse($month->year_month));
+        } catch (ReceivableGap $gap) {
+            throw new SalesActionNotAllowed($gap->getMessage(), previous: $gap);
+        }
         $invoice->received_amount = $month->received;
         $invoice->save();
 

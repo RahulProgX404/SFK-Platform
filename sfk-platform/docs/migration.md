@@ -37,7 +37,7 @@ not taken over, reconciliation differences).
 | 150 | 06 売上入力 | sales | |
 | 160 / 170 | 10 納品書管理, 11 請求書管理 | delivery_notes / invoices | rows linked to the sales by 売上No |
 | 180 | 21 売入金管理 | receipts | |
-| 190 / 195 | 23 売掛管理, 23-2 売掛管理(締日別) | receivable_months (derived) | only 消費税端数調整 taken over |
+| 190 / 195 | 23 売掛管理, 23-2 売掛管理(締日別) | receivable_months (derived) | only 消費税端数調整 taken over; legacy gaps, wrong 前月売掛残 and balances not carried are logged (docs/receivables.md) |
 | 200 / 210 | 22 過去の売上データ, 25 販売先別売上計画 | past_sales / sales_plans | |
 | 220–240 | 16 申請管理, 17 安全衛生チェック, 18 アルコールチェック | leave_requests / safety_checks / alcohol_checks | |
 

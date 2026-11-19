@@ -40,17 +40,20 @@ use Modules\Core\Access\FieldAccess;
 use Modules\Core\Application\Cache\ReferenceCache;
 use Modules\Core\Application\Documents\AppDocuments;
 use Modules\Core\Application\Documents\PrintJobs;
+use Modules\Core\Application\Export\ListCsvExport;
 use Modules\Core\Application\Filters\FilterField;
 use Modules\Core\Application\Filters\RecordFilterQuery;
 use Modules\Core\Application\History\HasRecordHistory;
 use Modules\Core\Application\History\RecordHistory;
 use Modules\Core\Application\Records\RecordDeletion;
 use Modules\Core\Application\Records\RecordValidator;
+use Modules\Core\Application\Records\RecordVersion;
 use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Application\Views\ListViewInvalid;
 use Modules\Core\Application\Views\ListViewSchema;
 use Modules\Core\Application\Views\ListViewService;
+use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\FieldAccessLevel;
 use Modules\Core\Domain\Documents\OutputDelivery;
 use Modules\Core\Domain\Documents\OutputMode;
@@ -67,6 +70,7 @@ use Modules\Core\Filament\Support\MenuButtons;
 use Modules\Core\Filament\Support\SummaryCard;
 use Modules\Core\Filament\Tables\InlineField;
 use Modules\Core\Models\DocumentOutput;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Record list of an app (design_ref/app-index.png): the app name with the home link and the description popup,
@@ -136,6 +140,10 @@ abstract class AppListRecords extends ListRecords
 
     /** インライン編集: key of the row being edited */
     public ?string $inlineRecordKey = null;
+
+    /** インライン編集: 更新日時 of the row when it was opened (RecordVersion) */
+    #[Locked]
+    public ?string $inlineVersion = null;
 
     /** @var array<string, mixed> インライン編集: values of the row being edited, by field */
     public array $inlineData = [];
@@ -240,6 +248,7 @@ abstract class AppListRecords extends ListRecords
 
         $this->inlineRecordKey = (string) $record->getKey();
         $this->inlineData = $this->inlineEditState($record);
+        $this->inlineVersion = RecordVersion::of($record);
     }
 
     /** 保存 of the row being edited: checked with the fields' rules, saved and kept in the 変更履歴. */
@@ -264,6 +273,14 @@ abstract class AppListRecords extends ListRecords
 
         /** @var array<string, mixed> $data */
         $data = $this->validate($rules, [], $attributes)['inlineData'] ?? [];
+
+        // optimistic locking (RecordVersion): someone else saved the row since it was opened
+        if (! RecordVersion::unchanged($record, $this->inlineVersion)) {
+            Notification::make()->danger()->persistent()->title(RecordVersion::CONFLICT)->send();
+            $this->cancelInlineEdit();
+
+            return;
+        }
 
         // the app's RecordRules (e.g. unique per person and month), for the fields changed here only — whatever else a
         // legacy record lacks does not keep this edit from being saved
@@ -1006,6 +1023,7 @@ abstract class AppListRecords extends ListRecords
             MenuButtons::export($this->exportActions()),
             MenuButtons::settings([
                 ...$this->optionActions(),
+                $this->exportCsvAction(),
                 $this->bulkDeleteAction(),
                 ...$this->appSettingsActions(),
             ])
@@ -1022,6 +1040,41 @@ abstract class AppListRecords extends ListRecords
     protected function optionActions(): array
     {
         return [];
+    }
+
+    /**
+     * 「ファイルに書き出す」 (legacy ファイル書き出し, ListCsvExport) for users with the app's ファイル書き出し permission: the list as
+     * filtered, searched and sorted, with its database columns the user may see. An app with its own export (an option
+     * action named `export`, e.g. 01. 取引先マスタ) keeps it instead.
+     */
+    private function exportCsvAction(): Action
+    {
+        return Action::make('exportCsv')
+            ->label('ファイルに書き出す')
+            ->icon(Heroicon::OutlinedArrowDownTray)
+            ->visible(fn (): bool => $this->appResource()::appCan(AppAbility::Export)
+                && ! in_array('export', array_map(fn (Action $action): string => (string) $action->getName(), $this->optionActions()), true))
+            ->action(fn (): StreamedResponse => app(ListCsvExport::class)->download(
+                ($query = $this->getFilteredSortedTableQuery()) instanceof Builder ? $query : $this->appResource()::getEloquentQuery(),
+                $this->exportColumns(),
+                $this->appResource()::displayName(),
+            ));
+    }
+
+    /** @return array<string, string> the database columns of the list the user may see (attribute => label), id first */
+    public function exportColumns(): array
+    {
+        $model = $this->appResource()::getEloquentQuery()->getModel();
+        $stored = self::databaseColumns($model);
+        $hidden = $this->hiddenFields();
+        $columns = in_array($model->getKeyName(), $stored, true) ? [$model->getKeyName() => 'レコード番号'] : [];
+        foreach ($this->listColumns() as $name => $label) {
+            if (in_array($name, $stored, true) && ! in_array($name, $hidden, true)) {
+                $columns[$name] = $label;
+            }
+        }
+
+        return $columns;
     }
 
     /**
@@ -1370,16 +1423,19 @@ abstract class AppListRecords extends ListRecords
         $deleted = 0;
         $kept = [];
 
-        foreach (array_chunk($keys, 200) as $chunk) {
-            foreach ($resource::getEloquentQuery()->whereKey($chunk)->get() as $record) {
-                if (! $resource::canDelete($record)) {
-                    continue;
-                }
+        // one transaction (R4): an error part way through deletes nothing; records that may not go are only kept
+        DB::transaction(function () use ($keys, $resource, $deletion, &$deleted, &$kept): void {
+            foreach (array_chunk($keys, 200) as $chunk) {
+                foreach ($resource::getEloquentQuery()->whereKey($chunk)->get() as $record) {
+                    if (! $resource::canDelete($record)) {
+                        continue;
+                    }
 
-                $reason = $deletion->delete($record);
-                $reason === null ? $deleted++ : $kept[] = $reason;
+                    $reason = $deletion->delete($record);
+                    $reason === null ? $deleted++ : $kept[] = $reason;
+                }
             }
-        }
+        });
 
         $this->cancelInlineEdit();
         $this->resetPage($this->getTablePaginationPageName());

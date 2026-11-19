@@ -30,6 +30,7 @@ final class EditPurchase extends AppEditRecord
 
     protected function beforeSave(): void
     {
+        parent::beforeSave();
         $this->alertBefore = $this->alertState($this->record);
     }
 

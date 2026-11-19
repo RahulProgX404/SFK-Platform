@@ -9,9 +9,11 @@
 
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Artisan;
 use Modules\MasterData\Models\Partner;
 use Modules\Orders\Models\Order;
 use Modules\Purchasing\Application\ConsumableOrders\ConsumableOrderWorkflow;
+use Modules\Purchasing\Application\Payables\PayableLedger;
 use Modules\Purchasing\Application\PurchasingActionNotAllowed;
 use Modules\Purchasing\Domain\ConsumableOrders\ConsumableOrderStatus;
 use Modules\Purchasing\Models\ConsumableOrder;
@@ -172,4 +174,27 @@ it('takes a consumable order through 承認依頼 and 承認する', function ()
     expect($order->fresh()->status)->toBe(ConsumableOrderStatus::Approved)
         ->and($creator->notifications()->count())->toBe(1)
         ->and($workflow->canAdvance($order->fresh(), $admin))->toBeFalse();
+});
+
+it('carries a credit of the supplier (overpaid) into the following months, and the roll-forward is idempotent (docs/receivables.md defect 1)', function () {
+    $supplier = flowSupplier('過払商事', ['supplier_tax_mode' => '無']);
+    flowPurchase($supplier, ['purchased_on' => '2026-09-10', 'amount' => 10000]);
+    flowPayment('2026-10-25', [['supplier_id' => $supplier->id, 'amount' => 12000]]);
+
+    expect(payables($supplier, ['previous_balance', 'paid', 'closing_balance']))->toBe([
+        '2026-09' => ['previous_balance' => 0, 'paid' => 0, 'closing_balance' => 10000],
+        '2026-10' => ['previous_balance' => 10000, 'paid' => 12000, 'closing_balance' => -2000],
+        '2026-11' => ['previous_balance' => -2000, 'paid' => 0, 'closing_balance' => -2000], // the legacy dropped it here
+        '2026-12' => ['previous_balance' => -2000, 'paid' => 0, 'closing_balance' => -2000],
+    ]);
+
+    PayableMonth::query()->where('supplier_id', $supplier->id)->where('year_month', '2026-11')->delete();
+    expect(app(PayableLedger::class)->rollForward())->toBe(['suppliers' => 1, 'created' => 1, 'updated' => 0, 'deleted' => 0])
+        ->and(Artisan::call('purchasing:payables-roll'))->toBe(0)
+        ->and(Artisan::output())->toContain('1 supplier(s): 0 month(s) created, 0 updated, 0 removed');
+
+    // a balance of exactly 0 stops the months
+    flowPurchase($supplier, ['purchased_on' => '2026-12-01', 'amount' => 2000]);
+    expect(array_keys(payables($supplier)))->toBe(['2026-09', '2026-10', '2026-11', '2026-12'])
+        ->and(payables($supplier)['2026-12']['closing_balance'])->toBe(0);
 });

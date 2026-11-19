@@ -12,9 +12,10 @@ use Modules\Core\Application\Filters\FilterField;
 use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Domain\Billing\ClosingDay;
-use Modules\Core\Domain\Filters\DateMode;
+use Modules\Core\Domain\Calendar\YearMonth;
 use Modules\Core\Domain\Filters\FilterCondition;
 use Modules\Core\Domain\Filters\FilterOperator;
+use Modules\Core\Domain\Filters\RecordFilter;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\Tables\AppRecordActions;
 use Modules\Core\Filament\Tables\AppTextColumn;
@@ -30,9 +31,14 @@ use Modules\Sales\Models\ReceivableMonth;
 
 /**
  * Record list of 23. 売掛管理 and 23-2. 売掛管理(締日別) with the legacy views (SYSTEM_BRAIN APP_23 / APP_23-2 views.md), by
- * 得意先名 (23-2: then newest 年月 first); （すべて） shows columns() in order. 23: 先月売掛一覧, 当月売掛一覧 and 売掛一覧 —
- * 先々月売掛一覧 was fixed to 2025年06月 and is not carried over. 23-2: 売掛一覧 and one list per 締日 (also 随時請求 and
- * 締日空欄). The search box replaces 売掛一覧(検索特化). インライン編集 changes 消費税端数調整 (the only figure entered by hand).
+ * 得意先名 (23-2: then newest 年月 first); （すべて） shows columns() in order. 23: 先月売掛一覧, 当月売掛一覧, 先々月売掛一覧 and
+ * 売掛一覧; 23-2: 売掛一覧, the same three and one list per 締日 (also 随時請求 and 締日空欄). The search box replaces
+ * 売掛一覧(検索特化). インライン編集 changes 消費税端数調整 (the only figure entered by hand).
+ *
+ * The month lists are relative to the page's 基準月 (ListReceivableMonths::baseMonth(), default the current month), not
+ * to today: their filter is 対象月 (`base_offset`) = 当月 / 前月 / 前々月 of the 基準月 — a saved view stores the offset,
+ * never a month (legacy: 先月 = LAST_MONTH(today) dropped a September record on 1 November, and 先々月売掛一覧 was fixed to
+ * 2025年06月 — D-23-2, docs/receivables.md defect 7).
  */
 final class ReceivablesTable
 {
@@ -41,6 +47,11 @@ final class ReceivablesTable
     public const VIEW_LAST_MONTH = 'last-month';
 
     public const VIEW_THIS_MONTH = 'this-month';
+
+    public const VIEW_MONTH_BEFORE_LAST = 'month-before-last';
+
+    /** 対象月 of the month lists: stored value (m + months before the 基準月) => label. */
+    public const OFFSETS = ['m0' => '当月', 'm1' => '前月', 'm2' => '前々月'];
 
     public const LIST_COLUMNS = ['year_month', 'customer_id', 'previous_balance', 'received', 'net_balance', 'sales_amount', 'tax_amount', 'month_total', 'closing_balance'];
 
@@ -74,17 +85,16 @@ final class ReceivablesTable
     /** @return list<ListView> */
     public static function defaultViews(ReceivableBasis $basis): array
     {
+        $months = [
+            ListView::table(self::VIEW_LAST_MONTH, '先月売掛一覧', self::LIST_COLUMNS, [], [self::offsetCondition(1)]),
+            ListView::table(self::VIEW_THIS_MONTH, '当月売掛一覧', self::LIST_COLUMNS, [], [self::offsetCondition(0)]),
+            ListView::table(self::VIEW_MONTH_BEFORE_LAST, '先々月売掛一覧', self::LIST_COLUMNS, [], [self::offsetCondition(2)]),
+        ];
         if ($basis === ReceivableBasis::Calendar) {
-            $month = fn (DateMode $mode): array => [['field' => 'month_start', 'operator' => FilterOperator::Equals->value, 'values' => [], 'mode' => $mode->value]];
-
-            return [
-                ListView::table(self::VIEW_LAST_MONTH, '先月売掛一覧', self::LIST_COLUMNS, [], $month(DateMode::LastMonth)),
-                ListView::table(self::VIEW_THIS_MONTH, '当月売掛一覧', self::LIST_COLUMNS, [], $month(DateMode::ThisMonth)),
-                ListView::table(self::VIEW_LIST, '売掛一覧', [...self::LIST_COLUMNS, 'carries_forward']),
-            ];
+            return [...$months, ListView::table(self::VIEW_LIST, '売掛一覧', [...self::LIST_COLUMNS, 'carries_forward'])];
         }
 
-        $views = [ListView::table(self::VIEW_LIST, '売掛一覧', self::LIST_COLUMNS)];
+        $views = [ListView::table(self::VIEW_LIST, '売掛一覧', self::LIST_COLUMNS), ...$months];
         foreach (ClosingDay::cases() as $day) {
             $views[] = ListView::table('closing-'.$day->name, '売掛一覧 - '.($day === ClosingDay::AdHoc ? $day->value : $day->value.'締'), self::LIST_COLUMNS, [],
                 [['field' => 'closing_day', 'operator' => FilterOperator::In->value, 'values' => [$day->value]]]);
@@ -118,12 +128,13 @@ final class ReceivablesTable
      *
      * @return list<FilterField>
      */
-    public static function filterFields(ReceivableBasis $basis): array
+    public static function filterFields(ReceivableBasis $basis, YearMonth $base): array
     {
         $label = fn (string $name): string => ReceivableLayout::label($name, $basis);
         $days = array_map(fn (ClosingDay $day): string => $day->value, ClosingDay::cases());
 
         return [
+            FilterField::choice('base_offset', '対象月', self::OFFSETS)->query(fn (Builder $query, FilterCondition $condition) => self::filterOffset($query, $condition, $base)),
             FilterField::text('year_month', $label('year_month')),
             FilterField::choice('customer_id', $label('customer_id'), fn (): array => PartnerResource::visibleOr(Partner::query()->where('is_customer', true), ReceivableResource::getEloquentQuery()->select('receivable_months.customer_id'))->orderByDesc('id')
                 ->pluck('name', 'id')->mapWithKeys(fn (string $name, int|string $id): array => [(string) $id => $name])->all()),
@@ -167,8 +178,47 @@ final class ReceivablesTable
                 ->state(fn (ReceivableMonth $record): ?string => SalesFormat::text($record->customer->getAttribute(self::MASTER[$name])))
                 ->sortable(query: $partner(self::MASTER[$name])),
             $name === 'carries_forward' => $column->state(fn (ReceivableMonth $record): string => $record->carriesForward())
-                ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderByRaw('(receivable_months.closing_balance > 0) '.($direction === 'desc' ? 'desc' : 'asc'))),
+                ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderByRaw('(receivable_months.closing_balance <> 0) '.($direction === 'desc' ? 'desc' : 'asc'))),
             default => $column,
+        };
+    }
+
+    /** @return array{field: string, operator: string, values: list<string>} 対象月 = `$offset` months before the 基準月 */
+    public static function offsetCondition(int $offset): array
+    {
+        return ['field' => 'base_offset', 'operator' => FilterOperator::In->value, 'values' => ['m'.$offset]];
+    }
+
+    /**
+     * The one month a filter shows (for the title): its 対象月 condition with a single value, resolved against the 基準月;
+     * null when it has none, several, or is an OR filter.
+     */
+    public static function shownMonth(RecordFilter $filter, YearMonth $base): ?YearMonth
+    {
+        if ($filter->match !== RecordFilter::MATCH_ALL) {
+            return null;
+        }
+        $offsets = array_values(array_filter($filter->conditions, fn (FilterCondition $condition): bool => $condition->field === 'base_offset'));
+        if (count($offsets) !== 1 || $offsets[0]->operator !== FilterOperator::In || count($offsets[0]->values) !== 1 || ! isset(self::OFFSETS[$offsets[0]->values[0]])) {
+            return null;
+        }
+
+        return $base->addMonths(-(int) substr($offsets[0]->values[0], 1));
+    }
+
+    /**
+     * 対象月: 年月 = the 基準月 minus the chosen offsets.
+     *
+     * @param  Builder<*>  $query
+     */
+    private static function filterOffset(Builder $query, FilterCondition $condition, YearMonth $base): void
+    {
+        $months = array_values(array_map(fn (string $offset): string => $base->addMonths(-(int) substr($offset, 1))->key(), array_intersect($condition->values, array_keys(self::OFFSETS))));
+
+        match (true) {
+            $condition->operator === FilterOperator::NotIn => $months === [] ? $query : $query->whereNotIn('receivable_months.year_month', $months),
+            $months === [] => $query->whereRaw('1 = 0'),
+            default => $query->whereIn('receivable_months.year_month', $months),
         };
     }
 
@@ -183,7 +233,7 @@ final class ReceivablesTable
     }
 
     /**
-     * 次月分判定 「要作成」 while 当月売掛残 is open (BR-AR-05).
+     * 次月分判定 「要作成」 while 当月売掛残 is not 0 (BR-AR-05, credits too — ReceivableMonth::carriesForward()).
      *
      * @param  Builder<*>  $query
      */
@@ -198,8 +248,8 @@ final class ReceivablesTable
 
         match (true) {
             $wantsOpen && $wantsBlank => $query,
-            $wantsOpen => $query->where('receivable_months.closing_balance', '>', 0),
-            $wantsBlank => $query->where('receivable_months.closing_balance', '<=', 0),
+            $wantsOpen => $query->where('receivable_months.closing_balance', '<>', 0),
+            $wantsBlank => $query->where('receivable_months.closing_balance', 0),
             default => $query->whereRaw('1 = 0'),
         };
     }

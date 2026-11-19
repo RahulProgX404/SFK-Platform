@@ -5,17 +5,23 @@ declare(strict_types=1);
 namespace Modules\Sales\Providers;
 
 use App\Modules\ModuleServiceProvider;
+use Illuminate\Console\Scheduling\Schedule;
 use Modules\Core\Application\Legacy\LegacyImporter;
 use Modules\Core\Application\Records\RecordCards;
+use Modules\Core\Application\Records\RecordDeletion;
 use Modules\Core\Filament\Records\RecordTabs;
 use Modules\MasterData\Filament\Resources\Partners\Pages\ViewPartner;
+use Modules\MasterData\Models\Partner;
 use Modules\Sales\Application\Legacy\LegacyCycleReceivableImport;
 use Modules\Sales\Application\Legacy\LegacyDeliveryNoteImport;
 use Modules\Sales\Application\Legacy\LegacyInvoiceImport;
 use Modules\Sales\Application\Legacy\LegacyReceiptImport;
 use Modules\Sales\Application\Legacy\LegacyReceivableImport;
 use Modules\Sales\Application\Legacy\LegacySaleImport;
+use Modules\Sales\Application\Receivables\ReceivableLedger;
+use Modules\Sales\Application\Sales\SaleDeletion;
 use Modules\Sales\Application\SalesObserver;
+use Modules\Sales\Console\RollReceivablesCommand;
 use Modules\Sales\Filament\PartnerTabs;
 use Modules\Sales\Models\DeliveryNote;
 use Modules\Sales\Models\DeliveryNoteLine;
@@ -29,6 +35,10 @@ use Modules\Sales\Models\Sale;
 final class SalesServiceProvider extends ModuleServiceProvider
 {
     protected string $slug = 'sales';
+
+    protected array $commands = [
+        RollReceivablesCommand::class,
+    ];
 
     protected function registerModule(): void
     {
@@ -72,5 +82,19 @@ final class SalesServiceProvider extends ModuleServiceProvider
         foreach ([Sale::class, DeliveryNoteLine::class, InvoiceLine::class, Receipt::class, ReceiptLine::class, ReceivableMonth::class] as $model) {
             $model::observe(SalesObserver::class);
         }
+        // deleting 売上: blocked over paid invoices; emptied 納品書 / 請求書 (with their 21 record) go too (SaleDeletion)
+        RecordDeletion::guard(Sale::class, SaleDeletion::class);
+
+        // a changed 締日 / 端数区分 of a customer re-applies to all its receivable months (docs/receivables.md, defect 2)
+        Partner::updated(function (Partner $partner): void {
+            if ($partner->wasChanged(['closing_day', 'rounding'])) {
+                app(ReceivableLedger::class)->refresh((int) $partner->id);
+            }
+        });
+
+        // month close: every customer's receivables rolled forward to the current month, gaps filled (idempotent)
+        $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
+            $schedule->command(RollReceivablesCommand::class)->dailyAt('00:30')->withoutOverlapping();
+        });
     }
 }

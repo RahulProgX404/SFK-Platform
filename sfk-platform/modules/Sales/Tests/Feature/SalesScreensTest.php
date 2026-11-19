@@ -620,7 +620,7 @@ it('deletes sales like the legacy 削除 (06_SalesEntry.bundle.js) through 選�
     // the record page's 削除する asks twice too, naming the note and the invoice
     Livewire::test(ViewSale::class, ['record' => $last->getRouteKey()])
         ->mountAction('delete')
-        ->assertMountedActionModalSee(['このレコードを削除しますか？', '10. 納品書管理(売上)', InvoiceResource::appName()])
+        ->assertMountedActionModalSee(['このレコードを削除しますか？', '10. 納品書管理(売上)', InvoiceResource::appName(), '1件の請求書が明細がなくなるため削除されます'])
         ->callMountedAction()
         ->assertActionMounted('confirmDelete')
         ->assertMountedActionModalSee(['本当にこのレコードを削除しますか？', 'この操作は取り消せません。'])
@@ -629,7 +629,8 @@ it('deletes sales like the legacy 削除 (06_SalesEntry.bundle.js) through 選�
 
     expect(Sale::query()->whereKey($last->id)->exists())->toBeFalse()
         ->and($note->lines()->pluck('product_name')->all())->toBe(['角2封筒'])
-        ->and(Invoice::query()->sole()->lines()->count())->toBe(0);
+        ->and(Invoice::query()->count())->toBe(0) // left without rows: deleted with its 21 record (item 2.4)
+        ->and(Receipt::query()->count())->toBe(0);
 });
 
 it('colours the 納品書 / 請求書 buttons and turns the 請求書 ones off while no sale concerned has a 納品書番号', function () {

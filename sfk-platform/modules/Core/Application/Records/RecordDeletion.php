@@ -26,9 +26,22 @@ final class RecordDeletion
     /** @var array<string, string>|null table => app name */
     private ?array $apps = null;
 
+    /** @var array<class-string<Model>, class-string<DeletionGuard>> the modules' business rules about deleting */
+    private static array $guards = [];
+
+    /** A module's rules about deleting records of `$model` (registered at boot). */
+    public static function guard(string $model, string $guard): void
+    {
+        self::$guards[$model] = $guard;
+    }
+
     /** Why the record cannot be deleted (what still uses it), or null when it can. */
     public function blocker(Model $record): ?string
     {
+        if (($reason = self::guardOf($record)?->blocker($record)) !== null) {
+            return $reason;
+        }
+
         $uses = [];
         $deletesWith = self::deletesWith($record);
         foreach ($this->referencesTo($record->getTable()) as $key) {
@@ -118,7 +131,14 @@ final class RecordDeletion
             ];
         }
 
-        return $impact;
+        return $keys === [] ? $impact : [...$impact, ...(self::guardOf($model)?->impact($keys) ?? [])];
+    }
+
+    private static function guardOf(Model $model): ?DeletionGuard
+    {
+        $guard = self::$guards[$model::class] ?? null;
+
+        return $guard === null ? null : app($guard);
     }
 
     private static function isForeignKeyViolation(QueryException $exception): bool

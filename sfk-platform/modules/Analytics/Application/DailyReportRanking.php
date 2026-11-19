@@ -17,7 +17,7 @@ use Modules\Production\Models\DailyReport;
  * 分析 → 日報分析 (legacy DailyReportAnalysis.bundle.js, app 日報分析) and the 作業者 card of the dashboard: per 作業者 the
  * sum of 枚数単価 + 型替え単価 of 08. 日報入力 (出来上 × 加工単価(枚) + 型替単価(回) × 回数, by 作業日), cut to whole yen per
  * month like the legacy script, and the hours worked (作業時間 + 残業時間, BR-PR-01); the 年度別金額ランキング by 年間合計
- * (ties by name). Summed from the reports the user may see (DailyReportResource::onlyVisible) whenever it is shown.
+ * (ties: the lower user id first — stable whatever the names, item 4 of docs/legacy-customizations.md). Summed from the reports the user may see (DailyReportResource::onlyVisible) whenever it is shown.
  */
 final class DailyReportRanking
 {
@@ -107,14 +107,14 @@ final class DailyReportRanking
     }
 
     /**
-     * @template T of array{rank: int, name: string, total: int}
+     * @template T of array{rank: int, user_id: int, name: string, total: int}
      *
      * @param  list<T>  $list
      * @return list<T>
      */
     private function ranked(array $list): array
     {
-        usort($list, fn (array $a, array $b): int => [$b['total'], $a['name']] <=> [$a['total'], $b['name']]);
+        usort($list, fn (array $a, array $b): int => [$b['total'], $a['user_id']] <=> [$a['total'], $b['user_id']]);
         foreach ($list as $index => $row) {
             $list[$index]['rank'] = $index + 1;
         }

@@ -6,6 +6,7 @@ namespace Modules\Purchasing\Providers;
 
 use App\Modules\ModuleServiceProvider;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Application\Legacy\LegacyImporter;
 use Modules\Core\Application\Notifications\NotificationKind;
@@ -23,6 +24,7 @@ use Modules\Purchasing\Application\Legacy\LegacyPaymentImport;
 use Modules\Purchasing\Application\Legacy\LegacyPurchaseImport;
 use Modules\Purchasing\Application\Purchases\OverrunAlert;
 use Modules\Purchasing\Application\PurchasingObserver;
+use Modules\Purchasing\Console\RollPayablesCommand;
 use Modules\Purchasing\Filament\PartnerTabs;
 use Modules\Purchasing\Filament\Resources\Purchases\PurchaseResource;
 use Modules\Purchasing\Filament\Resources\Purchases\PurchaseRows;
@@ -34,6 +36,10 @@ use Modules\Purchasing\Models\Purchase;
 final class PurchasingServiceProvider extends ModuleServiceProvider
 {
     protected string $slug = 'purchasing';
+
+    protected array $commands = [
+        RollPayablesCommand::class,
+    ];
 
     protected function registerModule(): void
     {
@@ -80,6 +86,11 @@ final class PurchasingServiceProvider extends ModuleServiceProvider
         foreach ([Purchase::class, PaymentLine::class, PayableMonth::class] as $model) {
             $model::observe(PurchasingObserver::class);
         }
+
+        // month close: every supplier's payables rolled forward to the current month, credits carried (idempotent)
+        $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
+            $schedule->command(RollPayablesCommand::class)->dailyAt('00:35')->withoutOverlapping();
+        });
 
         // 納品日 of a 20. 消耗品発注 row → 入庫 in the stock of 19
         ConsumableOrderLine::saved(fn (ConsumableOrderLine $line) => $this->app->make(ConsumableReceipt::class)->sync($line));

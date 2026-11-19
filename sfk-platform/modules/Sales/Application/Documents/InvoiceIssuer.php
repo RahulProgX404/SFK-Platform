@@ -9,8 +9,11 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Domain\Billing\BillingCycle;
 use Modules\Core\Domain\Billing\ClosingDay;
+use Modules\Core\Domain\Calendar\YearMonth;
+use Modules\Sales\Application\Receivables\ReceivableLedger;
 use Modules\Sales\Application\SalesActionNotAllowed;
 use Modules\Sales\Domain\Receivables\ReceivableBasis;
+use Modules\Sales\Domain\Receivables\ReceivableGap;
 use Modules\Sales\Models\Invoice;
 use Modules\Sales\Models\Receipt;
 use Modules\Sales\Models\ReceivableMonth;
@@ -21,9 +24,10 @@ use Modules\Sales\Models\Sale;
  * 06_SalesEntry.bundle.js — issueOrAppend()): one statement invoice per customer, its rows the customer's sales in order of 納品予定日
  * (日付 = 納品予定日, 伝票No = 納品書番号), numbered from the invoice sequence.
  *
- * - issue(): only sales already on a delivery note, not yet invoiced and not 随時請求. 請求日付 is the given date, else by
- *   the closing day of the first sale (BR-SA-10: 5〜25日 → that day of this month, 末日 → last day of the previous
- *   month, else today). 今回締日 = that closing day. 前月御請求額 / ご入金額 come from the customer's cycle receivable of
+ * - issue(): only sales already on a delivery note, not yet invoiced and not 随時請求. 請求日付 is the given date, else the
+ *   closing date of the first sale's 月度 (BillingCycle::closingDateOf(): 5〜25日 → that day of the 月度, 末日 / blank → its
+ *   last day) — the period whose balances the invoice carries, never the day the job runs (the legacy BR-SA-10 took this
+ *   month's closing day / last month's end from today). 今回締日 = that closing day. 前月御請求額 / ご入金額 come from the customer's cycle receivable of
  *   the sales' 月度 (BR-SA-12: 前月売掛残 / 当月入金額); 繰越金額 follows (BR-SA-11).
  * - issueAdHoc(): only 随時請求 sales; 請求日付 = 請求日付 of the first sale, 今回締日 「随時請求」.
  *
@@ -36,7 +40,7 @@ final class InvoiceIssuer
      * @param  iterable<Sale>  $sales
      * @return list<Invoice>
      */
-    public function issue(iterable $sales, ?CarbonImmutable $invoiceDate = null, ?CarbonImmutable $today = null): array
+    public function issue(iterable $sales, ?CarbonImmutable $invoiceDate = null): array
     {
         $sales = $this->checked($sales);
         $adHoc = $sales->filter(fn (Sale $sale): bool => $sale->isAdHoc());
@@ -44,10 +48,8 @@ final class InvoiceIssuer
             throw new SalesActionNotAllowed('随時請求の売上が含まれています（売上No: '.$adHoc->pluck('sales_number')->implode('、').'）。随時請求の請求書作成から作成してください。');
         }
 
-        $today ??= CarbonImmutable::today();
-
         return $this->create($sales, fn (Sale $first): array => [
-            'invoiced_on' => $invoiceDate ?? BillingCycle::defaultInvoiceDate($first->effectiveClosingDay(), $today),
+            'invoiced_on' => $invoiceDate ?? self::periodDate($first),
             'closing_day' => $first->effectiveClosingDay()?->value,
         ], withBalances: true);
     }
@@ -61,7 +63,7 @@ final class InvoiceIssuer
      * @param  iterable<Sale>  $sales
      * @return list<Invoice> the invoices created or added to
      */
-    public function issueOrAppend(iterable $sales, ?CarbonImmutable $invoiceDate = null, ?CarbonImmutable $today = null): array
+    public function issueOrAppend(iterable $sales, ?CarbonImmutable $invoiceDate = null): array
     {
         $sales = new Collection(is_array($sales) ? $sales : iterator_to_array($sales));
         if ($sales->isEmpty()) {
@@ -81,16 +83,15 @@ final class InvoiceIssuer
         }
 
         $groups = CustomerDocuments::of($sales->load(['customer', 'assignees', 'order', 'deliveryNote', 'invoice']), 'invoice');
-        $today ??= CarbonImmutable::today();
 
-        return DB::transaction(fn (): array => array_map(function (array $group) use ($invoiceDate, $today): Invoice {
+        return DB::transaction(fn (): array => array_map(function (array $group) use ($invoiceDate): Invoice {
             $invoice = $group['document'];
             if (! $invoice instanceof Invoice) {
                 /** @var Sale $first */
                 $first = $group['sales']->first();
 
                 return $this->invoiceFor($group['sales'], [
-                    'invoiced_on' => $invoiceDate ?? BillingCycle::defaultInvoiceDate($first->effectiveClosingDay(), $today),
+                    'invoiced_on' => $invoiceDate ?? self::periodDate($first),
                     'closing_day' => $first->effectiveClosingDay()?->value,
                 ], withBalances: true);
             }
@@ -104,6 +105,12 @@ final class InvoiceIssuer
 
             return $invoice;
         }, $groups));
+    }
+
+    /** 請求日付 by default: the closing date of the 月度 of the customer's first sale (the period the invoice carries). */
+    private static function periodDate(Sale $first): CarbonImmutable
+    {
+        return BillingCycle::closingDateOf(YearMonth::parse($first->billing_month), $first->effectiveClosingDay());
     }
 
     /**
@@ -174,9 +181,15 @@ final class InvoiceIssuer
         /** @var Sale $first */
         $first = $sales->first();
         $addressee = $first->customer->invoiceAddressee();
+        // 前月御請求額 = 前月売掛残 of the 月度 (the one opening-balance function; a gap is refused, never read as 0)
         $balance = $withBalances
             ? ReceivableMonth::query()->ofBasis(ReceivableBasis::Cycle)->where('customer_id', $first->customer_id)->where('year_month', $first->billing_month)->first()
             : null;
+        try {
+            $previous = $withBalances ? app(ReceivableLedger::class)->openingBalance((int) $first->customer_id, ReceivableBasis::Cycle, YearMonth::parse($first->billing_month)) : 0;
+        } catch (ReceivableGap $gap) {
+            throw new SalesActionNotAllowed($gap->getMessage(), previous: $gap);
+        }
 
         $invoice = Invoice::query()->create([
             ...$header,
@@ -184,7 +197,7 @@ final class InvoiceIssuer
             'customer_rounding' => $first->customer_rounding,
             'postal_code' => $addressee['postal_code'],
             'address' => $addressee['address'],
-            'previous_amount' => $balance->previous_balance ?? 0,
+            'previous_amount' => $previous,
             'received_amount' => $balance->received ?? 0,
         ]);
         $assignees = $first->assignees->pluck('id')->all();

@@ -25,18 +25,22 @@ use Modules\Purchasing\Models\Purchase;
  * - Purchases count in the month of 納品(仕入)日 with 仕入金額合計 (仕入額), its components and its 仕入カテゴリ判定 column;
  *   payment rows in the month of 支払日 (BR-PU-08).
  * - Tax by the supplier's current 消費税区分 and 端数区分 (BR-TX-07).
+ * - A balance ≠ 0 carries (credits too, PayableRoll); rebuilding is an idempotent upsert, also run daily for every
+ *   supplier (`purchasing:payables-roll`, rollForward()).
  */
 final class PayableLedger
 {
-    public function refresh(?int $supplierId, ?CarbonImmutable $today = null): void
+    /** @return array{created: int, updated: int, deleted: int} */
+    public function refresh(?int $supplierId, ?CarbonImmutable $today = null): array
     {
+        $changes = ['created' => 0, 'updated' => 0, 'deleted' => 0];
         $supplier = $supplierId === null ? null : Partner::query()->find($supplierId);
         if ($supplier === null) {
-            return;
+            return $changes;
         }
 
         $today ??= CarbonImmutable::now();
-        DB::transaction(function () use ($supplier, $today): void {
+        DB::transaction(function () use ($supplier, $today, &$changes): void {
             $existing = PayableMonth::query()->where('supplier_id', $supplier->id)->lockForUpdate()->get()->keyBy('year_month');
             $months = $this->months($supplier, $existing, $today);
 
@@ -45,19 +49,48 @@ final class PayableLedger
                 $month = $existing->get($key);
                 if ($month === null) {
                     (new PayableMonth(['supplier_id' => $supplier->id, 'year_month' => $key, ...$values]))->saveQuietly();
+                    $changes['created']++;
                 } else {
                     $month->forceFill($values);
                     if ($month->isDirty()) {
                         $month->saveQuietly();
+                        $changes['updated']++;
                     }
                 }
             }
 
             $stale = $existing->keys()->diff(array_keys($months))->all();
             if ($stale !== []) {
-                PayableMonth::query()->where('supplier_id', $supplier->id)->whereIn('year_month', $stale)->delete();
+                $changes['deleted'] = PayableMonth::query()->where('supplier_id', $supplier->id)->whereIn('year_month', $stale)->delete();
             }
         });
+
+        return $changes;
+    }
+
+    /**
+     * Roll-forward of every supplier with purchases, payments or payable months (daily by the scheduler): all their
+     * months up to the current one written, stale ones corrected. Idempotent.
+     *
+     * @param  list<int>|null  $supplierIds  null = all
+     * @return array{suppliers: int, created: int, updated: int, deleted: int}
+     */
+    public function rollForward(?array $supplierIds = null, ?CarbonImmutable $today = null): array
+    {
+        $ids = $supplierIds ?? DB::table('purchases')->whereNotNull('supplier_id')->distinct()->pluck('supplier_id')
+            ->merge(DB::table('payment_lines')->whereNotNull('supplier_id')->distinct()->pluck('supplier_id'))
+            ->merge(DB::table('payable_months')->distinct()->pluck('supplier_id'))
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()->sort()->values()->all();
+
+        $totals = ['suppliers' => count($ids), 'created' => 0, 'updated' => 0, 'deleted' => 0];
+        foreach ($ids as $id) {
+            foreach ($this->refresh($id, $today) as $kind => $count) {
+                $totals[$kind] += $count;
+            }
+        }
+
+        return $totals;
     }
 
     /**
