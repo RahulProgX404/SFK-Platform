@@ -2737,8 +2737,8 @@
         background-color: var(--sfk-hover);
     }
 
-    .fi-ta-row.fi-selected>td,
-    .fi-ta-row:has(.fi-ta-record-checkbox:checked)>td {
+    /* Filament marks a selected row itself; a :has(:checked) here restyled the whole page on every tick */
+    .fi-ta-row.fi-selected>td {
         background-color: var(--sfk-primary-soft);
     }
 
@@ -2936,17 +2936,18 @@
         line-height: var(--sfk-lh-tight);
     }
 
-    /* every one-line field has the control height: inputs, selects, multi-selects and the read-only values */
-    .fi-input-wrp:not(:has(textarea)) {
+    /* every one-line field has the control height: inputs, selects, multi-selects and the read-only values (Filament
+       marks a textarea's wrapper .fi-fo-textarea; a :has() on the textarea restyled the whole page on every change) */
+    .fi-input-wrp:not(.fi-fo-textarea) {
         min-height: var(--sfk-control);
     }
 
-    .fi-input-wrp:not(:has(textarea))>.fi-input-wrp-content-ctn {
+    .fi-input-wrp:not(.fi-fo-textarea)>.fi-input-wrp-content-ctn {
         display: flex;
         align-items: center;
     }
 
-    .fi-input-wrp:not(:has(textarea))>.fi-input-wrp-content-ctn>* {
+    .fi-input-wrp:not(.fi-fo-textarea)>.fi-input-wrp-content-ctn>* {
         flex: 1;
         min-width: 0;
     }

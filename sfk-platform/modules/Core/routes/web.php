@@ -10,9 +10,13 @@ use Modules\Core\Http\Controllers\PortalController;
 use Modules\Core\Http\Controllers\ThemeAssetController;
 use Modules\Core\Http\Middleware\EnsurePasswordIsChanged;
 
-// The panels' stylesheet and script (versioned, kept by the browser).
-Route::get('core/theme.css', [ThemeAssetController::class, 'css'])->name('core.theme.css');
-Route::get('core/theme.js', [ThemeAssetController::class, 'js'])->name('core.theme.js');
+// The panels' stylesheet and script and Filament's stylesheet (versioned, kept by the browser) — the same for everyone,
+// so without the web middleware: no session, no signed-in user, no database.
+Route::withoutMiddleware('web')->group(function (): void {
+    Route::get('core/theme.css', [ThemeAssetController::class, 'css'])->name('core.theme.css');
+    Route::get('core/theme.js', [ThemeAssetController::class, 'js'])->name('core.theme.js');
+    Route::get('core/filament.css', [ThemeAssetController::class, 'filament'])->name('core.filament.css');
+});
 
 // 通知 in real time: a user's pulse (NotificationPulse), asked by their pages every few seconds — without the web
 // middleware (session, signed-in user), so it reads only the cache and never the database. Signed per user.

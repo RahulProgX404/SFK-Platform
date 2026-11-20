@@ -37,7 +37,13 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   must survive running again, and elements appended to the body must check `isConnected`. A new cache gets a test with
   `config(['core.reference_cache' => true])` that changes are seen (`ReferenceCacheTest`).
 - Speed: nothing large goes into every page — panel CSS / JS live in the theme views served as one cached file
-  (`ThemeAssets`), big data of a dialog is fetched when it opens (e.g. 絞り込む). Modules are cached
+  (`ThemeAssets`), big data of a dialog is fetched when it opens (e.g. 絞り込む). CSS: no `:has()` whose argument
+  changes while the page is used (`[aria-expanded]`, `:checked`, a class Alpine toggles) and no `:not(:has(…))` on common
+  wrappers — each such change makes the browser restyle the whole page (60–210 ms per click, measured 2026-11-20); use a
+  class the element already carries or `:focus-within`. Filament's own such rules are replaced when its stylesheet is
+  served (`Core\Filament\Support\FilamentStylesheet`, `InteractionStyleTest`). Record pages name the belongs-to relations
+  they show (also of their rows, `papers.supplier`) in `batchedRelations()` — one query per related table on every
+  request (`Core\Application\Records\RelationBatch`). Modules are cached
   (`php artisan module:cache`, part of `optimize`); a new conventional folder in a module needs it rebuilt.
   Lists draw 100+ rows, so nothing per row may be a component of its own (2026-11-09): user names are
   `UserPopup` buttons carrying their card (one script draws it, `core::filament.user-popup-script`; 従業員カテゴリ /

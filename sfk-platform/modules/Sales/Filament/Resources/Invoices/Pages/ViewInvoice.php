@@ -12,6 +12,12 @@ use Modules\Sales\Models\Invoice;
 /** @property Invoice $record */
 final class ViewInvoice extends AppViewRecord
 {
+    /** 得意先 besides 作成者 / 更新者 (one query for them, one for 得意先). */
+    protected function batchedRelations(): array
+    {
+        return [...parent::batchedRelations(), 'customer'];
+    }
+
     protected static string $resource = InvoiceResource::class;
 
     public function getTitle(): string

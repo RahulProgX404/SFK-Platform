@@ -12,6 +12,12 @@ use Modules\Sales\Models\Receipt;
 /** @property Receipt $record */
 final class ViewReceipt extends AppViewRecord
 {
+    /** 請求書, 得意先 and the receipt of each line (one query per table) besides 作成者 / 更新者. */
+    protected function batchedRelations(): array
+    {
+        return [...parent::batchedRelations(), 'invoice', 'customer', 'lines.receipt'];
+    }
+
     protected static string $resource = ReceiptResource::class;
 
     public function getTitle(): string

@@ -16,6 +16,12 @@ use Modules\Orders\Models\Quotation;
  */
 final class ViewQuotation extends AppViewRecord
 {
+    /** 得意先 besides 作成者 / 更新者 (one query for them, one for 得意先). */
+    protected function batchedRelations(): array
+    {
+        return [...parent::batchedRelations(), 'customer'];
+    }
+
     protected static string $resource = QuotationResource::class;
 
     public function getTitle(): string

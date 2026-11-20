@@ -12,6 +12,12 @@ use Modules\Sales\Models\DeliveryNote;
 /** @property DeliveryNote $record */
 final class ViewDeliveryNote extends AppViewRecord
 {
+    /** 得意先 besides 作成者 / 更新者 (one query for them, one for 得意先). */
+    protected function batchedRelations(): array
+    {
+        return [...parent::batchedRelations(), 'customer'];
+    }
+
     protected static string $resource = DeliveryNoteResource::class;
 
     public function getTitle(): string

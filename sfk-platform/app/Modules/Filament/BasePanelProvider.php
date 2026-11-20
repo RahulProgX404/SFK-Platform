@@ -29,6 +29,7 @@ use Modules\Core\Access\DashboardAccess;
 use Modules\Core\Filament\AppPages\AppSidebarState;
 use Modules\Core\Filament\DashboardSettings\DashboardSettingsPlugin;
 use Modules\Core\Filament\Profile\ProfilePage;
+use Modules\Core\Filament\Support\FilamentStylesheet;
 use Modules\Core\Filament\Support\InitialAvatarProvider;
 use Modules\Core\Filament\Support\ThemeAssets;
 use Modules\Core\Http\Middleware\EnsureAccountIsActive;
@@ -78,6 +79,9 @@ abstract class BasePanelProvider extends PanelProvider
                 'gray' => Color::Gray,
             ])
             ->darkMode(false)
+            // Filament's stylesheet without the :has() rules that restyled the whole page on every drop-down, check box
+            // and menu (60–200 ms each on a 100-row list, docs/performance.md)
+            ->theme(FilamentStylesheet::theme())
             // Noto Sans JP, served by this system (public/fonts/noto-sans-jp: unicode-range slices, only the characters a
             // page shows are loaded; the Content-Security-Policy allows no font host); the full stack with the system
             // Japanese fonts as fallback is set by core::filament.design (--sfk-font).

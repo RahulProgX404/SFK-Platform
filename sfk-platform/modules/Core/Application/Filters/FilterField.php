@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\Core\Application\Filters;
 
-use App\Models\User;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
+use Modules\Core\Application\Users\UserChoices;
 use Modules\Core\Domain\Filters\DateMode;
 use Modules\Core\Domain\Filters\FilterCondition;
 use Modules\Core\Domain\Filters\FilterFieldType;
 use Modules\Core\Domain\Filters\FilterOperator;
+use WeakMap;
 
 /**
  * A field offered in the 絞り込む dialog of an app list (AppListRecords::filterFields()). By default it filters and
@@ -33,6 +35,9 @@ final class FilterField
     private ?Closure $query = null;
 
     private bool $sortable = true;
+
+    /** @var WeakMap<Request, WeakMap<Closure, array<string, string>>>|null choices already asked in a request */
+    private static ?WeakMap $resolved = null;
 
     /** @param  array<string, string>|Closure(): array<string, string>  $options */
     private function __construct(
@@ -78,9 +83,7 @@ final class FilterField
     /** A user column (作成者, 更新者 …) or, with relationship(), a ユーザー選択 field. */
     public static function user(string $name, string $label): self
     {
-        return new self($name, $label, FilterFieldType::User, fn (): array => User::query()->orderBy('name')->pluck('name', 'id')
-            ->mapWithKeys(fn (string $name, int|string $id): array => [(string) $id => $name])
-            ->all());
+        return new self($name, $label, FilterFieldType::User, fn (): array => UserChoices::all());
     }
 
     /** Database column, when it differs from the field name. */
@@ -143,10 +146,25 @@ final class FilterField
         return $this->query;
     }
 
-    /** @return array<string, string> */
+    /**
+     * The choices; a closure is asked once per request even when several fields share it (e.g. 段ボール and 仕切り of 日報
+     * list the same boxes).
+     *
+     * @return array<string, string>
+     */
     public function getOptions(): array
     {
-        return $this->options instanceof Closure ? ($this->options)() : $this->options;
+        if (! $this->options instanceof Closure) {
+            return $this->options;
+        }
+
+        self::$resolved ??= new WeakMap;
+        $request = request();
+        /** @var WeakMap<Closure, array<string, string>> $answers */
+        $answers = self::$resolved[$request] ?? new WeakMap;
+        self::$resolved[$request] = $answers;
+
+        return $answers[$this->options] ??= ($this->options)();
     }
 
     /**

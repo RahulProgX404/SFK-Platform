@@ -16,6 +16,12 @@ use Modules\Production\Models\DailyReport;
  */
 final class ViewDailyReport extends AppViewRecord
 {
+    /** 作業者 (with 作成者 / 更新者), 受注, 機械, 段ボール and 仕切り (one query per table). */
+    protected function batchedRelations(): array
+    {
+        return [...parent::batchedRelations(), 'worker', 'order', 'machine', 'cardboard', 'partition'];
+    }
+
     protected static string $resource = DailyReportResource::class;
 
     public function getTitle(): string

@@ -44,6 +44,13 @@ final class ViewOrder extends AppViewRecord
 
     public int $pastPage = 1;
 
+    /** 取引先 of the order and of its 用紙 / 印刷 / 加工 rows (one query), デザイナー / 作成者 / 更新者 (one query). */
+    protected function batchedRelations(): array
+    {
+        return [...parent::batchedRelations(), 'customer', 'plateSupplier', 'manufacturer', 'dataSupplier', 'filmSupplier',
+            'papers.supplier', 'printings.supplier', 'finishings.supplier', 'designer'];
+    }
+
     public function mount(int|string $record): void
     {
         parent::mount($record);

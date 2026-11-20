@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Js;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Modules\Core\Application\Comments\HasRecordComments;
 use Modules\Core\Application\Comments\RecordComments;
@@ -35,9 +36,10 @@ use Modules\Core\Application\Documents\AppDocuments;
 use Modules\Core\Application\History\HasRecordHistory;
 use Modules\Core\Application\History\RecordHistory;
 use Modules\Core\Application\Records\RecordDeletion;
+use Modules\Core\Application\Records\RelationBatch;
+use Modules\Core\Application\Users\UserChoices;
 use Modules\Core\Domain\Documents\OutputDelivery;
 use Modules\Core\Domain\Documents\OutputPlacement;
-use Modules\Core\Domain\People\EmploymentStatus;
 use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
 use Modules\Core\Filament\Support\DeleteImpact;
 use Modules\Core\Filament\Support\DocumentNameField;
@@ -74,6 +76,16 @@ abstract class AppViewRecord extends ViewRecord
     /** @var array<string, mixed>|null コメント being written: body, mentions (宛先; 「全員」 = COMMENT_TO_EVERYONE) */
     public ?array $commentData = [];
 
+    /**
+     * ‹ › of the header (recordNeighbours()), worked out when the page opens and kept with the page: the header is drawn
+     * again on every Livewire request of the page, which asked the database twice each time (performance pass
+     * 2026-11-20).
+     *
+     * @var array{previous: string|null, next: string|null}|null
+     */
+    #[Locked]
+    public ?array $neighbourUrls = null;
+
     /** 返信する: the comment the one being written answers */
     public ?int $commentReplyTo = null;
 
@@ -97,6 +109,27 @@ abstract class AppViewRecord extends ViewRecord
         parent::mount($record);
 
         $this->commentForm->fill();
+    }
+
+    /** Every request of the page: the record's belongs-to relations shown on it, one query per table (batchedRelations()). */
+    public function booted(): void
+    {
+        $paths = $this->batchedRelations();
+        if ($paths !== [] && $this->record instanceof Model) {
+            RelationBatch::load($this->record, $paths);
+        }
+    }
+
+    /**
+     * Belongs-to relations the page shows — of the record or of its rows ("papers.supplier") — loaded together with one
+     * query per related table (Core RelationBatch) instead of one per relation and row, on every request of the page.
+     * 作成者 and 更新者 by default (relations the model lacks are skipped); pages add theirs to these.
+     *
+     * @return list<string>
+     */
+    protected function batchedRelations(): array
+    {
+        return ['creator', 'updater'];
     }
 
     public function appPageKind(): string
@@ -199,14 +232,7 @@ abstract class AppViewRecord extends ViewRecord
                     // position measured while hidden and the next opening scrolled the page to it
                     ->extraAlpineAttributes(['x-init' => "\$watch('state', () => requestAnimationFrame(() => requestAnimationFrame(() => { if (select?.isOpen) { select.closeDropdown(); select.selectButton?.focus({ preventScroll: true }); } })))"])
                     // `+` keeps the user ids as keys (a spread would number them anew)
-                    ->options(fn (): array => [self::COMMENT_TO_EVERYONE => '全員'] + User::query()
-                        ->whereIn('employment_status', array_map(
-                            fn (EmploymentStatus $status): string => $status->value,
-                            array_filter(EmploymentStatus::cases(), fn (EmploymentStatus $status): bool => $status->canSignIn()),
-                        ))
-                        ->orderBy('name')
-                        ->pluck('name', 'id')
-                        ->all())
+                    ->options(fn (): array => [self::COMMENT_TO_EVERYONE => '全員'] + UserChoices::active())
                     // the choices go with the page: opening the list asks the server nothing (a closure would make Filament
                     // fetch them again on every opening — a round trip each time the list is reopened for the next 宛先)
                     ->dynamicOptions(false),
@@ -665,20 +691,46 @@ abstract class AppViewRecord extends ViewRecord
     /** @return array{previous: string|null, next: string|null} */
     public function recordNeighbours(): array
     {
+        if ($this->neighbourUrls !== null) {
+            return $this->neighbourUrls;
+        }
+
         $resource = static::getResource();
         $urls = [];
+        $neighbours = $this->neighbours();
 
-        foreach (['previous' => false, 'next' => true] as $direction => $forward) {
-            $neighbour = $this->neighbour($forward);
+        foreach (['previous', 'next'] as $direction) {
+            $neighbour = $neighbours[$direction];
             $urls[$direction] = $neighbour !== null && $resource::canView($neighbour)
                 ? $resource::getUrl('view', ['record' => $neighbour])
                 : null;
         }
 
-        return $urls;
+        return $this->neighbourUrls = $urls;
     }
 
-    private function neighbour(bool $forward): ?Model
+    /**
+     * The records before and after this one in the app's default order — both in one query.
+     *
+     * @return array{previous: Model|null, next: Model|null}
+     */
+    private function neighbours(): array
+    {
+        $rows = $this->neighbourQuery(false)->unionAll($this->neighbourQuery(true)->toBase())->get();
+
+        $found = ['previous' => null, 'next' => null];
+        foreach ($rows as $row) {
+            $direction = $row->getAttribute('sfk_neighbour') === 'next' ? 'next' : 'previous';
+            $row->offsetUnset('sfk_neighbour');
+            $row->syncOriginal();
+            $found[$direction] = $row;
+        }
+
+        return $found;
+    }
+
+    /** @return Builder<Model> */
+    private function neighbourQuery(bool $forward): Builder
     {
         $record = $this->record;
         $key = $record->getQualifiedKeyName();
@@ -689,12 +741,18 @@ abstract class AppViewRecord extends ViewRecord
         $operator = $forward ? '>' : '<';
         $direction = $forward ? 'asc' : 'desc';
 
-        return static::getResource()::getEloquentQuery()
+        $query = static::getResource()::getEloquentQuery();
+        if ($query->getQuery()->columns === null) {
+            $query->select($record->getTable().'.*');
+        }
+
+        return $query
+            ->selectRaw('cast(? as varchar(8)) as sfk_neighbour', [$forward ? 'next' : 'previous'])
             ->where(fn (Builder $query): Builder => $query
                 ->where($column, $operator, $value)
                 ->orWhere(fn (Builder $query): Builder => $query->where($column, $value)->where($key, $operator, $id)))
             ->orderBy($column, $direction)
             ->orderBy($key, $direction)
-            ->first();
+            ->limit(1);
     }
 }

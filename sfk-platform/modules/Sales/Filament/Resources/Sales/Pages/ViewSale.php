@@ -29,6 +29,12 @@ use Modules\Sales\Models\Sale;
  */
 final class ViewSale extends AppViewRecord
 {
+    /** 得意先, 受注 and its 得意先, 納品書 (one query per table) besides 作成者 / 更新者. */
+    protected function batchedRelations(): array
+    {
+        return [...parent::batchedRelations(), 'customer', 'order.customer', 'deliveryNote'];
+    }
+
     protected static string $resource = SaleResource::class;
 
     public function getTitle(): string

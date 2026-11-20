@@ -16,6 +16,12 @@ use Modules\Purchasing\Models\Payment;
  */
 final class ViewPayment extends AppViewRecord
 {
+    /** 仕入先 of every line (one query) besides 作成者 / 更新者. */
+    protected function batchedRelations(): array
+    {
+        return [...parent::batchedRelations(), 'lines.supplier'];
+    }
+
     protected static string $resource = PaymentResource::class;
 
     public function getTitle(): string
