@@ -23,6 +23,22 @@ final class MenuButtons
 
     private const SETTINGS_MARKER = 'data-sfk-settings';
 
+    private const HEAD_MARKER = 'data-sfk-head';
+
+    /**
+     * A button of the page drawn at the top right of a record page, before 編集 (e.g. 売上入力 of 04. 受注入力), in the
+     * order of the header actions.
+     */
+    public static function head(Action $action): Action
+    {
+        return $action->button()->color('gray')->extraAttributes([self::HEAD_MARKER => 'true'], merge: true);
+    }
+
+    public static function isHead(mixed $action): bool
+    {
+        return $action instanceof Action && ($action->getExtraAttributes()[self::HEAD_MARKER] ?? null) === 'true';
+    }
+
     /**
      * @template T of Action|ActionGroup
      *
@@ -47,7 +63,8 @@ final class MenuButtons
 
     /**
      * The エクスポート menu of a page (帳票出力 of アプリの設定 → 帳票出力): one drop-down at the top right listing the 出力設定
-     * of the page; null without any.
+     * of the page; null without any. When all of them share one ボタン名 (e.g. 04. 受注入力's 「出力する書類」), the button
+     * is that one: its name, its サブボタン名 listed at once, without a sub-menu.
      *
      * @param  list<Action|ActionGroup>  $actions  entries; an ActionGroup is one with a sub-menu (exportEntry())
      */
@@ -57,8 +74,14 @@ final class MenuButtons
             return null;
         }
 
+        $label = 'エクスポート';
+        if (count($actions) === 1 && $actions[0] instanceof ActionGroup) {
+            $label = (string) $actions[0]->getLabel();
+            $actions = $actions[0]->getActions();
+        }
+
         return ActionGroup::make($actions)
-            ->label('エクスポート')
+            ->label($label)
             ->icon('heroicon-o-arrow-up-on-square')
             ->button()
             ->color('gray')

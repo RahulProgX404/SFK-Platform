@@ -8,6 +8,21 @@ single cache read (no database, no session) — the bell every 4 s while in view
 only what changed. Nothing extra to run or pay for: the pulses use the app servers and the Valkey cache the plan already
 has. Delay: a new message shows within ~1.5 s in the open messenger, a 通知 / badge within ~4 s.
 
+## Live pages (売上分析, 日報分析)
+
+Pages whose figures add up other apps' records follow changes without a reload (user 2026-11-21). Core
+`Application\Realtime\DataPulse`: a module lists the tables its live pages read (`DataPulse::watch()`; the pages say
+them in `liveTables()` — 売上分析: 売上, 予想 / 仕掛, users, 取引先; 日報分析: 日報, users; both: `DataPulse::REFERENCE`,
+access rights). When a record of a watched table is saved or deleted anywhere (the Eloquent listener of
+CoreServiceProvider, also queue jobs and commands), its stamp in the cache is renewed after the commit, once at the end
+of the request (a long process: at most once a second). The stamps travel on the page pulse (`x.d`, cache reads only).
+The page draws a marker with the stamps it was drawn with (`core::filament.live-data` inside its Livewire component);
+`core::filament.live-data-script` compares each pulse with it and runs `$refresh` on the component when a stamp moved —
+not while the user is typing in the page (then on leaving the input). Delay: about the pulse interval (~4 s in view, at
+once when the tab comes back). With WebSockets on, a page with a marker asks the pulse every 4 s itself. Writes outside
+Eloquent (query-builder updates, a pivot sync without its parent) stamp nothing; the cache is per environment, so a
+change made on Render is not seen by a page served locally.
+
 **Laravel Reverb stays as an option** (code and dependency kept): set `BROADCAST_CONNECTION=reverb` with the `REVERB_*`
 settings and the same pages are also pushed to, while polling drops to a safety net. Turn it on only where a Reverb
 server exists at no cost (local: `docker compose --profile realtime up -d`; Render: start.sh runs it in the container)

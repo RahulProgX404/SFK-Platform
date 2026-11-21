@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Modules\Core\Application\Realtime\DataPulse;
 
 /**
  * Speed (user, 2026-11-11 — "pages must not feel like loading"): the data every screen needs before it shows anything —
@@ -95,6 +96,8 @@ final class ReferenceCache
     /** Something cached here changed: every key is read afresh from the next request on. */
     public static function bump(): void
     {
+        // who may see what changed: the open live pages redraw what the viewer may see (DataPulse)
+        DataPulse::touched(DataPulse::REFERENCE);
         if (self::enabled()) {
             CacheVersions::bump(CacheVersions::REFERENCE);
         }

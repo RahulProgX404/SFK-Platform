@@ -1938,7 +1938,7 @@
 
     .sfk-order-past-head {
         padding: 14px 18px !important;
-        background: #ffffff !important;
+        background: #a3abb7 !important;
         border-bottom: 1px solid var(--sfk-line);
     }
 

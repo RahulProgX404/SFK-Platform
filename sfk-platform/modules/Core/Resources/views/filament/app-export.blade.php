@@ -1,6 +1,7 @@
 {{--
     エクスポート of an app list or record (Modules\Core\Filament\Support\MenuButtons::export()): a menu of the 帳票出力 of the
-    page; 出力設定 with the same ボタン名 open a sub-menu of their サブボタン名. An entry is a link (the record's file) or mounts
+    page; 出力設定 with the same ボタン名 open a sub-menu of their サブボタン名 — or, when there is only that ボタン名, the
+    button bears it and lists the サブボタン名 at once. An entry is a link (the record's file) or mounts
     its action — through the table when it works on the checked rows, so they are sent along.
     $export: the ActionGroup of the page's header actions.
 --}}
@@ -22,7 +23,7 @@
 <div class="sfk-export" x-data="{ open: false, sub: null }" x-on:keydown.escape.window="open = false; sub = null" x-on:click.outside="open = false; sub = null">
     <button type="button" class="sfk-export-btn" x-on:click="open = ! open; sub = null" x-bind:aria-expanded="open ? 'true' : 'false'" aria-haspopup="menu">
         <x-filament::icon icon="heroicon-o-arrow-up-on-square" class="sfk-export-icon" />
-        <span>エクスポート</span>
+        <span>{{ $export->getLabel() }}</span>
         <x-filament::icon icon="heroicon-m-chevron-down" class="sfk-export-chevron" />
     </button>
 

@@ -18,9 +18,13 @@ use Modules\Analytics\Filament\Pages\DailyReportAnalysis;
 use Modules\Analytics\Filament\Pages\SalesAnalysis;
 use Modules\Analytics\Models\SalesForecast;
 use Modules\Core\Application\Apps\AppDiscovery;
+use Modules\Core\Application\Cache\ReferenceCache;
+use Modules\Core\Application\Notifications\NotificationPulse;
+use Modules\Core\Application\Realtime\DataPulse;
 use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\AppStatus;
 use Modules\Core\Domain\Apps\PermissionSubject;
+use Modules\Core\Filament\Support\ThemeAssets;
 use Modules\Core\Models\BusinessApp;
 use Modules\Core\Models\Space;
 use Modules\MasterData\Models\Partner;
@@ -228,4 +232,50 @@ it('never changes the actuals by saving 予想 / 仕掛, and refuses another 担
     $this->actingAs($this->second);
     expect(fn () => (new SalesAnalysis)->saveForecast($this->first->id, 'forecast', 6, '1'))->toThrow(HttpException::class)
         ->and(SalesForecast::query()->sole()->months('forecast')[6])->toBe(0);
+});
+
+it('keeps 売上分析 and 日報分析 live: a change of what they show moves its stamp on the pulse, the open page redraws (DataPulse)', function () {
+    $this->actingAs($this->admin);
+    $pulse = fn (): array => (array) $this->get(NotificationPulse::url($this->admin->id))->assertOk()->json('x.d');
+    DataPulse::flush();
+
+    // the pages are drawn with the stamps of their tables, inside their Livewire component
+    foreach ([SalesAnalysis::class, DailyReportAnalysis::class] as $page) {
+        $html = (string) $this->get($page::getUrl())->assertOk()->getContent();
+        $marker = (string) str($html)->after('wire:id=')->after('data-sfk-live="')->before('"');
+        expect(array_keys(json_decode(html_entity_decode($marker), true)))->toBe($page::liveTables());
+    }
+    expect(SalesAnalysis::liveTables())->toContain('sales', 'sales_forecasts', 'users', 'partners', DataPulse::REFERENCE)
+        ->and(DailyReportAnalysis::liveTables())->toContain('daily_reports', 'users', DataPulse::REFERENCE)
+        ->and(ThemeAssets::bundle()['js'])->toContain('sfkLiveData', 'data-sfk-live');
+
+    $before = $pulse();
+    expect(array_keys($before))->toContain('sales', 'daily_reports', DataPulse::REFERENCE);
+
+    // another user's sale, saved on another screen: only the stamp of 売上 moves, once the request is over
+    $page = Livewire::test(SalesAnalysis::class)->assertSee('¥150,000');
+    Sale::query()->create(['customer_id' => Partner::query()->value('id'), 'sold_on' => '2026-10-01', 'delivery_due_on' => '2026-10-01', 'product_name' => '長3封筒', 'amount' => 25000])
+        ->assignees()->attach($this->second->id);
+    expect($pulse()['sales'])->toBe($before['sales']);
+    DataPulse::flush();
+    $after = $pulse();
+    expect($after['sales'])->not->toBe($before['sales'])
+        ->and($after['daily_reports'])->toBe($before['daily_reports']);
+    // the open page refreshes its component and shows the new figures
+    $page->call('$refresh')->assertSee('¥175,000');
+
+    // 日報分析: a new daily report moves its stamp
+    DailyReport::query()->create(['worked_on' => '2026-06-01', 'user_id' => $this->first->id, 'produced' => '1000', 'processing_rate' => '1']);
+    DataPulse::flush();
+    expect($pulse()['daily_reports'])->not->toBe($after['daily_reports']);
+
+    // who may see what: access rights changed
+    ReferenceCache::bump();
+    DataPulse::flush();
+    expect($pulse()[DataPulse::REFERENCE])->not->toBe($before[DataPulse::REFERENCE]);
+
+    // tables no live page shows are never stamped (no cache write)
+    DataPulse::touched('not_watched');
+    DataPulse::flush();
+    expect(DataPulse::versions(['not_watched']))->toBe(['not_watched' => '']);
 });

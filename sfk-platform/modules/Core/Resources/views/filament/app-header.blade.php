@@ -2,10 +2,10 @@
     Header of an app screen (Modules\Core\Filament\AppPages\Concerns\HasAppChrome; design_ref/app-index.png and
     add-invoice.png): only the app name — on a list after the home link, on a record / form after ← (back to the list) —
     with (i) opening the app's description in a popup. The breadcrumb home › app (› step) stays on every screen.
-    list: エクスポート (帳票出力) and 新規 on the right; the summary cards (summaryCards(), to users who see everyone's money); the 一覧 as tabs; the toolbar
+    list: 出力する書類 (帳票出力) and 新規 on the right; the summary cards (summaryCards(), to users who see everyone's money); the 一覧 as tabs; the toolbar
           of a view without a table (calendar / custom). An app of one screen (AppResource::isSingleScreen): ⚙ in place
           of 新規, no tabs, no 絞り込む, no toolbar.
-    view: 編集, 再利用, 「…」 (印刷・削除), エクスポート, ⚙ and ‹ › on the right; the app's legacy buttons under the name.
+    view: the page's head buttons (e.g. 売上入力), 編集, 再利用, 出力する書類, 「…」 (印刷・削除), ⚙ and ‹ › on the right; the app's legacy buttons under the name.
     create / edit: nothing more (キャンセル / 保存 are in the footer of the form).
     settings: the tabs of アプリの設定.
 --}}
@@ -20,8 +20,11 @@
     $export = array_values(array_filter($actions, fn ($action): bool => MenuButtons::isExport($action) && $visible($action)))[0] ?? null;
     $own = fn ($action): bool => ! MenuButtons::isMenuButton($action) && ! MenuButtons::isExport($action) && ! MenuButtons::isSettings($action);
     // on a record: 編集, 再利用 and 「…」 at the top right; the page's other buttons (e.g. 申請する) go under the name
-    $isStandard = fn ($action): bool => $action instanceof \Filament\Actions\ActionGroup || in_array($action->getName(), ['edit', 'duplicate'], true);
+    $isStandard = fn ($action): bool => $action instanceof \Filament\Actions\ActionGroup || MenuButtons::isHead($action) || in_array($action->getName(), ['edit', 'duplicate'], true);
     $endActions = array_values(array_filter($actions, fn ($action): bool => $own($action) && $isStandard($action)));
+    // the page's head buttons (MenuButtons::head()), 編集 / 再利用, then 出力する書類 (エクスポート), then 「…」
+    $moreActions = array_values(array_filter($endActions, fn ($action): bool => $action instanceof \Filament\Actions\ActionGroup));
+    $endActions = array_values(array_filter($endActions, fn ($action): bool => ! $action instanceof \Filament\Actions\ActionGroup));
     $extraActions = array_values(array_filter($actions, fn ($action): bool => $own($action) && ! $isStandard($action) && $visible($action)));
     $printing = (bool) ($page->printMode ?? false);
     $menuHelp = $kind === 'view' && ! $printing ? $page->menuHelp() : [];
@@ -99,6 +102,9 @@
                 @endif
                 @if ($export)
                     @include('core::filament.app-export', ['export' => $export])
+                @endif
+                @if ($moreActions)
+                    <x-filament::actions :actions="$moreActions" class="sfk-app-actions" />
                 @endif
 
                 @include('core::filament.app-settings-menu', ['chrome' => $chrome])

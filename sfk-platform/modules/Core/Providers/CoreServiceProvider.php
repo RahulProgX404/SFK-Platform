@@ -24,6 +24,7 @@ use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Events\ConnectionEstablished;
 use Illuminate\Database\Events\MigrationsEnded;
 use Illuminate\Notifications\Events\NotificationSent;
@@ -44,9 +45,11 @@ use Modules\Core\Application\Notifications\NotificationKind;
 use Modules\Core\Application\Notifications\NotificationKinds;
 use Modules\Core\Application\Notifications\NotificationPulse;
 use Modules\Core\Application\Notifications\Notifier;
+use Modules\Core\Application\Notifications\PulseChannels;
 use Modules\Core\Application\Notifications\RecordDirectory;
 use Modules\Core\Application\Notifications\SystemNotification;
 use Modules\Core\Application\Numbering\DocumentNumberGenerator;
+use Modules\Core\Application\Realtime\DataPulse;
 use Modules\Core\Application\Realtime\Realtime;
 use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Console\ImportLegacyDataCommand;
@@ -138,12 +141,24 @@ final class CoreServiceProvider extends ModuleServiceProvider
         Event::listen(MigrationsEnded::class, fn () => ReferenceCache::bump());
         // any record saved or deleted: the dashboard's figures are added up afresh (DataCache), throttled, flushed at the end
         Event::listen(['eloquent.saved: *', 'eloquent.deleted: *'], function (string $event, array $payload): void {
-            if (! ($payload[0] ?? null) instanceof OutsideDataCache) {
+            $record = $payload[0] ?? null;
+            if (! $record instanceof OutsideDataCache) {
                 DataCache::changed();
+                // …and the open live pages showing its table redraw themselves (DataPulse)
+                if ($record instanceof Model) {
+                    DataPulse::touched($record->getTable());
+                }
             }
         });
-        Event::listen([JobProcessed::class, JobFailed::class, CommandFinished::class], fn () => DataCache::flush());
-        $this->app->terminating(fn () => DataCache::flush());
+        // the figures first, then the stamps: a page redrawn on a stamp adds up afresh
+        $flush = function (): void {
+            DataCache::flush();
+            DataPulse::flush();
+        };
+        Event::listen([JobProcessed::class, JobFailed::class, CommandFinished::class], $flush);
+        $this->app->terminating($flush);
+        // the stamps of the live pages ride on the pulse of every page (cache reads only)
+        PulseChannels::register('d', fn (): array => DataPulse::versions(DataPulse::watched()));
 
         // the compared form of the list search (sfk_search_norm) on SQLite connections; PostgreSQL has it from a migration
         Event::listen(ConnectionEstablished::class, fn (ConnectionEstablished $event) => SearchQuery::registerFunction($event->connection));

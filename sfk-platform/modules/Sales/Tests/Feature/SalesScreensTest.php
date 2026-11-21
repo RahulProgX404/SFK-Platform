@@ -10,19 +10,24 @@
 
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Repeater;
 use Livewire\Livewire;
 use Modules\Core\Application\Apps\AppDiscovery;
 use Modules\Core\Application\Apps\AppLifecycle;
+use Modules\Core\Application\Documents\DocumentSettings;
 use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\AppStatus;
 use Modules\Core\Domain\Apps\PermissionSubject;
+use Modules\Core\Filament\Support\MenuButtons;
 use Modules\Core\Models\AppListView;
 use Modules\Core\Models\BusinessApp;
 use Modules\Core\Models\Space;
 use Modules\MasterData\Models\Partner;
+use Modules\Orders\Filament\Resources\Orders\OrderResource;
 use Modules\Orders\Filament\Resources\Orders\Pages\ViewOrder;
 use Modules\Orders\Models\Order;
 use Modules\Sales\Application\Documents\DeliveryNoteIssuer;
@@ -201,6 +206,51 @@ it('starts a sale of a job from 売上入力 on its 04 record (legacy app action
 
     Livewire::withQueryParams(['order' => $order->id])->test(CreateSale::class)
         ->assertSchemaStateSet(['customer_id' => $this->customer->id, 'order_id' => $order->id, 'product_name' => '角2封筒']);
+});
+
+it('puts 売上入力 before 編集 of a 04 record, in neither 出力する書類 nor 「…」, and 出力する書類 before 「…」', function () {
+    app(AppLifecycle::class)->syncWithCode([OrderResource::appCode() => OrderResource::appName()], [OrderResource::appCode() => OrderResource::appSettingDefaults()]);
+    $app = BusinessApp::query()->where('code', OrderResource::appCode())->sole();
+    $app->forceFill(['status' => AppStatus::Published])->save();
+    $app->spaces()->attach(Space::query()->firstOrCreate(['panel_id' => 'erp', 'name' => '売上スペース']));
+    $settings = app(DocumentSettings::class);
+    $template = $settings->createTemplate($app, ['name' => '作業明細表', 'paper' => 'a4_portrait'], null);
+    $settings->saveDesign($template, '作業明細表', [['type' => 'field', 'field' => 'order_number', 'x' => 20, 'y' => 20, 'w' => 60, 'h' => 8]], null);
+    // the 04 出力設定: one ボタン名 「出力する書類」 with four サブボタン名
+    $subs = ['11.加工チェックシート', '1. 営業控え', '2. 注文書', '3. 原稿添付用'];
+    foreach ($subs as $sub) {
+        $settings->saveOutput($app, null, ['name' => '出力する書類', 'sub_name' => $sub, 'document_template_id' => $template->id, 'placements' => ['record_space', 'list_checked']]);
+    }
+    $order = Order::query()->create(['customer_id' => $this->customer->id, 'product_name' => '角2封筒', 'quantity' => '1000', 'sales_amount' => 20000]);
+    $this->actingAs($this->admin);
+
+    $groups = collect(Livewire::test(ViewOrder::class, ['record' => $order->getRouteKey()])->instance()->getCachedHeaderActions())
+        ->filter(fn (mixed $action): bool => $action instanceof ActionGroup);
+    $names = fn (ActionGroup $group): array => array_keys($group->getFlatActions());
+    $export = $groups->first(fn (ActionGroup $group): bool => MenuButtons::isExport($group));
+    $more = $groups->first(fn (ActionGroup $group): bool => ! MenuButtons::isExport($group) && ! MenuButtons::isMenuButton($group));
+
+    // the button is 「出力する書類」 itself: its four options at once, no sub-menu
+    expect($export)->not->toBeNull()
+        ->and($export->getLabel())->toBe('出力する書類')
+        ->and(array_map(fn (mixed $entry): string => $entry instanceof Action ? (string) $entry->getLabel() : 'group', array_values($export->getActions())))->toBe($subs)
+        ->and($names($export))->not->toContain('enterSale')
+        ->and($names($more))->toContain('print', 'delete')->not->toContain('enterSale');
+
+    $html = $this->get(OrderResource::getUrl('view', ['record' => $order]))->assertOk()->getContent();
+    $actions = (string) str($html)->after('class="sfk-app-head-actions"')->before('</header>');
+    $sale = strpos($actions, e(SaleResource::getUrl('create', ['order' => $order->id])));
+    expect($sale)->not->toBeFalse()
+        ->and($sale)->toBeLessThan(strpos($actions, 'レコードを編集する'))
+        ->and($actions)->not->toContain('エクスポート')
+        ->and(strpos($actions, 'レコードを編集する'))->toBeLessThan(strpos($actions, '出力する書類'))
+        ->and(strpos($actions, '出力する書類'))->toBeLessThan(strpos($actions, 'その他の操作'))
+        ->and(strpos($actions, 'その他の操作'))->toBeLessThan(strpos($actions, 'レコードの移動'))
+        ->and($actions)->not->toContain('sfk-export-submenu');
+    $this->get(OrderResource::getUrl('view', ['record' => $order]))->assertSeeInOrder(['sfk-export-btn', '出力する書類', 'sfk-export-menu', ...$subs]);
+
+    // the list: the same button, for the checked rows
+    $this->get(OrderResource::getUrl('index'))->assertOk()->assertSeeInOrder(['sfk-export-btn', '出力する書類', 'sfk-export-menu', ...$subs]);
 });
 
 it('shows and edits a delivery note, an untouched table row is not saved', function () {

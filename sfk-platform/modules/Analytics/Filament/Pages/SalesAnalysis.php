@@ -11,8 +11,11 @@ use Modules\Analytics\Application\StaffSalesAnalysis;
 use Modules\Analytics\Domain\FiscalYear;
 use Modules\Analytics\Filament\Pages\Concerns\HasAnalysisChrome;
 use Modules\Analytics\Models\SalesForecast;
+use Modules\Core\Application\Realtime\DataPulse;
 use Modules\Core\Filament\Support\SummaryCard;
+use Modules\MasterData\Models\Partner;
 use Modules\Sales\Filament\Resources\Sales\SaleResource;
+use Modules\Sales\Models\Sale;
 
 /**
  * 分析 → 売上分析 (/erp/analysis/sales; legacy SalesAnalysis.bundle.js, 担当者別 売上ダッシュボード), not an app yet: the
@@ -45,6 +48,18 @@ final class SalesAnalysis extends Page
 
     /** @var array{staff: int|null, year: int, month: int}|null the month whose 売上先 are open */
     public ?array $detail = null;
+
+    /**
+     * Live (user 2026-11-21): what the page adds up — 06. 売上入力 (its 担当者 are saved with the sale), 予想 / 仕掛, the
+     * 担当者 (names), the 売上先 of the opened month and who may see which sales — so an open page redraws itself when
+     * any of it changes (HasAnalysisChrome, DataPulse).
+     *
+     * @return list<string>
+     */
+    public static function liveTables(): array
+    {
+        return [(new Sale)->getTable(), (new SalesForecast)->getTable(), (new User)->getTable(), (new Partner)->getTable(), DataPulse::REFERENCE];
+    }
 
     public static function canAccess(): bool
     {

@@ -103,12 +103,12 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   are black (`--kt-label`), never grey. No table column is bold (no `->weight()` on table columns; the theme forces normal weight in table cells —
   only the header row is bold).
 - App screens (Core `app-header`, nothing per app): the breadcrumb home › app name on a list, home › app name ›
-  レコードの追加 / レコードの編集 / レコードの詳細 on the record screens, with (i) for the description popup. List: エクスポート (帳票出力; same ボタン名 = sub-menu) and 新規 at the
+  レコードの追加 / レコードの編集 / レコードの詳細 on the record screens, with (i) for the description popup. List: エクスポート (帳票出力; same ボタン名 = sub-menu; only one ボタン名 = the button bears it and lists its サブボタン名 at once, e.g. 04 「出力する書類」) and 新規 at the
   top right, summary cards (`summaryCards()` with `SummaryCard::make()` — never a toolbar render hook of your own; drawn only for users who see everyone's money, `User::seesOverallFinance()`), the
   一覧 as tabs, then search, 絞り込む, the switch of the legacy buttons (+ ボタンの説明 popup), 並び替え and ⚙ (the
   app's `optionActions()`, 一括削除, アプリの設定) — no 列 chooser, the columns come from the 一覧; rows end with 「…」 (編集する → edit page, 削除する); 表示件数 and the page
   numbers under the table, which fills the screen; cell values stay on one line (full text on hover). Record page:
-  編集, 再利用, 「…」 (印刷 / 削除), エクスポート, ⚙, ‹ › at the top right; the page's other buttons and the legacy buttons
+  the page's head buttons (`MenuButtons::head()`, e.g. 04's 売上入力), 編集, 再利用, エクスポート, 「…」 (印刷 / 削除), ⚙, ‹ › at the top right; the page's other buttons and the legacy buttons
   under the name. Create / edit: キャンセル (left) and 保存 (right) in the form's footer, which stays at the bottom of the
   screen; other buttons (e.g. FAX 読込) under the name. An app may add records in a panel over the screen instead of a
   create page (`AppResource::quickCreateComponent()`, e.g. 08. 日報入力's step-by-step, mobile-first QuickDailyReport): Core
@@ -229,6 +229,10 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   `BROADCAST_CONNECTION=null`) — pages poll session-less cache pulses, so every real-time feature must work by polling
   alone (cache reads only, no database). Optional Laravel Reverb push: Core `Realtime::send()` (private channels only,
   after the commit, never failing the request), subscribers via `Realtime::channel()`; pushes carry signals / ids only.
+  Live pages (売上分析, 日報分析, user 2026-11-21): figures from other apps' records redraw themselves when those records
+  change — the page lists its tables (`liveTables()`, registered with Core `Realtime\DataPulse::watch()`) and draws
+  `core::filament.live-data` inside its Livewire component; Core stamps watched tables on every Eloquent save / delete
+  and the pulse carries the stamps. A new table such a page reads goes into its `liveTables()`.
 - 社内メッセージ (Messaging module, `docs/messaging.md`): every read / write / download asks `MessagingAccess` (404 for
   ids that are not the user's); real time = cache pulses (`Signals`), optionally pushed through Realtime; models that change no
   dashboard figure implement Core `Cache\OutsideDataCache`; a module adds to every page's script only through

@@ -12,7 +12,8 @@ use Modules\Analytics\Filament\Pages\SalesAnalysis;
 
 /**
  * The frame of the 分析 pages (売上分析, 日報分析), in the look of the app screens (core::filament.app-header): the
- * breadcrumb home › 分析 › page, and links to the other 分析 page the user may open. Full width, no outer spacing.
+ * breadcrumb home › 分析 › page, and links to the other 分析 page the user may open. Full width, no outer spacing. Live:
+ * the header carries the page's DataPulse marker (core::filament.live-data), so the page follows changes as they happen.
  */
 trait HasAnalysisChrome
 {
@@ -27,8 +28,17 @@ trait HasAnalysisChrome
             'title' => static::$title,
             'tabs' => array_map(fn (string $page, string $url): array => ['label' => $page::titleText(), 'url' => $url, 'active' => $page === static::class], array_keys($pages), $pages),
             'homeUrl' => Filament::getCurrentPanel()?->getUrl() ?? url('/'),
+            'liveTables' => static::liveTables(),
         ]);
     }
+
+    /**
+     * The tables the page shows (DataPulse, watched by AnalyticsServiceProvider): a change of one of them, anywhere,
+     * redraws the open page without a reload.
+     *
+     * @return list<string>
+     */
+    abstract public static function liveTables(): array;
 
     /** The page's name (売上分析, 日報分析). */
     public static function titleText(): string

@@ -139,12 +139,12 @@ replace Filament's page header with `core::filament.app-header`:
 
 - the app name (after the home link on a list, after ← elsewhere) with (i) for the app description
   (`BusinessApp.description`, else `AppResource::appDescription()`) in a popup;
-- list: エクスポート and 新規 at the top right, the summary cards, the app's views as tabs (columns read
+- list: エクスポート (or the one ボタン名 of the app's 帳票, its options at once) and 新規 at the top right, the summary cards, the app's views as tabs (columns read
   `$livewire->listView`), search, 絞り込む, the switch of the legacy buttons, 並び替え, 列 and ⚙ (the app's option
   actions, 一括削除, アプリの設定 for administrators); 表示件数 and the page numbers under the rows;
 - create / edit: キャンセル and 保存 in the footer of the form, kept at the bottom of the screen; record tabs sit above
   the fields (`RecordLayout::tabbed()` / `tabPanel()`) and switch only their own sections;
-- record page: 編集, 再利用, 「…」 (印刷 / 削除), エクスポート, ⚙ and ‹ › at the top right.
+- record page: head buttons (MenuButtons::head()), 編集, 再利用, エクスポート, 「…」 (印刷 / 削除), ⚙ and ‹ › at the top right.
 
 ## Not covered yet
 

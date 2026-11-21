@@ -1,13 +1,14 @@
 {{--
     Header of the 分析 pages (Modules\Analytics\Filament\Pages\Concerns\HasAnalysisChrome), in the look of the app screens
     (core::filament.app-header): the breadcrumb home › 分析 › page, then the 分析 pages the user may open as tabs.
-    $title; $tabs: list<{label, url, active}>; $homeUrl
+    $title; $tabs: list<{label, url, active}>; $homeUrl; $liveTables: the tables the page shows (live, DataPulse)
 --}}
 @php
     use Filament\Support\Icons\Heroicon;
 @endphp
 
 <header class="sfk-app-header sfk-app-header-list">
+    @include('core::filament.live-data', ['tables' => $liveTables])
     <div class="sfk-app-head">
         <div class="sfk-app-head-title">
             <a href="{{ $homeUrl }}" class="sfk-app-home" title="ホーム">

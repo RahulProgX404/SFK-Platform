@@ -19,7 +19,8 @@ final class ThemeAssets
 {
     /** Views rendered into the assets, in order (core::filament.design, the current look, last of the styles). */
     private const VIEWS = ['core::filament.theme', 'core::filament.design', 'core::filament.app-filter-script', 'core::filament.user-popup-script',
-        'core::filament.row-menu-script', 'core::filament.table-links-script', 'core::filament.realtime-script', 'core::filament.notification-pulse-script'];
+        'core::filament.row-menu-script', 'core::filament.table-links-script', 'core::filament.realtime-script', 'core::filament.notification-pulse-script',
+        'core::filament.live-data-script'];
 
     /** Views whose changes make new assets (the ones above and what they include). */
     private const SOURCES = [...self::VIEWS, 'core::filament.ui', 'core::filament.documents.styles'];

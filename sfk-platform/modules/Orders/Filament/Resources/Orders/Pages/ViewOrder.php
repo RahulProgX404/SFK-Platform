@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace Modules\Orders\Filament\Resources\Orders\Pages;
 
 use Filament\Actions\Action;
-use Filament\Actions\ActionGroup;
+use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Modules\Core\Filament\AppPages\AppViewRecord;
 use Modules\Core\Filament\AppResource;
+use Modules\Core\Filament\Support\MenuButtons;
 use Modules\Orders\Domain\Orders\OrderFields;
 use Modules\Orders\Filament\Resources\Orders\OrderResource;
 use Modules\Orders\Models\Order;
@@ -19,8 +20,8 @@ use Modules\Orders\Models\Order;
 /**
  * A record of 04. 受注入力. 過去の受注履歴検索 (legacy OrderEntryAppSearchPastOrdersHistory widget, which never appeared
  * because its space was missing — D-04-3): other orders by 得意先(受注先) (this order's customer at first), 品名 and a
- * 受注日 range, newest 受注日 first, at most 500, 10 per page; each opens in a new tab. 「…」 has 売上入力 (legacy app action):
- * a new sale of 06. 売上入力 for this job, while that app is there and the user may add sales.
+ * 受注日 range, newest 受注日 first, at most 500, 10 per page; each opens in a new tab. 売上入力 (legacy app action), at the
+ * top right before 編集: a new sale of 06. 売上入力 for this job, while that app is there and the user may add sales.
  *
  * @property Order $record
  */
@@ -65,13 +66,16 @@ final class ViewOrder extends AppViewRecord
 
     protected function getHeaderActions(): array
     {
-        return array_map(function (Action|ActionGroup $action): Action|ActionGroup {
-            if ($action instanceof ActionGroup) {
-                $action->actions([$this->enterSaleAction(), ...$action->getActions()]);
+        // 売上入力 at the top right, just before 編集
+        $actions = [];
+        foreach (parent::getHeaderActions() as $action) {
+            if ($action instanceof EditAction) {
+                $actions[] = $this->enterSaleAction();
             }
+            $actions[] = $action;
+        }
 
-            return $action;
-        }, parent::getHeaderActions());
+        return $actions;
     }
 
     private function enterSaleAction(): Action
@@ -80,7 +84,7 @@ final class ViewOrder extends AppViewRecord
             ? null
             : AppResource::createUrlForApp('sales-entry', $panel, ['order' => $this->record->getKey()]);
 
-        return Action::make('enterSale')
+        return MenuButtons::head(Action::make('enterSale'))
             ->label('売上入力')
             ->icon(Heroicon::OutlinedCurrencyYen)
             ->url($url)

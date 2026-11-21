@@ -9,8 +9,10 @@ use Filament\Pages\Page;
 use Modules\Analytics\Application\DailyReportRanking;
 use Modules\Analytics\Domain\FiscalYear;
 use Modules\Analytics\Filament\Pages\Concerns\HasAnalysisChrome;
+use Modules\Core\Application\Realtime\DataPulse;
 use Modules\Core\Filament\Support\SummaryCard;
 use Modules\Production\Filament\Resources\DailyReports\DailyReportResource;
+use Modules\Production\Models\DailyReport;
 
 /**
  * 分析 → 日報分析 (/erp/analysis/daily-reports; legacy DailyReportAnalysis.bundle.js), not an app yet: per 作業者 and month
@@ -32,6 +34,17 @@ final class DailyReportAnalysis extends Page
     protected string $view = 'analytics::filament.analysis-daily';
 
     public ?int $year = null;
+
+    /**
+     * Live (user 2026-11-21): what the page adds up — 08. 日報入力, the 作業者 (names) and who may see which reports — so
+     * an open page redraws itself when any of it changes (HasAnalysisChrome, DataPulse).
+     *
+     * @return list<string>
+     */
+    public static function liveTables(): array
+    {
+        return [(new DailyReport)->getTable(), (new User)->getTable(), DataPulse::REFERENCE];
+    }
 
     public static function canAccess(): bool
     {
