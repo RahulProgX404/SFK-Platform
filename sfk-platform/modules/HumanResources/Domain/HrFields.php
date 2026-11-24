@@ -29,6 +29,7 @@ final class HrFields
         'reason' => '申請理由',
         'status' => 'ステータス',
         'assignee' => '作業者',
+        'approver_id' => '承認者',
         'id' => '申請管理ID',
         ...self::AUTHORS,
     ];

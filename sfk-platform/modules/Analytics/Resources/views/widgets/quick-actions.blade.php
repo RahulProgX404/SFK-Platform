@@ -1,4 +1,5 @@
-{{-- クイックアクション (Modules\Analytics\Filament\Widgets\QuickActionsCard): one coloured row per waiting step; a click runs it.
+{{-- クイックアクション (Modules\Analytics\Filament\Widgets\QuickActionsCard): one coloured row per waiting step with its buttons
+     (TeamDashboard::pendingActions(): a button runs its step — 承認, 差戻し after a confirmation — or opens its page, e.g. 申請する).
      Nothing waiting: the apps the user opened last ($recent), each with the record last opened in it (a click opens it).
      Every state keeps the height of the six recent apps (ghost rows, user 2026-11-17). --}}
 @php
@@ -24,6 +25,8 @@
         .sfk-quick-run { flex: none; display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 12px; border-radius: 9999px; background: rgba(255, 255, 255, .2); color: #fff; font-size: var(--sfk-fs-badge); font-weight: var(--sfk-fw-semibold); white-space: nowrap; }
         .sfk-quick-run:hover { background: rgba(255, 255, 255, .32); }
         .sfk-quick-run .fi-icon { width: 14px; height: 14px; }
+        .sfk-quick-runs { flex: none; display: inline-flex; gap: var(--sfk-space-2); }
+        a.sfk-quick-run { text-decoration: none; }
         .sfk-quick-done { display: flex; flex-direction: column; align-items: center; align-self: center; gap: var(--sfk-space-2); padding: var(--sfk-space-6) var(--sfk-space-4); color: var(--sfk-muted); font-size: var(--sfk-fs-small); text-align: center; }
         .sfk-quick-done .fi-icon { width: 36px; height: 36px; color: #16956b; }
         .sfk-recent { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
@@ -82,10 +85,25 @@
                                 <strong>{{ $action['title'] }}</strong>
                                 <small>{{ $action['subtitle'] }}</small>
                             </a>
-                            <button type="button" class="sfk-quick-run" wire:click="runAction(@js($action['key']))" wire:loading.attr="disabled">
-                                {{ $action['action'] }}
-                                <x-filament::icon icon="heroicon-m-arrow-right" />
-                            </button>
+                            <span class="sfk-quick-runs">
+                                @foreach ($action['buttons'] as $button)
+                                    @if (isset($button['url']))
+                                        <a href="{{ $button['url'] }}" class="sfk-quick-run">
+                                            {{ $button['label'] }}
+                                            <x-filament::icon icon="heroicon-m-arrow-right" />
+                                        </a>
+                                    @else
+                                        <button type="button" class="sfk-quick-run" wire:click="runAction(@js($button['run']))"
+                                            @isset($button['confirm']) wire:confirm="{{ $button['confirm'] }}" @endisset
+                                            wire:loading.attr="disabled">
+                                            {{ $button['label'] }}
+                                            @if ($loop->first)
+                                                <x-filament::icon icon="heroicon-m-arrow-right" />
+                                            @endif
+                                        </button>
+                                    @endif
+                                @endforeach
+                            </span>
                         </li>
                     @endforeach
                 </ul>

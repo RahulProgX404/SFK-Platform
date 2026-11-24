@@ -26,6 +26,7 @@ use Modules\Core\Models\AppListView;
 use Modules\Core\Models\BusinessApp;
 use Modules\Core\Models\Space;
 use Modules\HumanResources\Application\AlcoholChecks\AlcoholCheckRules;
+use Modules\HumanResources\Application\HrActionNotAllowed;
 use Modules\HumanResources\Application\LeaveRequests\LeaveRequestRules;
 use Modules\HumanResources\Application\LeaveRequests\LeaveRequestWorkflow;
 use Modules\HumanResources\Application\SafetyChecks\SafetyCheckRules;
@@ -71,6 +72,16 @@ function publishHrApps(User ...$members): void
     });
 }
 
+/** A マネージャー (users.is_manager) in the space of the HR apps. */
+function hrManager(string $name): User
+{
+    $manager = grantDashboards(User::factory()->create(['name' => $name]), 'erp');
+    $manager->forceFill(['is_manager' => true])->save();
+    Space::query()->where('name', '総務スペース')->sole()->users()->attach($manager);
+
+    return $manager;
+}
+
 function hrView(string $code, string $name): string
 {
     return (string) AppListView::query()->where('business_app_id', BusinessApp::query()->where('code', $code)->value('id'))->where('name', $name)->value('id');
@@ -95,6 +106,7 @@ it('registers the three apps from the code, with 一括削除 off as in their le
 });
 
 it('takes a request through 申請する, 差戻し and 承認済, and shows employees only their own', function () {
+    $manager = hrManager('課長 次郎');
     $this->actingAs($this->employee);
 
     // 新規: the quick entry (user, 2026-11-09) — taps move on, the times of an early leave in 30-minute steps (BR-HR-02)
@@ -140,9 +152,12 @@ it('takes a request through 申請する, 差戻し and 承認済, and shows emp
             '01:30', '15:30', '申請理由', '通院のため'])
         ->assertActionVisible(TestAction::make('submit'))
         ->assertActionHidden(TestAction::make('approve'))
-        ->callAction(TestAction::make('submit'));
+        ->callAction(TestAction::make('submit'), data: ['approver_id' => $manager->id]);
+    // only the chosen マネージャー is told (user, 2026-11-24)
     expect($request->fresh()->status)->toBe(LeaveRequestStatus::Pending)
-        ->and($this->admin->notifications()->count())->toBe(1);
+        ->and($request->fresh()->approver_id)->toBe($manager->id)
+        ->and($manager->notifications()->count())->toBe(1)
+        ->and($this->admin->notifications()->count())->toBe(0);
     Livewire::test(ViewLeaveRequest::class, ['record' => $request->getRouteKey()])->assertActionHidden(TestAction::make('approve'))->assertActionHidden(TestAction::make('submit'));
 
     // the administrators decide: 差戻し, then 承認済 after it is sent again
@@ -150,15 +165,14 @@ it('takes a request through 申請する, 差戻し and 承認済, and shows emp
     Livewire::test(ListLeaveRequests::class)
         ->assertCanSeeTableRecords([$request, $others])
         ->set('listView', hrView('leave-request', '作業者が自分'))
-        ->assertCanSeeTableRecords([$request])
-        ->assertCanNotSeeTableRecords([$others])
+        ->assertCanNotSeeTableRecords([$request, $others]) // sent to the manager, not to the administrators
         ->set('listView', hrView('leave-request', '休暇申請一覧'))
         ->assertCanSeeTableRecords([$others])
         ->assertCanNotSeeTableRecords([$request]);
     Livewire::test(ViewLeaveRequest::class, ['record' => $request->getRouteKey()])->callAction(TestAction::make('sendBack'));
     expect($request->fresh()->status)->toBe(LeaveRequestStatus::Draft)->and($this->employee->notifications()->count())->toBe(1);
 
-    app(LeaveRequestWorkflow::class)->run($request->fresh(), $this->employee, '申請する', '16. 申請管理', 'http://localhost');
+    app(LeaveRequestWorkflow::class)->run($request->fresh(), $this->employee, '申請する', '16. 申請管理', 'http://localhost', $manager->id);
     Livewire::test(ViewLeaveRequest::class, ['record' => $request->getRouteKey()])->callAction(TestAction::make('approve'));
     expect($request->fresh()->status)->toBe(LeaveRequestStatus::Approved);
 
@@ -166,6 +180,85 @@ it('takes a request through 申請する, 差戻し and 承認済, and shows emp
         ->set('listView', hrView('leave-request', '未承認一覧'))
         ->assertCanNotSeeTableRecords([$request])
         ->assertCanSeeTableRecords([$others]);
+});
+
+it('sends a request to the マネージャー chosen on 申請する, who decides it and tells the applicant', function () {
+    $manager = hrManager('課長 次郎');
+    $otherManager = hrManager('部長 三郎');
+    $outsider = User::factory()->create(['name' => '外部 四郎']); // a manager who may not open the app
+    $outsider->forceFill(['is_manager' => true])->save();
+    $retired = hrManager('退職 五郎');
+    $retired->forceFill(['employment_status' => 'resigned'])->save();
+    $this->employee->forceFill(['is_manager' => true])->save(); // the applicant is never their own approver
+
+    $this->actingAs($this->employee);
+    $request = LeaveRequest::query()->create(['request_type' => '休暇申請', 'applicant_id' => $this->employee->id, 'category' => '有給休暇',
+        'target_on' => '2026-10-30', 'reason' => '私用']);
+
+    // the choice: managers who may open the app and sign in, never the applicant
+    expect(app(LeaveRequestWorkflow::class)->approverOptions($request))->toHaveCount(2)->toMatchArray([$otherManager->id => '部長 三郎', $manager->id => '課長 次郎']);
+    Livewire::test(ViewLeaveRequest::class, ['record' => $request->getRouteKey()])
+        ->callAction(TestAction::make('submit'), data: ['approver_id' => null])
+        ->assertHasFormErrors(['approver_id' => 'required']);
+    Livewire::test(ViewLeaveRequest::class, ['record' => $request->getRouteKey()])
+        ->callAction(TestAction::make('submit'), data: ['approver_id' => $outsider->id])
+        ->assertHasFormErrors(['approver_id']);
+    expect(fn () => app(LeaveRequestWorkflow::class)->run($request, $this->employee, '申請する', 's', 'u'))->toThrow(HrActionNotAllowed::class, '承認者（マネージャー）を選択してください。');
+    expect($request->fresh()->status)->toBe(LeaveRequestStatus::Draft);
+
+    // ?action=submit (the dashboard's 申請する) opens the dialog with the choice
+    $this->get(LeaveRequestResource::getUrl('view', ['record' => $request]).'?action=submit')->assertOk()->assertSee("mountAction('submit'", false);
+    Livewire::test(ViewLeaveRequest::class, ['record' => $request->getRouteKey()])
+        ->mountAction(TestAction::make('submit'))
+        ->assertSee(['承認者', '課長 次郎', '部長 三郎']);
+
+    Livewire::test(ViewLeaveRequest::class, ['record' => $request->getRouteKey()])
+        ->callAction(TestAction::make('submit'), data: ['approver_id' => $manager->id])
+        ->assertHasNoFormErrors();
+    $request->refresh();
+    expect($request->status)->toBe(LeaveRequestStatus::Pending)
+        ->and($request->approver_id)->toBe($manager->id)
+        ->and($manager->notifications()->sole()->data['body'])->toBe('申請 太郎: 申請する（承認者: 課長 次郎）')
+        ->and($otherManager->notifications()->count())->toBe(0)
+        ->and($this->admin->notifications()->count())->toBe(0);
+
+    // the other manager neither sees nor decides it
+    $this->actingAs($otherManager);
+    $this->get(LeaveRequestResource::getUrl('view', ['record' => $request]))->assertNotFound();
+    expect(app(LeaveRequestWorkflow::class)->canRun($request, $otherManager, '承認済'))->toBeFalse();
+
+    // the chosen manager sees it (作業者 and 承認者), may decide but not change or delete it
+    $this->actingAs($manager);
+    Livewire::test(ListLeaveRequests::class)->assertCanSeeTableRecords([$request])
+        ->set('listView', hrView('leave-request', '作業者が自分'))->assertCanSeeTableRecords([$request]);
+    expect(LeaveRequestResource::canEdit($request))->toBeFalse()->and(LeaveRequestResource::canDelete($request))->toBeFalse();
+    $this->get(LeaveRequestResource::getUrl('edit', ['record' => $request]))->assertForbidden();
+    Livewire::test(ViewLeaveRequest::class, ['record' => $request->getRouteKey()])
+        ->assertSeeInOrder(['ステータス', '第一申請中', '作業者', '課長 次郎', '承認者', '課長 次郎'])
+        ->assertActionHidden(TestAction::make('submit'))
+        ->assertActionVisible(TestAction::make('approve'))
+        ->callAction(TestAction::make('sendBack'));
+    expect($request->fresh()->status)->toBe(LeaveRequestStatus::Draft)
+        ->and($this->employee->notifications()->sole()->data['body'])->toBe('課長 次郎: 差戻し（ステータス: 申請前）');
+
+    // sent again (the last approver is offered first), then approved by the manager
+    $this->actingAs($this->employee);
+    Livewire::test(ViewLeaveRequest::class, ['record' => $request->getRouteKey()])
+        ->mountAction(TestAction::make('submit'))
+        ->assertSchemaStateSet(['approver_id' => $manager->id], 'mountedActionSchema0')
+        ->callMountedAction();
+    $this->actingAs($manager);
+    Livewire::test(ViewLeaveRequest::class, ['record' => $request->getRouteKey()])->callAction(TestAction::make('approve'));
+    expect($request->fresh()->status)->toBe(LeaveRequestStatus::Approved)
+        ->and($this->employee->notifications()->get()->pluck('data.body')->sort()->values()->all())
+        ->toBe(['課長 次郎: 差戻し（ステータス: 申請前）', '課長 次郎: 承認済（ステータス: 承認済）']);
+
+    // no longer a manager: a request still sent to them waits for the administrators
+    $second = LeaveRequest::query()->create(['request_type' => '休暇申請', 'applicant_id' => $this->employee->id, 'category' => '有給休暇', 'target_on' => '2026-11-02', 'reason' => '私用']);
+    app(LeaveRequestWorkflow::class)->run($second, $this->employee, '申請する', 's', 'u', $manager->id);
+    $manager->forceFill(['is_manager' => false])->save();
+    expect(app(LeaveRequestWorkflow::class)->canRun($second->fresh(), $manager->fresh(), '承認済'))->toBeFalse()
+        ->and(app(LeaveRequestWorkflow::class)->canRun($second->fresh(), $this->admin, '承認済'))->toBeTrue();
 });
 
 it('keeps a checklist with its rows and reuses it for the next month', function () {

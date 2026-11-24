@@ -26,11 +26,12 @@ use Modules\HumanResources\Models\LeaveRequest;
 /**
  * Form and record page of 16. 申請管理 (fields of SYSTEM_BRAIN APP_16 fields.md), on a 12-column grid of the 1,500 px canvas:
  * 申請内容 (申請区分, 申請分類, 対象日付; 申請者 — the signed-in user to start with — and 作業員名, employees 在籍中), 遅刻・早退
- * (the times in steps of 30 minutes) and 申請理由. The record page shows ステータス and 作業者 of the プロセス管理 above the fields.
+ * (the times in steps of 30 minutes) and 申請理由. The record page shows ステータス, 作業者 and 承認者 (the マネージャー chosen on
+ * 申請する, LeaveRequestWorkflow) of the プロセス管理 above the fields.
  */
 final class LeaveRequestLayout
 {
-    private const STATUS = [[['status', 250], ['assignee', 375]]];
+    private const STATUS = [[['status', 250], ['assignee', 375], ['approver_id', 375]]];
 
     private const MAIN = [
         '申請内容',
@@ -61,12 +62,15 @@ final class LeaveRequestLayout
         return HrFields::LEAVE[$attribute];
     }
 
-    /** 作業者: the 作成者 while 申請前, the administrators while 第一申請中, nobody once 承認済. */
+    /**
+     * 作業者: the 作成者 while 申請前, the chosen 承認者 while 第一申請中 (the administrators for requests sent before there was
+     * one), nobody once 承認済.
+     */
     public static function assignee(LeaveRequest $request): HtmlString
     {
         return match ($request->status) {
             LeaveRequestStatus::Draft => UserPopup::html($request->creator),
-            LeaveRequestStatus::Pending => new HtmlString(e('管理者')),
+            LeaveRequestStatus::Pending => $request->approver !== null ? UserPopup::html($request->approver) : new HtmlString(e('管理者')),
             LeaveRequestStatus::Approved => new HtmlString(''),
         };
     }
@@ -102,6 +106,7 @@ final class LeaveRequestLayout
             // user names open the ユーザー情報 popup
             'applicant_id' => $entry->state(Employees::popup('applicant'))->html(),
             'worker_id' => $entry->state(Employees::popup('worker'))->html(),
+            'approver_id' => $entry->state(Employees::popup('approver'))->html(),
             'target_on' => $entry->date('Y-m-d'),
             'total_time', 'clock_time' => $entry->formatStateUsing($time),
             'creator', 'updater' => $entry->state(Employees::popup($name))->html(),

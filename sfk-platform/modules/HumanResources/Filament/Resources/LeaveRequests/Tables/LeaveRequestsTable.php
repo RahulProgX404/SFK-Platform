@@ -84,7 +84,7 @@ final class LeaveRequestsTable
         $names = $livewire instanceof AppListRecords ? $livewire->viewColumns() : self::COLUMNS;
 
         return $table
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['applicant', 'worker', 'creator']))
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['applicant', 'worker', 'creator', 'approver']))
             ->columns([
                 ...array_map(fn (string $name): AppTextColumn => self::column($name), $names),
             ])
@@ -155,8 +155,9 @@ final class LeaveRequestsTable
     }
 
     /**
-     * 作業者 in (users): the requests waiting for them — their own 申請前 ones, and the 第一申請中 ones when an administrator
-     * is among them (LeaveRequestWorkflow).
+     * 作業者 in (users): the requests waiting for them — their own 申請前 ones, the 第一申請中 ones sent to them as 承認者, and
+     * the 第一申請中 ones without a 承認者 (sent before there was one) when an administrator is among them (LeaveRequestWorkflow,
+     * LeaveRequestLayout::assignee()).
      *
      * @param  Builder<*>  $query
      */
@@ -170,8 +171,11 @@ final class LeaveRequestsTable
         $matches = function (Builder $q) use ($ids, $blank, $administrator): void {
             $q->where(fn (Builder $own): Builder => $own->where('leave_requests.status', LeaveRequestStatus::Draft->value)
                 ->whereIn('leave_requests.created_by', $ids === [] ? [0] : $ids));
+            $q->orWhere(fn (Builder $sent): Builder => $sent->where('leave_requests.status', LeaveRequestStatus::Pending->value)
+                ->whereIn('leave_requests.approver_id', $ids === [] ? [0] : $ids));
             if ($administrator) {
-                $q->orWhere('leave_requests.status', LeaveRequestStatus::Pending->value);
+                $q->orWhere(fn (Builder $old): Builder => $old->where('leave_requests.status', LeaveRequestStatus::Pending->value)
+                    ->whereNull('leave_requests.approver_id'));
             }
             if ($blank) {
                 $q->orWhere('leave_requests.status', LeaveRequestStatus::Approved->value);

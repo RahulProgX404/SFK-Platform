@@ -24,8 +24,9 @@ use Modules\Purchasing\Models\ConsumableOrder;
  * - 休暇・勤怠 of today and tomorrow: the requests of 16. 申請管理 for the day (申請中 and 承認済), as far as the user may
  *   see them (employees: their own — the app's rule);
  * - クイックアクション: what waits for the user and is done with one click — the next step of 16. 申請管理 (申請する on
- *   their own 申請前 requests, 承認 of 第一申請中 for administrators) and of 20. 消耗品発注 (承認依頼 on their own 未処理
- *   orders, 承認する of 確認中 for administrators), run through the apps' workflows (notifications included).
+ *   their own 申請前 requests — it opens the request's 申請する dialog, which asks for the 承認者 —, 承認 or 差戻し of
+ *   第一申請中 for its chosen マネージャー and the administrators, user 2026-11-24) and of 20. 消耗品発注 (承認依頼 on their
+ *   own 未処理 orders, 承認する of 確認中 for administrators), run through the apps' workflows (notifications included).
  */
 final class TeamDashboard
 {
@@ -68,12 +69,15 @@ final class TeamDashboard
     }
 
     /**
-     * @return list<array{key: string, kind: string, id: int, title: string, subtitle: string, action: string, url: string}>
-     *                                                                                                                       newest first; key = 「kind:id」 for run()
+     * Newest first. `buttons`: what a click does — `run` a key for run() (「kind:id」, 「leave:id:sendBack」), or open `url`;
+     * `action` is the label of the first.
+     *
+     * @return list<array{key: string, kind: string, id: int, title: string, subtitle: string, action: string, url: string, buttons: list<array{label: string, run?: string, url?: string, confirm?: string}>}>
      */
     public function pendingActions(User $user, int $limit = 6): array
     {
-        return $this->cached('pending', [(string) $user->id, (string) $limit], function () use ($user, $limit): array {
+        // 'pending-steps': the entries carry their buttons (2026-11-24)
+        return $this->cached('pending-steps', [(string) $user->id, (string) $limit], function () use ($user, $limit): array {
             $actions = [];
 
             if (LeaveRequestResource::canViewAny()) {
@@ -85,12 +89,21 @@ final class TeamDashboard
                 foreach ($leaves as $request) {
                     $step = $this->leaveStep($request, $user);
                     if ($step !== null) {
+                        $url = LeaveRequestResource::getUrl('view', ['record' => $request]);
+                        $buttons = $step === LeaveRequestWorkflow::APPROVE
+                            ? [
+                                ['label' => '承認', 'run' => 'leave:'.$request->id],
+                                ['label' => LeaveRequestWorkflow::SEND_BACK, 'run' => 'leave:'.$request->id.':sendBack', 'confirm' => 'この申請を差戻しますか？'],
+                            ]
+                            // the 承認者 is chosen in the request's 申請する dialog
+                            : [['label' => LeaveRequestWorkflow::SUBMIT, 'url' => $url.'?action=submit']];
                         $actions[] = [
                             'key' => 'leave:'.$request->id, 'kind' => 'leave', 'id' => $request->id, 'at' => $request->updated_at?->getTimestamp() ?? 0,
-                            'title' => $step === '承認済' ? $request->request_type.'を承認' : $request->request_type.'を申請',
+                            'title' => $step === LeaveRequestWorkflow::APPROVE ? $request->request_type.'を承認' : $request->request_type.'を申請',
                             'subtitle' => (($request->worker ?? $request->applicant)->name).'・'.$request->target_on->format('n/j').' '.$request->category,
-                            'action' => $step === '承認済' ? '承認' : '申請する',
-                            'url' => LeaveRequestResource::getUrl('view', ['record' => $request]),
+                            'action' => $buttons[0]['label'],
+                            'url' => $url,
+                            'buttons' => $buttons,
                         ];
                     }
                 }
@@ -110,6 +123,7 @@ final class TeamDashboard
                             'subtitle' => ($order->supplier->name ?? '仕入先未設定').'・'.$order->ordered_on->format('n/j'),
                             'action' => (string) $order->status->action(),
                             'url' => ConsumableOrderResource::getUrl('view', ['record' => $order]),
+                            'buttons' => [['label' => (string) $order->status->action(), 'run' => 'order:'.$order->id]],
                         ];
                     }
                 }
@@ -128,7 +142,7 @@ final class TeamDashboard
     }
 
     /**
-     * Runs the step of a クイックアクション (「leave:12」, 「order:5」).
+     * Runs the step of a クイックアクション (「leave:12」 — 承認, 「leave:12:sendBack」 — 差戻し, 「order:5」).
      *
      * @return string the message to show
      *
@@ -136,11 +150,14 @@ final class TeamDashboard
      */
     public function run(string $key, User $user): string
     {
-        [$kind, $id] = array_pad(explode(':', $key, 2), 2, '');
+        [$kind, $id, $variant] = array_pad(explode(':', $key, 3), 3, '');
 
         if ($kind === 'leave') {
             $request = LeaveRequestResource::onlyVisible(LeaveRequest::query())->find((int) $id) ?? throw new HrActionNotAllowed('この操作を行う権限がありません。');
             $step = $this->leaveStep($request, $user) ?? throw new HrActionNotAllowed('この操作を行う権限がありません。');
+            if ($variant === 'sendBack' && $step === LeaveRequestWorkflow::APPROVE) {
+                $step = LeaveRequestWorkflow::SEND_BACK;
+            }
             $this->leaveWorkflow->run($request, $user, $step, LeaveRequestResource::displayName().' '.LeaveRequestResource::titleOf($request), LeaveRequestResource::getUrl('view', ['record' => $request]));
 
             return '「'.$request->status->value.'」にしました';
@@ -156,10 +173,10 @@ final class TeamDashboard
         throw new \InvalidArgumentException('Unknown quick action.');
     }
 
-    /** The one-click step of a request for the user: 申請する (申請前) or 承認済 (第一申請中) — never 差戻し. */
+    /** The step of a request waiting for the user: 申請する (申請前) or 承認済 (第一申請中; 差戻し beside it). */
     private function leaveStep(LeaveRequest $request, User $user): ?string
     {
-        $step = $request->status === LeaveRequestStatus::Draft ? '申請する' : '承認済';
+        $step = $request->status === LeaveRequestStatus::Draft ? LeaveRequestWorkflow::SUBMIT : LeaveRequestWorkflow::APPROVE;
 
         return $this->leaveWorkflow->canRun($request, $user, $step) ? $step : null;
     }

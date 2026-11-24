@@ -20,13 +20,15 @@ use Modules\HumanResources\Domain\LeaveRequests\LeaveRequestStatus;
 /**
  * An attendance request of 16. 申請管理 (SYSTEM_BRAIN APP_16): 申請区分, 申請者, 作業員名, 申請分類, 対象日付, the late /
  * early times (30 分単位) and 申請理由, with the legacy プロセス管理 (LeaveRequestStatus, LeaveRequestWorkflow) — the status
- * is changed by its actions only. Employees see only their own requests (legacy app description; visibleTo()).
+ * is changed by its actions only. Employees see only their own requests (legacy app description; visibleTo()) and those
+ * sent to them as 承認者 (the マネージャー chosen on 申請する, user 2026-11-24 — set by the workflow only).
  *
  * @property int $id
  * @property int|null $legacy_id
  * @property string $request_type
  * @property int $applicant_id
  * @property int|null $worker_id
+ * @property int|null $approver_id 承認者 (LeaveRequestWorkflow)
  * @property string $category
  * @property Carbon $target_on
  * @property string|null $total_time
@@ -37,6 +39,7 @@ use Modules\HumanResources\Domain\LeaveRequests\LeaveRequestStatus;
  * @property int|null $updated_by
  * @property-read User $applicant
  * @property-read User|null $worker
+ * @property-read User|null $approver
  */
 final class LeaveRequest extends Model implements HasRecordComments, HasRecordHistory
 {
@@ -48,7 +51,7 @@ final class LeaveRequest extends Model implements HasRecordComments, HasRecordHi
     }
     use RecordsHistory;
 
-    protected $guarded = ['id', 'status', 'created_by', 'updated_by', 'created_at', 'updated_at'];
+    protected $guarded = ['id', 'status', 'approver_id', 'created_by', 'updated_by', 'created_at', 'updated_at'];
 
     /** @var array<string, mixed> */
     protected $attributes = ['status' => '申請前'];
@@ -57,6 +60,7 @@ final class LeaveRequest extends Model implements HasRecordComments, HasRecordHi
     {
         return [
             'legacy_id' => 'integer',
+            'approver_id' => 'integer',
             'target_on' => 'date',
             'status' => LeaveRequestStatus::class,
         ];
@@ -68,8 +72,14 @@ final class LeaveRequest extends Model implements HasRecordComments, HasRecordHi
         return $this->applicant_id === $user->id || $this->created_by === $user->id;
     }
 
+    /** Whether the request was sent to the user to decide (承認者). */
+    public function isSentTo(User $user): bool
+    {
+        return $this->approver_id !== null && $this->approver_id === $user->id;
+    }
+
     /**
-     * The requests a user may see: all for administrators, else their own.
+     * The requests a user may see: all for administrators, else their own and those sent to them as 承認者.
      *
      * @param  Builder<self>  $query
      * @return Builder<self>
@@ -78,19 +88,27 @@ final class LeaveRequest extends Model implements HasRecordComments, HasRecordHi
     {
         return AppAccess::manages($user, self::APP_CODE)
             ? $query
-            : $query->where(fn (Builder $own): Builder => $own->where('leave_requests.applicant_id', $user->id)->orWhere('leave_requests.created_by', $user->id));
+            : $query->where(fn (Builder $own): Builder => $own->where('leave_requests.applicant_id', $user->id)
+                ->orWhere('leave_requests.created_by', $user->id)
+                ->orWhere('leave_requests.approver_id', $user->id));
     }
 
-    /** @return list<User|null> コメント → 作成者 / 更新者, and the 申請者 */
+    /** @return list<User|null> コメント → 作成者 / 更新者, the 申請者 and the 承認者 */
     public function commentRecipients(): iterable
     {
-        return [$this->creator, $this->updater, $this->applicant];
+        return [$this->creator, $this->updater, $this->applicant, $this->approver];
     }
 
     /** @return BelongsTo<User, $this> 申請者 */
     public function applicant(): BelongsTo
     {
         return $this->belongsTo(User::class, 'applicant_id');
+    }
+
+    /** @return BelongsTo<User, $this> 承認者 */
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approver_id');
     }
 
     /** @return BelongsTo<User, $this> 作業員名 */

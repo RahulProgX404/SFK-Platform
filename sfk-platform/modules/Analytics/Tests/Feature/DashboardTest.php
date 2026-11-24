@@ -50,7 +50,9 @@ use Modules\Core\Filament\Users\UserDetailWidgets;
 use Modules\Core\Models\BusinessApp;
 use Modules\Core\Models\RecordVersion;
 use Modules\Core\Models\Space;
+use Modules\HumanResources\Application\LeaveRequests\LeaveRequestWorkflow;
 use Modules\HumanResources\Domain\LeaveRequests\LeaveRequestStatus;
+use Modules\HumanResources\Filament\Resources\LeaveRequests\LeaveRequestResource;
 use Modules\HumanResources\Models\LeaveRequest;
 use Modules\MasterData\Filament\Resources\Employees\EmployeeResource;
 use Modules\MasterData\Models\Partner;
@@ -205,6 +207,54 @@ it('lists who is off today and tomorrow, and approves a request with one click',
     $mine = app(TeamDashboard::class)->pendingActions($this->other);
     expect(array_column($mine, 'action'))->toBe(['申請する']);
     Livewire::test(QuickActionsCard::class)->call('runAction', 'leave:'.$pending->id)->assertNotified('この操作を行う権限がありません。');
+});
+
+it('puts a request sent to a マネージャー on their クイックアクション with 承認 and 差戻し, and tells the applicant', function () {
+    // 16. 申請管理 open to everyone in a space of 白石封筒
+    $app = new BusinessApp(['code' => 'leave-request', 'name' => '16. 申請管理']);
+    $app->forceFill(['status' => AppStatus::Published])->save();
+    $app->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true]);
+    $space = Space::query()->create(['panel_id' => 'erp', 'name' => '総務スペース']);
+    $app->spaces()->attach($space);
+    $manager = grantDashboards(User::factory()->create(['name' => '課長 次郎']), 'erp');
+    $manager->forceFill(['is_manager' => true])->save();
+    $space->users()->attach([grantDashboards($this->other, 'erp')->id, $manager->id]);
+
+    $draft = LeaveRequest::query()->create(['request_type' => '休暇申請', 'applicant_id' => $this->other->id, 'category' => '有給休暇', 'target_on' => '2026-11-10', 'reason' => '私用']);
+    $sent = LeaveRequest::query()->create(['request_type' => '休暇申請', 'applicant_id' => $this->other->id, 'category' => '慶弔休暇', 'target_on' => '2026-11-11', 'reason' => '私用']);
+    $workflow = app(LeaveRequestWorkflow::class);
+    $workflow->run($sent, $this->other, '申請する', '16. 申請管理', 'http://localhost', $manager->id);
+
+    // the applicant: 申請する opens the request's dialog, where the 承認者 is chosen
+    $this->actingAs($this->other);
+    $mine = app(TeamDashboard::class)->pendingActions($this->other);
+    expect(array_column($mine, 'key'))->toBe(['leave:'.$draft->id])
+        ->and($mine[0]['buttons'])->toBe([['label' => '申請する', 'url' => LeaveRequestResource::getUrl('view', ['record' => $draft]).'?action=submit']]);
+
+    // the manager: 承認 and 差戻し of what was sent to them
+    $this->actingAs($manager);
+    $waiting = app(TeamDashboard::class)->pendingActions($manager);
+    expect(array_column($waiting, 'key'))->toBe(['leave:'.$sent->id])
+        ->and(array_column($waiting[0]['buttons'], 'label'))->toBe(['承認', '差戻し']);
+    Livewire::test(QuickActionsCard::class)
+        ->assertSee(['休暇申請を承認', '営業 二郎・11/11 慶弔休暇', '承認', '差戻し'])
+        ->assertSeeHtml('wire:confirm="この申請を差戻しますか？"')
+        ->call('runAction', 'leave:'.$sent->id.':sendBack')
+        ->assertNotified('「申請前」にしました');
+    expect($sent->fresh()->status)->toBe(LeaveRequestStatus::Draft)
+        ->and($this->other->notifications()->sole()->data['body'])->toBe('課長 次郎: 差戻し（ステータス: 申請前）')
+        ->and(app(TeamDashboard::class)->pendingActions($manager))->toBe([]);
+
+    $workflow->run($sent->fresh(), $this->other, '申請する', '16. 申請管理', 'http://localhost', $manager->id);
+    Livewire::test(QuickActionsCard::class)->call('runAction', 'leave:'.$sent->id)->assertNotified('「承認済」にしました');
+    expect($sent->fresh()->status)->toBe(LeaveRequestStatus::Approved)
+        ->and($this->other->notifications()->count())->toBe(2);
+
+    // a request sent to someone else is not theirs to decide
+    $another = LeaveRequest::query()->create(['request_type' => '休暇申請', 'applicant_id' => $this->other->id, 'category' => '有給休暇', 'target_on' => '2026-11-12', 'reason' => '私用']);
+    $another->forceFill(['status' => LeaveRequestStatus::Pending])->save();
+    Livewire::test(QuickActionsCard::class)->call('runAction', 'leave:'.$another->id.':sendBack')->assertNotified('この操作を行う権限がありません。');
+    expect($another->fresh()->status)->toBe(LeaveRequestStatus::Pending);
 });
 
 it('shows only the activity that concerns the user', function () {

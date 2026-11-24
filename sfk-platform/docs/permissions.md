@@ -76,7 +76,13 @@ It stays inside the app: ダッシュボード設定 (スペース, アプリの
 **マネージャー** (`users.is_manager`, user 2026-11-24): a check box administrators tick in ユーザー管理 (create / edit;
 shown on the user's page). Managers will get additional permissions; ask `User::isManager()` for them — never a 役職 or
 従業員カテゴリ name. It is not mass assignable: only `UserAccountService` sets it (an update without the key keeps it).
-It grants nothing yet.
+Used by:
+
+- 16. 申請管理 (user 2026-11-24, `LeaveRequestWorkflow`): 申請する asks for the 承認者 — a マネージャー who can sign in and
+  may open the app, never the 申請者 (`leave_requests.approver_id`). Only that manager is notified; they then see the
+  request (not edit or delete it), find it under 作業者が自分 and on their クイックアクション with 承認 / 差戻し, and decide
+  it while they are still a マネージャー. The app's administrators may decide every request too. 承認済 / 差戻し notify the
+  申請者 and 作成者.
 
 ## Which records (`Modules\Core\Access\RecordAccess`)
 
