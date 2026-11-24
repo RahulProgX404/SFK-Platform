@@ -32,4 +32,10 @@ final class ListAccidentReports extends AppListRecords
     {
         return AccidentReportsTable::inlineFields();
     }
+
+    /** Speed: 報告者 / 作成者 1 / 作成者 2 are all users: one query for the page (was one each) (AppListRecords::batchedTableRelations). */
+    protected function batchedTableRelations(): array
+    {
+        return ['reporter', 'maker1', 'maker2'];
+    }
 }

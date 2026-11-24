@@ -10,6 +10,8 @@
 
 {{-- not is-fit: as high as 売上の推移 and 売れ筋 TOP3 of the same row (user 2026-11-18) --}}
 <div class="sfk-dash-cell sfk-dash-span-30p">
+    {{-- live: redrawn when what it reads changes (DashboardCard::liveTables(), DataPulse) --}}
+    @include('core::filament.live-data', ['tables' => $this::liveTables()])
     <section class="sfk-dash-card" aria-labelledby="sfk-top-customers-title">
         <header class="sfk-dash-card-head">
             <div class="sfk-dash-card-titles">

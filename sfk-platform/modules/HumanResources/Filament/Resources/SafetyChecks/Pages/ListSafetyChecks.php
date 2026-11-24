@@ -32,4 +32,10 @@ final class ListSafetyChecks extends AppListRecords
     {
         return SafetyChecksTable::inlineFields();
     }
+
+    /** Speed: the two users of a check: one query for the page (was one each) (AppListRecords::batchedTableRelations). */
+    protected function batchedTableRelations(): array
+    {
+        return ['user', 'employee'];
+    }
 }

@@ -15,7 +15,8 @@ use Symfony\Component\HttpFoundation\Response;
  * `Server-Timing` header that the browser's DevTools show under Network → Timing — the time PHP spent on the request
  * (`app`, from LARAVEL_START), the time in the database (`db`) and the number of queries (`q`). With
  * SFK_SERVER_TIMING_LOG=true each request also adds one line to storage/logs/server-timing.log (method, path, Livewire
- * calls, status, times, queries, peak memory) for percentiles over many interactions (docs/performance.md).
+ * calls, status, times, queries, peak memory) for percentiles over many interactions (docs/performance.md), followed by
+ * the request's queries — their time and SQL without the bound values — on indented lines.
  *
  * The queries are counted from the moment the Core module boots (listen()), so the service providers' own queries
  * are included.
@@ -25,6 +26,9 @@ final class ServerTiming
     private static int $queries = 0;
 
     private static float $dbMs = 0.0;
+
+    /** @var list<string> the queries of the request for the log: time and SQL (no bound values) */
+    private static array $sql = [];
 
     /** the event dispatcher counted on (a new application — tests — gets a new one) */
     private static ?int $listening = null;
@@ -45,6 +49,9 @@ final class ServerTiming
         Event::listen(QueryExecuted::class, function (QueryExecuted $query): void {
             self::$queries++;
             self::$dbMs += $query->time;
+            if (config('core.server_timing_log') && count(self::$sql) < 200) {
+                self::$sql[] = sprintf('%.1f', $query->time)."\t".preg_replace('/\s+/', ' ', mb_strimwidth($query->sql, 0, 400, '…'));
+            }
         });
     }
 
@@ -57,6 +64,7 @@ final class ServerTiming
         // a long-lived worker (queue, Octane) keeps the statics: count from this request on
         self::$queries = 0;
         self::$dbMs = 0.0;
+        self::$sql = [];
         $start = defined('LARAVEL_START') ? (float) LARAVEL_START : microtime(true);
 
         $response = $next($request);
@@ -100,7 +108,7 @@ final class ServerTiming
             self::$queries,
             memory_get_peak_usage(true) / 1048576,
             implode(' ', $calls),
-        );
+        ).implode('', array_map(fn (string $sql): string => "\t\t".$sql."\n", self::$sql));
         @file_put_contents(storage_path('logs/server-timing.log'), $line, FILE_APPEND | LOCK_EX);
     }
 }

@@ -11,6 +11,8 @@
 @endphp
 
 <div class="sfk-dash-cell sfk-dash-span-{{ $span }}">
+    {{-- live: redrawn when what it reads changes (DashboardCard::liveTables(), DataPulse) --}}
+    @include('core::filament.live-data', ['tables' => $this::liveTables()])
     <style>
         .sfk-overview-kpis { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--sfk-space-4); }
         .sfk-overview-kpi { min-width: 0; }

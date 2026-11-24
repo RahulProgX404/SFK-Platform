@@ -9,6 +9,8 @@ use Modules\Analytics\Application\PersonalOverview;
 use Modules\Analytics\Domain\Period;
 use Modules\Analytics\Filament\Dashboard\DashboardCard;
 use Modules\Core\Access\EmployeeDataAccess;
+use Modules\HumanResources\Models\LeaveRequest;
+use Modules\Production\Models\DailyReport;
 
 /**
  * 個人の概要 (bug.md 2026-11-06, overview.png): the first row of the dashboard for users without 財務分析を表示 — their
@@ -20,6 +22,16 @@ class PersonalOverviewCard extends DashboardCard
     protected static ?int $sort = 0;
 
     protected string $view = 'analytics::widgets.personal-overview';
+
+    /**
+     * Live: what the card reads — the person's 08. 日報入力 (hours, rates, 出勤日数) and 16. 申請管理 (休暇日数, 有給休暇).
+     *
+     * @return list<string>
+     */
+    public static function liveTables(): array
+    {
+        return self::tablesOf(DailyReport::class, LeaveRequest::class, User::class);
+    }
 
     public static function canView(): bool
     {

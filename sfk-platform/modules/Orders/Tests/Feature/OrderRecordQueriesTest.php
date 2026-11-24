@@ -9,8 +9,15 @@
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
+use Modules\Core\Application\Apps\AppLifecycle;
 use Modules\Core\Application\Records\RelationBatch;
+use Modules\Core\Domain\Apps\AppStatus;
+use Modules\Core\Models\AppListView;
+use Modules\Core\Models\BusinessApp;
 use Modules\MasterData\Models\Partner;
+use Modules\Orders\Filament\Resources\Orders\OrderResource;
+use Modules\Orders\Filament\Resources\Orders\Pages\EditOrder;
+use Modules\Orders\Filament\Resources\Orders\Pages\ListOrders;
 use Modules\Orders\Filament\Resources\Orders\Pages\ViewOrder;
 use Modules\Orders\Models\Order;
 
@@ -71,4 +78,60 @@ it('shows the 受注 record with its 取引先 and works out ‹ › only when t
     DB::disableQueryLog();
     expect($orderQueries)->toBe([]);
     unset($next);
+});
+
+it('reads the 取引先 of the 受注 list with one query per click and none for the users\' cards (2026-11-24)', function () {
+    foreach (range(1, 3) as $i) {
+        Order::query()->create(['customer_id' => $this->order->customer_id, 'quantity' => (string) $i, 'plate_supplier_id' => $this->order->plate_supplier_id,
+            'manufacturer_id' => $this->order->manufacturer_id, 'designer_id' => $this->admin->id])->assignees()->attach($this->admin->id);
+    }
+    // the users' cards (UserPopup) from the reference cache, as in production
+    config(['core.reference_cache' => true]);
+    // 04. 受注入力 as the registry has it, its list on 受注一覧 (every order)
+    app(AppLifecycle::class)->syncWithCode(['order-entry' => '04. 受注入力'], ['order-entry' => OrderResource::appSettingDefaults()]);
+    BusinessApp::query()->where('code', 'order-entry')->sole()->forceFill(['status' => AppStatus::Published])->save();
+    $this->actingAs($this->admin);
+    $page = Livewire::test(ListOrders::class);
+    $page->set('listView', (string) AppListView::query()->where('name', '受注一覧')->value('id'))
+        ->assertSee('得意先株式会社');
+    // the 取引先 the rows hold, all five relations loaded (from the one query)
+    $rows = $page->instance()->getTableRecords()->getCollection();
+    expect($rows)->toHaveCount(4)
+        ->and($rows->every(fn (Order $order): bool => $order->relationLoaded('customer') && $order->relationLoaded('plateSupplier')
+            && $order->relationLoaded('manufacturer') && $order->relationLoaded('dataSupplier') && $order->relationLoaded('filmSupplier')))->toBeTrue()
+        ->and($rows->map(fn (Order $order): ?string => $order->manufacturer?->name)->unique()->values()->all())->toBe(['製造所'])
+        ->and($rows->first()->dataSupplier)->toBeNull();
+
+    $count = function (string $table) use ($page): int {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $page->call('$refresh');
+        $queries = count(array_filter(DB::getQueryLog(), fn (array $query): bool => str_contains($query['query'], 'from "'.$table.'"')
+            || str_contains($query['query'], 'join "'.$table.'"')));
+        DB::disableQueryLog();
+
+        return $queries;
+    };
+    expect($count('partners'))->toBe(1)
+        ->and($count('employee_categories'))->toBe(0)
+        ->and($count('positions'))->toBe(0);
+    $page->assertSee('得意先株式会社');
+});
+
+it('reads the preloaded 取引先 of the 受注 form once per kind, not once per select (2026-11-24)', function () {
+    $this->actingAs($this->admin);
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+    $page = Livewire::test(EditOrder::class, ['record' => $this->order->getRouteKey()]);
+    $partners = array_values(array_filter(DB::getQueryLog(), fn (array $query): bool => str_contains($query['query'], 'from "partners"')));
+    DB::disableQueryLog();
+
+    $lists = array_filter($partners, fn (array $query): bool => str_starts_with($query['query'], 'select "name", "id" from "partners"'));
+
+    // 得意先 once, the suppliers once (製版先 / 製造先 / データ / フィルム and the rows' 仕入先 share it) — the chosen 取引先
+    // are named from those lists, not looked up select by select; then one per supplier of a row (紙屋, 紙屋2, 印刷屋:
+    // 得意先ID / 略名 next to it)
+    expect(count($lists))->toBe(2)
+        ->and(count($partners))->toBe(2 + 3);
+    $page->assertSee(['得意先株式会社', '刷版屋', '製造所', '紙屋']);
 });

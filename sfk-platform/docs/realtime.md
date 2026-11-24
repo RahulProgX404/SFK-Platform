@@ -8,9 +8,10 @@ single cache read (no database, no session) — the bell every 4 s while in view
 only what changed. Nothing extra to run or pay for: the pulses use the app servers and the Valkey cache the plan already
 has. Delay: a new message shows within ~1.5 s in the open messenger, a 通知 / badge within ~4 s.
 
-## Live pages (売上分析, 日報分析)
+## Live pages (売上分析, 日報分析, the dashboard)
 
-Pages whose figures add up other apps' records follow changes without a reload (user 2026-11-21). Core
+Pages whose figures add up other apps' records follow changes without a reload (user 2026-11-21; the dashboard /erp —
+every card, every user type — 2026-11-24). Core
 `Application\Realtime\DataPulse`: a module lists the tables its live pages read (`DataPulse::watch()`; the pages say
 them in `liveTables()` — 売上分析: 売上, 予想 / 仕掛, users, 取引先; 日報分析: 日報, users; both: `DataPulse::REFERENCE`,
 access rights). When a record of a watched table is saved or deleted anywhere (the Eloquent listener of
@@ -22,6 +23,34 @@ not while the user is typing in the page (then on leaving the input). Delay: abo
 once when the tab comes back). With WebSockets on, a page with a marker asks the pulse every 4 s itself. Writes outside
 Eloquent (query-builder updates, a pivot sync without its parent) stamp nothing; the cache is per environment, so a
 change made on Render is not seen by a page served locally.
+
+**The dashboard** (Analytics `DashboardCard`): each card is its own Livewire component with its own marker and its own
+`liveTables()` (registered from `DashboardCard::CARDS`, which DashboardTest keeps complete), so a change redraws only the
+cards that read it — same period, scope and chosen year; the figures come fresh because every Eloquent write also
+renews the DataCache version. The page itself has a `DataPulse::REFERENCE` marker: when who may see what changes
+(財務分析を表示 / 範囲, アクセス権, apps) the cards shown, 新規作成 and アプリ are redrawn.
+
+| Card | Tables (+ `@reference`) |
+|---|---|
+| 売上合計 | sales, sales_plans, sales_forecasts |
+| 売上概要 | sales, invoices, receipts, partners |
+| 入出金 | receipts, receipt_lines, payments, sales, invoices, partners |
+| 売上の推移 · 売れ筋 TOP3 | sales |
+| 上位の売上先 | sales, partners |
+| 担当者別売上 | sales, partners, users |
+| 作業者ランキング | daily_reports, users |
+| 休暇・勤怠予定 | leave_requests, users |
+| クイックアクション / 最近表示した項目 | leave_requests, consumable_orders, partners, users, `@me:app-usage` |
+| 最近のアクティビティ | notifications, record_versions, record_comments |
+| 個人の概要 | daily_reports, leave_requests, users |
+| 勤務時間・収入の推移 | daily_reports, users |
+
+`@me:…` channels (`DataPulse::PERSONAL`) are one user's own: `DataPulse::touchedBy($channel, $userId)` stamps them at
+once, and the pulse and the marker carry the stamp of their own user. `AppUsageLog::touch()` (one upsert, no model
+events) stamps `@me:app-usage`, so 最近表示した項目 follows the apps the user opens in another tab without moving anyone
+else's dashboard. Sales whose 請求書 is issued get `invoice_id` by a query-builder update, but the same request saves
+the 請求書 (invoices is watched), so 売上概要 follows. Not followed: a record's title changed by someone else in
+最近表示した項目 / 最近のアクティビティ (until the next change of those cards' tables), and the day turning (今日・明日).
 
 **Laravel Reverb stays as an option** (code and dependency kept): set `BROADCAST_CONNECTION=reverb` with the `REVERB_*`
 settings and the same pages are also pushed to, while polling drops to a safety net. Turn it on only where a Reverb

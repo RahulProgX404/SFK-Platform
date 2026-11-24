@@ -43,7 +43,10 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   class the element already carries or `:focus-within`. Filament's own such rules are replaced when its stylesheet is
   served (`Core\Filament\Support\FilamentStylesheet`, `InteractionStyleTest`). Record pages name the belongs-to relations
   they show (also of their rows, `papers.supplier`) in `batchedRelations()` — one query per related table on every
-  request (`Core\Application\Records\RelationBatch`). Modules are cached
+  request (`Core\Application\Records\RelationBatch`); list pages name the belongs-to relations of their rows that
+  point at the same table more than once in `batchedTableRelations()` (pass 2026-11-24). The signed-in user comes from
+  the reference cache (`Core\Auth\CachedUserProvider`): a write to `users` without model events must call
+  `ReferenceCache::bump()`. Modules are cached
   (`php artisan module:cache`, part of `optimize`); a new conventional folder in a module needs it rebuilt.
   Lists draw 100+ rows, so nothing per row may be a component of its own (2026-11-09): user names are
   `UserPopup` buttons carrying their card (one script draws it, `core::filament.user-popup-script`; 従業員カテゴリ /
@@ -232,7 +235,11 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   Live pages (売上分析, 日報分析, user 2026-11-21): figures from other apps' records redraw themselves when those records
   change — the page lists its tables (`liveTables()`, registered with Core `Realtime\DataPulse::watch()`) and draws
   `core::filament.live-data` inside its Livewire component; Core stamps watched tables on every Eloquent save / delete
-  and the pulse carries the stamps. A new table such a page reads goes into its `liveTables()`.
+  and the pulse carries the stamps. A new table such a page reads goes into its `liveTables()`. The dashboard is live
+  too (user 2026-11-24, every card, every user type): each `DashboardCard` lists its tables in `liveTables()` and draws
+  the marker in its own root (a new card goes into `DashboardCard::CARDS`); the page redraws on `DataPulse::REFERENCE`;
+  writes without model events that a card shows stamp themselves (`DataPulse::touchedBy()` for a user's own
+  `@me:` channel, e.g. `AppUsageLog`).
 - 社内メッセージ (Messaging module, `docs/messaging.md`): every read / write / download asks `MessagingAccess` (404 for
   ids that are not the user's); real time = cache pulses (`Signals`), optionally pushed through Realtime; models that change no
   dashboard figure implement Core `Cache\OutsideDataCache`; a module adds to every page's script only through

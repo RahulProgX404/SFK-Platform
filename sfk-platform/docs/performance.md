@@ -1,7 +1,94 @@
 # Performance
 
-Two passes so far: 2026-11-20 (clicks that take seconds — browser, round trips, workers) and 2026-11-18 (big lists,
-below). Every number was measured; nothing is estimated unless it says so.
+Three passes so far: 2026-11-24 (the whole system, every click), 2026-11-20 (clicks that take seconds — browser, round
+trips, workers) and 2026-11-18 (big lists, below). Every number was measured; nothing is estimated unless it says so.
+
+## Pass 2026-11-24: the whole system
+
+### How it was measured
+
+- **Where**: the development stack as used (Docker on Windows, PHP-FPM `pm = static` 8, Redis, the shared Neon database
+  in Singapore), the super admin's own Chrome session; warm workers unless said otherwise; 3–16 runs each.
+- **Server**: `SFK_SERVER_TIMING` + `_LOG` — the log now also lists **each query's time and SQL** (no bound values)
+  under its request, so the round trips of any click can be read directly (`Core\Http\Middleware\ServerTiming`).
+- **Browser**: a Livewire `request` hook per click — network + server, response size, and the main-thread work of
+  applying the response (until the next task); opening drop-downs: handler + forced style / layout, and whether any
+  server request was sent.
+- **Database**: `EXPLAIN (ANALYZE, BUFFERS)` and timed reads in a container (read-only), after idle pauses.
+- **Render**: `curl` of the public `/up` and `/login` (nobody signed in there).
+
+### Baseline (before)
+
+| What | Measured |
+|---|---|
+| Open 並び替え, a row's 「…」, 出力する書類, the sidebar (受注 list, 60 rows, 6,145 elements) | **0–26 ms** of main-thread work, **no server request** — already instant |
+| 受注 list click: 一覧 tab, next / previous page, sort | 1.78–2.16 s in the browser = 1.40–1.55 s network + server (**11–12 queries**, DB 1.05–1.16 s) + 0.29–0.63 s applying ~800 KB |
+| 絞り込む open (受注) | 0.52 s (server 0.36 s, 3 queries) |
+| Dashboard `/erp` | warm 0.54–1.08 s (3–4 queries); first visit after a reload **5.1 s** (cold workers and caches) |
+| 受注 record page / edit page | 1.92–2.44 s (18–19 queries) / 2.32 s (20 queries) |
+| Page pulse (every 4 s per tab in view) | 65–93 ms app time, 0 queries (booting the app) |
+| Render (free plan) | first request after a pause **50.7 s** (the instance sleeps); then `/up` 0.15–0.22 s, `/login` 0.21–0.25 s |
+
+### Findings
+
+| # | Finding | Measured |
+|---|---|---|
+| 1 | **Every query is a round trip to Singapore**; the SQL itself is fast | ~80 ms each; the 受注 list query runs in 0.18 ms in PostgreSQL |
+| 2 | **A big result needs several round trips** after a few idle seconds (TCP slow start on Neon's side): 60 rows of 受注 ≈ 42 KB | 60 rows 238 ms (3 trips), 20 rows 160 ms, ids only 80 ms; leaving out the text / JSON columns changed nothing (110 of ~708 bytes a row) |
+| 3 | The cache versions were read from the database on almost every click: the Redis copy lived 10 s, clicks are further apart | 1 query per click |
+| 4 | The signed-in user was read from the database on every request and click | 1 query per request |
+| 5 | List rows loaded each belongs-to relation separately, also several into the same table (受注: 得意先, 製版先, 製造先 … all 取引先; 申請管理 / アルコールチェック: four users relations) | 受注: 3 `partners` queries per click |
+| 6 | 受注 list eager-loaded the 担当者' 従業員カテゴリ and 役職, which the ユーザー情報 cards already take from the cache | 2 queries per click |
+| 7 | 受注 record page: 得意先 was read alone before the relations were batched (the page's mount() used it first) | 1 query per page |
+| 8 | 受注 form: 製版先 / 製造先 / データ / フィルム each read the same 50 suppliers, and each its chosen 取引先 again | 4 lists + 4 lookups |
+| 9 | A worker's first query opens a new TLS connection to Neon — after every PHP-FPM reload (the dev watcher reloads on each code change) and when Neon wakes from suspend | 580–616 ms instead of 80 ms |
+| 10 | **Render free**: the instance sleeps after 15 minutes; little CPU | 50.7 s for the first request |
+| 11 | Applying a list click in the browser: Filament redraws the page and its 60 × 26 cells | 0.29–0.63 s, ~800 KB per click |
+
+### Changes
+
+| Change | Where |
+|---|---|
+| Cache versions: stale-while-revalidate — older than 10 s but younger than 5 min they serve the request and are read again after the response (`defer()`); this environment's bumps are in the store at once anyway, another environment's (Render ⇄ local) are seen one request later | `Core\Application\Cache\CacheVersions` (`STALE_SECONDS`) |
+| The signed-in user read through the reference cache (column values, rebuilt as a model); every save / delete of a user bumps it, so passwords, 在籍状況, rights are read afresh on the next request; not where the cache store is the database (Render) | `Core\Auth\CachedUserProvider`, `config/auth.php` (`sfk-eloquent`) |
+| Models rebuilt from the reference cache carry the connection name, so `is()` compares equal with the same record from the database (was a latent mismatch) | `ReferenceCache::rememberModels()` |
+| Lists batch belongs-to relations: a list page names them (`batchedTableRelations()`), their eager loads are taken off the query and they load with one query per related table for the page of rows; what cannot be batched is eager-loaded as usual — never per row | `AppListRecords::paginateTableQuery()`, `RelationBatch::loadMany()`; 受注, 売上, 申請管理, アルコールチェック, 安全衛生チェック, 事故報告 |
+| 受注 list: no 従業員カテゴリ / 役職 eager loads (the cards come from the cache) | `OrdersTable` |
+| Record pages batch their relations right after mount, before the page's own mount() reads one | `AppViewRecord::mount()` |
+| 受注 form: the partner selects share one list per kind and request (the newest 50 — Filament's own preload; the suppliers are the first 50 of the rows' list), labels from it; searching still asks the relationship | `OrderForm::partner()` |
+| Measurement: the timing log lists each query's time and SQL | `ServerTiming` |
+
+### Results (same machine, same data, warm)
+
+| Operation | Before | After | Change |
+|---|---:|---:|---:|
+| 受注 list click (page / sort) — server | 1,387–1,533 ms, 11–12 queries | **968–1,034 ms, 6 queries** | −32 % |
+| 受注 list click — in the browser | 1,778–2,161 ms | 1,364–1,874 ms | −15 to −20 % |
+| Dashboard `/erp` — server | median 562 ms (528–1,079), 3–4 queries | **median 498 ms (465–507), 2 queries** | −11 % (median) |
+| 受注 record page — server | 1,916–2,443 ms, 18–19 queries | **1,722–1,802 ms, 16 queries** | −10 to −26 % |
+| 受注 edit page — server | 2,321 ms, 20 queries | **1,960–2,020 ms, 16 queries** | −14 % |
+| Open a drop-down / 「…」 / sidebar | 0–26 ms, no request | unchanged | — |
+
+Tests: `RequestRoundTripsTest` (stale-while-revalidate; the cached user sees every change, nothing where the store is
+the database), `OrderRecordQueriesTest` (one `partners` query per list click, no category / 役職 queries, the form's
+shared lists).
+
+### Remaining, and what to decide
+
+1. **The database is far away** (unchanged, the largest factor in development): ~80 ms per round trip and 3 trips for
+   a 60-row page. Production on the same network as its database (Tokyo) pays ~1 ms. For development: a local
+   PostgreSQL copy, or a database in Tokyo.
+2. **Render free sleeps**: 50.7 s for the first request after 15 idle minutes, little CPU after that. A paid instance
+   (no sleep) or the planned Tokyo server removes it; nothing in the code can.
+3. **PHP time per request** ~65 ms to boot (the pulse, `/up`) and 340–460 ms for a list click, record or form in
+   development (no config / event cache, debug on) — mostly Filament drawing the page; production caches config,
+   routes, views and events (the 2026-11-18 numbers on the production image were about half).
+4. **Applying a list click in the browser** (0.3–0.6 s for 60 rows): Filament redraws the whole page and every cell;
+   fewer rows per page is the lever (表示件数, the user's choice).
+5. Still one query each: the pager's `count(*)` (the summary cards count the same rows on 4 lists), the bell's unread
+   count on every page, comments / 変更履歴 of a record while its panel is closed, one lookup per distinct row supplier
+   on the 受注 form.
+6. `/messaging/api/unread` takes 8 queries (~0.7 s here), but only when the inbox version changes.
 
 ## Pass 2026-11-20: every click felt slow
 

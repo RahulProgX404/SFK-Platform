@@ -9,10 +9,25 @@ use DateTimeImmutable;
 use Filament\Facades\Filament;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Filament\Widgets\Widget;
+use Illuminate\Database\Eloquent\Model;
 use Modules\Analytics\Application\SalesDashboard;
 use Modules\Analytics\Domain\FiscalYear;
 use Modules\Analytics\Domain\Period;
 use Modules\Analytics\Domain\SalesCoverage;
+use Modules\Analytics\Filament\Widgets\AbsencesCard;
+use Modules\Analytics\Filament\Widgets\CashFlowCard;
+use Modules\Analytics\Filament\Widgets\PersonalOverviewCard;
+use Modules\Analytics\Filament\Widgets\QuickActionsCard;
+use Modules\Analytics\Filament\Widgets\RecentActivityCard;
+use Modules\Analytics\Filament\Widgets\RevenueCard;
+use Modules\Analytics\Filament\Widgets\SalesOverviewCard;
+use Modules\Analytics\Filament\Widgets\SalesTrendCard;
+use Modules\Analytics\Filament\Widgets\StaffSalesCard;
+use Modules\Analytics\Filament\Widgets\TopCustomersCard;
+use Modules\Analytics\Filament\Widgets\TopProductsCard;
+use Modules\Analytics\Filament\Widgets\TopWorkersCard;
+use Modules\Analytics\Filament\Widgets\WorkTrendCard;
+use Modules\Core\Application\Realtime\DataPulse;
 use Modules\Core\Filament\AppResource;
 use Modules\Core\Filament\Portal\FollowsDashboardFilters;
 use Modules\Sales\Filament\Resources\Sales\SaleResource;
@@ -34,6 +49,51 @@ abstract class DashboardCard extends Widget implements FollowsDashboardFilters
 
     /** drawn with the page: the cards of a dashboard are few and quick */
     protected static bool $isLazy = false;
+
+    /**
+     * Every card of the dashboard (Filament/Widgets; DashboardTest checks none is missing): their tables are watched
+     * (AnalyticsServiceProvider, DataPulse).
+     *
+     * @var list<class-string<self>>
+     */
+    public const CARDS = [
+        AbsencesCard::class,
+        CashFlowCard::class,
+        PersonalOverviewCard::class,
+        QuickActionsCard::class,
+        RecentActivityCard::class,
+        RevenueCard::class,
+        SalesOverviewCard::class,
+        SalesTrendCard::class,
+        StaffSalesCard::class,
+        TopCustomersCard::class,
+        TopProductsCard::class,
+        TopWorkersCard::class,
+        WorkTrendCard::class,
+    ];
+
+    /**
+     * Live (user 2026-11-24 — the dashboard follows its apps for every user type, no reload): the tables the card reads.
+     * A record of one saved or deleted on any screen, by anyone (also queue jobs and commands), renews its stamp
+     * (DataPulse); the card's view draws the stamps it was drawn with (`core::filament.live-data` inside its root) and
+     * the open card redraws itself — its own Livewire component only, same period and scope — within the page pulse's
+     * few seconds. A new table a card reads goes in here.
+     *
+     * @return list<string>
+     */
+    abstract public static function liveTables(): array;
+
+    /**
+     * The tables of these models, and who may see what (DataPulse::REFERENCE: access rights, the registry, users — the
+     * cards read through onlyVisible()).
+     *
+     * @param  class-string<Model>  ...$models
+     * @return list<string>
+     */
+    protected static function tablesOf(string ...$models): array
+    {
+        return [...array_map(fn (string $model): string => (new $model)->getTable(), $models), DataPulse::REFERENCE];
+    }
 
     /** The period of the card for its head (the dashboard's date button), e.g. 2026/10/13〜11/11. */
     public function periodCaption(): string

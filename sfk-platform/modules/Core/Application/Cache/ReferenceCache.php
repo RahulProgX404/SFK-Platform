@@ -78,6 +78,8 @@ final class ReferenceCache
         });
 
         $prototype = new $class;
+        // the connection a queried model carries, so is() / isNot() compare equal with the same record read from the database
+        $prototype->setConnection($prototype->getConnectionName() ?? (string) config('database.default'));
         $models = [];
         foreach ($rows as $row) {
             $model = $prototype->newFromBuilder($row['attributes']);

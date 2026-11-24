@@ -32,4 +32,10 @@ final class ListAlcoholChecks extends AppListRecords
     {
         return AlcoholChecksTable::inlineFields();
     }
+
+    /** Speed: 運転者 / 従業員 / 確認者 (乗務前・乗務後) are all users: one query for the page (was one each) (AppListRecords::batchedTableRelations). */
+    protected function batchedTableRelations(): array
+    {
+        return ['driver', 'employee', 'beforeChecker', 'afterChecker'];
+    }
 }

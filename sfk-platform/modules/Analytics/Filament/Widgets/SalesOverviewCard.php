@@ -10,6 +10,10 @@ use Modules\Analytics\Filament\Dashboard\DashboardCard;
 use Modules\Analytics\Filament\Dashboard\DashboardTips;
 use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Support\Tip;
+use Modules\MasterData\Models\Partner;
+use Modules\Sales\Models\Invoice;
+use Modules\Sales\Models\Receipt;
+use Modules\Sales\Models\Sale;
 
 /**
  * 売上概要 (row 1; design_ref Revenue.png, Invoice Overview): the number of sales of the period against the period
@@ -21,6 +25,16 @@ final class SalesOverviewCard extends DashboardCard
     protected static ?int $sort = 2;
 
     protected string $view = 'analytics::widgets.sales-overview';
+
+    /**
+     * Live: what the card reads — 06. 売上入力, their 請求書 and 入金 (入金済 / 入金待ち / 期限超過 / 未請求) and the 売上先's 回収予定 (01. 取引先マスタ).
+     *
+     * @return list<string>
+     */
+    public static function liveTables(): array
+    {
+        return self::tablesOf(Sale::class, Invoice::class, Receipt::class, Partner::class);
+    }
 
     public static function canView(): bool
     {

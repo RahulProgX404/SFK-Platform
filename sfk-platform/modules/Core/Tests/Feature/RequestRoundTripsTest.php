@@ -8,11 +8,13 @@
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Application\Cache\CacheVersions;
 use Modules\Core\Application\Cache\ReferenceCache;
 use Modules\Core\Application\Filters\FilterField;
 use Modules\Core\Application\Users\UserChoices;
+use Modules\Core\Auth\CachedUserProvider;
 
 beforeEach(function () {
     config(['core.reference_cache' => true]);
@@ -49,13 +51,33 @@ it('reads the cache versions from the cache store, sees a bump on the next reque
     }, 'cache_versions'))->toBe(0)
         ->and($next)->toBe($bumped);
 
-    // a bump by another environment sharing the database (Render ⇄ local development): seen after STORE_SECONDS
+    // a bump by another environment sharing the database (Render ⇄ local development): after STORE_SECONDS the next
+    // request still answers from the store without waiting for the database, which is read after its response
+    // (stale-while-revalidate, pass 2026-11-24); the request after that has it
     DB::table('cache_versions')->where('name', CacheVersions::REFERENCE)->update(['version' => 'elsewhere']);
     ($this->nextRequest)();
     expect($version())->toBe($bumped);
     $this->travel(CacheVersions::STORE_SECONDS + 1)->seconds();
     ($this->nextRequest)();
+    $stale = null;
+    expect(($this->queries)(function () use ($version, &$stale): void {
+        $stale = $version();
+    }, 'cache_versions'))->toBe(0)
+        ->and($stale)->toBe($bumped);
+    expect(($this->queries)(fn () => defer()->invoke(), 'cache_versions'))->toBe(1);
+    ($this->nextRequest)();
     expect($version())->toBe('elsewhere');
+
+    // much older than that (STALE_SECONDS): read before the request goes on
+    DB::table('cache_versions')->where('name', CacheVersions::REFERENCE)->update(['version' => 'later']);
+    $this->travel(CacheVersions::STALE_SECONDS + 1)->seconds();
+    ($this->nextRequest)();
+    expect($version())->toBe('later');
+    // a revalidation that comes after a bump of this environment leaves the bump's versions
+    ReferenceCache::bump();
+    $own = $version();
+    ($this->nextRequest)();
+    expect($version())->toBe($own);
 });
 
 it('reads the cache versions from the database where the cache store is the database itself', function () {
@@ -105,4 +127,43 @@ it('asks a choice list shared by several 絞り込む fields once per request', 
     ($this->nextRequest)();
     $fields[0]->getOptions();
     expect($asked)->toBe(2);
+});
+
+it('reads the signed-in user from the reference cache and sees every change of the user on the next request (2026-11-24)', function () {
+    $user = User::factory()->create(['name' => '青木']);
+    $provider = Auth::createUserProvider('users');
+    expect($provider)->toBeInstanceOf(CachedUserProvider::class);
+    $read = fn (): ?User => $provider->retrieveById($user->id);
+
+    expect(($this->queries)($read, 'users'))->toBe(1);
+    ($this->nextRequest)();
+    $cached = null;
+    expect(($this->queries)(function () use ($read, &$cached): void {
+        $cached = $read();
+    }, 'users'))->toBe(0)
+        ->and($cached)->toBeInstanceOf(User::class)
+        ->and($cached->is($user))->toBeTrue()
+        ->and($cached->exists)->toBeTrue()
+        ->and($cached->employment_status)->toBe($user->employment_status)
+        ->and($cached->getAuthPassword())->toBe($user->getAuthPassword());
+
+    // a saved user (name, password, 在籍状況, rights …) is read afresh on the next request
+    $user->forceFill(['name' => '青木 一郎', 'show_financial_analysis' => true])->save();
+    ($this->nextRequest)();
+    expect($read()->name)->toBe('青木 一郎')
+        ->and($read()->show_financial_analysis)->toBeTrue();
+    $user->forceFill(['employment_status' => 'retired'])->save();
+    ($this->nextRequest)();
+    expect($read()->employment_status->value)->toBe('retired');
+    // a deleted user is gone on the next request
+    $user->delete();
+    ($this->nextRequest)();
+    expect($read())->toBeNull();
+
+    // where the cache store is the database itself (Render): from the database, as before
+    config(['cache.default' => 'database']);
+    $other = User::factory()->create();
+    ($this->nextRequest)();
+    $provider->retrieveById($other->id);
+    expect(($this->queries)(fn () => $provider->retrieveById($other->id), 'users'))->toBe(1);
 });

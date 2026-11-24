@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Analytics\Filament\Widgets;
 
+use App\Models\User;
 use Modules\Analytics\Application\PersonalOverview;
 use Modules\Analytics\Filament\Dashboard\ChoosesYear;
 use Modules\Analytics\Filament\Dashboard\DashboardCard;
 use Modules\Analytics\Filament\Dashboard\TrendChart;
 use Modules\Core\Access\EmployeeDataAccess;
 use Modules\Core\Filament\Support\AppFormat;
+use Modules\Production\Models\DailyReport;
 
 /**
  * 勤務時間・収入の推移 (row 1 for users without 財務分析を表示, under 個人の概要; bug.md 2026-11-07, personal-growth.png): the
@@ -26,6 +28,16 @@ final class WorkTrendCard extends DashboardCard
     protected static ?int $sort = 1;
 
     protected string $view = 'analytics::widgets.work-trend';
+
+    /**
+     * Live: what the card reads — the person's 08. 日報入力 per month (勤務時間, 収入).
+     *
+     * @return list<string>
+     */
+    public static function liveTables(): array
+    {
+        return self::tablesOf(DailyReport::class, User::class);
+    }
 
     public static function canView(): bool
     {

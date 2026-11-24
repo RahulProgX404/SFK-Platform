@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Analytics\Filament\Widgets;
 
 use Modules\Analytics\Filament\Dashboard\DashboardCard;
+use Modules\Sales\Models\Sale;
 
 /** 売れ筋 TOP3 (row 2, 20%, bug.md 2026-11-11; design_ref top-3-products.png): the three 品名 with the most sales in the period, as horizontal bars. */
 final class TopProductsCard extends DashboardCard
@@ -15,6 +16,16 @@ final class TopProductsCard extends DashboardCard
     public const ROWS = 3;
 
     protected string $view = 'analytics::widgets.top-products';
+
+    /**
+     * Live: what the card reads — 06. 売上入力 per 品名.
+     *
+     * @return list<string>
+     */
+    public static function liveTables(): array
+    {
+        return self::tablesOf(Sale::class);
+    }
 
     public static function canView(): bool
     {

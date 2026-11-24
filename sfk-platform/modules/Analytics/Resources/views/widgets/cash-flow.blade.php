@@ -16,6 +16,8 @@
 @endphp
 
 <div class="sfk-dash-cell sfk-dash-span-3">
+    {{-- live: redrawn when what it reads changes (DashboardCard::liveTables(), DataPulse) --}}
+    @include('core::filament.live-data', ['tables' => $this::liveTables()])
     <style>
         .sfk-cash-rows { display: flex; flex-direction: column; margin: 0; }
         .sfk-cash-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sfk-space-3); padding: var(--sfk-space-3) 0; }

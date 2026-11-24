@@ -159,9 +159,10 @@ final class OrdersTable
         $names = $livewire instanceof AppListRecords ? $livewire->viewColumns() : self::BASE;
 
         return $table
+            // the users' 従業員カテゴリ / 役職 (ユーザー情報 popup) come from the reference cache (UserPopup::meta), not
+            // from two more queries on every click (pass 2026-11-24); the 取引先 are batched on the list page
             ->modifyQueryUsing(fn (Builder $query) => $query->with([
-                'customer', 'plateSupplier', 'manufacturer', 'dataSupplier', 'filmSupplier', 'machine', 'designer.employeeCategories', 'designer.position',
-                'assignees.employeeCategories', 'assignees.position',
+                'customer', 'plateSupplier', 'manufacturer', 'dataSupplier', 'filmSupplier', 'machine', 'designer', 'assignees',
             ]))
             ->columns([
                 ...array_map(fn (string $name): AppTextColumn => self::column($name), $names),

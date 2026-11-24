@@ -9,6 +9,7 @@ use App\Modules\ModuleServiceProvider;
 use Livewire\Livewire;
 use Modules\Analytics\Application\Legacy\LegacyPastSaleImport;
 use Modules\Analytics\Application\Legacy\LegacySalesPlanImport;
+use Modules\Analytics\Filament\Dashboard\DashboardCard;
 use Modules\Analytics\Filament\Pages\DailyReportAnalysis;
 use Modules\Analytics\Filament\Pages\SalesAnalysis;
 use Modules\Analytics\Filament\Users\UserOverviewCard;
@@ -29,8 +30,12 @@ final class AnalyticsServiceProvider extends ModuleServiceProvider
 
     protected function bootModule(): void
     {
-        // 売上分析 and 日報分析 are live: changes of what they show reach their open pages (DataPulse)
+        // 売上分析, 日報分析 and every card of the dashboard are live: changes of what they show reach their open pages
+        // (DataPulse)
         DataPulse::watch([...SalesAnalysis::liveTables(), ...DailyReportAnalysis::liveTables()]);
+        foreach (DashboardCard::CARDS as $card) {
+            DataPulse::watch($card::liveTables());
+        }
 
         // 個人の概要 on the page of a user (ユーザー管理, 02. 従業員マスタ): for the person and administrators (作業単価)
         Livewire::component('analytics.user-overview-card', UserOverviewCard::class);

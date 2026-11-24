@@ -24,12 +24,14 @@ use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Events\ConnectionEstablished;
 use Illuminate\Database\Events\MigrationsEnded;
 use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Livewire\ComponentHookRegistry;
@@ -52,6 +54,7 @@ use Modules\Core\Application\Numbering\DocumentNumberGenerator;
 use Modules\Core\Application\Realtime\DataPulse;
 use Modules\Core\Application\Realtime\Realtime;
 use Modules\Core\Application\Search\SearchQuery;
+use Modules\Core\Auth\CachedUserProvider;
 use Modules\Core\Console\ImportLegacyDataCommand;
 use Modules\Core\Console\PruneNotificationsCommand;
 use Modules\Core\Console\RunNotificationChecksCommand;
@@ -129,6 +132,8 @@ final class CoreServiceProvider extends ModuleServiceProvider
         }
         // table cells link to their record without a wire:navigate.hover each (RecordLink, docs/performance.md)
         RecordLink::register();
+        // the signed-in user through the reference cache, not one query on every request (config/auth.php)
+        Auth::provider('sfk-eloquent', fn (Application $app, array $config): CachedUserProvider => new CachedUserProvider($app['hash'], $config['model']));
 
         // a change of the registry, the access rights, 一覧 or 帳票 is read afresh on the next request (ReferenceCache)
         foreach ([BusinessApp::class, Space::class, AppPermission::class, SpacePermission::class, AppFieldPermission::class,
@@ -158,7 +163,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
         Event::listen([JobProcessed::class, JobFailed::class, CommandFinished::class], $flush);
         $this->app->terminating($flush);
         // the stamps of the live pages ride on the pulse of every page (cache reads only)
-        PulseChannels::register('d', fn (): array => DataPulse::versions(DataPulse::watched()));
+        PulseChannels::register('d', fn (int $userId): array => DataPulse::versions(DataPulse::watched(), $userId));
 
         // the compared form of the list search (sfk_search_norm) on SQLite connections; PostgreSQL has it from a migration
         Event::listen(ConnectionEstablished::class, fn (ConnectionEstablished $event) => SearchQuery::registerFunction($event->connection));

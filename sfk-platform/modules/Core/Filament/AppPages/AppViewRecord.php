@@ -107,12 +107,20 @@ abstract class AppViewRecord extends ViewRecord
     public function mount(int|string $record): void
     {
         parent::mount($record);
+        // before a page's own mount() reads one of them (e.g. 受注's 得意先): otherwise that one loads by itself first
+        $this->loadBatchedRelations();
 
         $this->commentForm->fill();
     }
 
     /** Every request of the page: the record's belongs-to relations shown on it, one query per table (batchedRelations()). */
     public function booted(): void
+    {
+        $this->loadBatchedRelations();
+    }
+
+    /** batchedRelations() not loaded yet (RelationBatch skips those already there). */
+    private function loadBatchedRelations(): void
     {
         $paths = $this->batchedRelations();
         if ($paths !== [] && $this->record instanceof Model) {

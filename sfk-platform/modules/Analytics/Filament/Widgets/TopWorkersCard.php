@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Analytics\Filament\Widgets;
 
+use App\Models\User;
 use Modules\Analytics\Application\DailyReportRanking;
 use Modules\Analytics\Filament\Dashboard\DashboardCard;
 use Modules\Analytics\Filament\Pages\DailyReportAnalysis;
+use Modules\Production\Models\DailyReport;
 
 /**
  * 作業者ランキング (row 3, every user; design of revenue-category.png, bug.md 2026-11-06): the five 作業者 who made the
@@ -21,6 +23,16 @@ final class TopWorkersCard extends DashboardCard
     public const ROWS = 5;
 
     protected string $view = 'analytics::widgets.top-workers';
+
+    /**
+     * Live: what the card reads — 08. 日報入力 per 作業者 (their names).
+     *
+     * @return list<string>
+     */
+    public static function liveTables(): array
+    {
+        return self::tablesOf(DailyReport::class, User::class);
+    }
 
     /** Only for users who see everyone's money (財務分析の範囲 全体; bug.md 2026-11-07). */
     public static function canView(): bool

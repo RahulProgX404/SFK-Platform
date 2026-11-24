@@ -25,8 +25,13 @@ use WeakMap;
  * where the store is the database itself (Render: nothing to gain) or the reference cache is off (tests). The bumper
  * writes the new versions there once its transaction committed, so its own environment sees them on the next request;
  * a request that missed the store fills it only if nobody did meanwhile (Cache::add), so it never puts back what a
- * bump replaced. The store keeps them STORE_SECONDS: what another environment sharing the database (Render ⇄ local
- * development) bumped, or a bump racing another one, is seen at most that much later.
+ * bump replaced. They are fresh for STORE_SECONDS: what another environment sharing the database (Render ⇄ local
+ * development) bumped, or a bump racing another one, is seen about that much later.
+ *
+ * Speed (pass 2026-11-24): clicks are usually more than STORE_SECONDS apart, so nearly every click still paid the query.
+ * Versions older than that but younger than STALE_SECONDS are used for the request while the database is read again
+ * after the response (defer(), stale-while-revalidate): this environment's own bumps are in the store at once anyway,
+ * another environment's are seen one request later. Older than STALE_SECONDS they are read before the request goes on.
  */
 final class CacheVersions
 {
@@ -36,6 +41,9 @@ final class CacheVersions
 
     /** How long HTTP requests take the versions from the cache store before asking the database again. */
     public const STORE_SECONDS = 10;
+
+    /** Until then versions older than STORE_SECONDS still serve a request, read again after its response. */
+    public const STALE_SECONDS = 300;
 
     private const STORE_KEY = 'sfk:cache-versions';
 
@@ -72,7 +80,7 @@ final class CacheVersions
             // once committed (others see the new version only then): this environment reads it on the next request
             DB::afterCommit(static function (): void {
                 try {
-                    Cache::put(self::STORE_KEY, self::read(), self::STORE_SECONDS);
+                    Cache::put(self::STORE_KEY, self::stored(self::read()), self::STALE_SECONDS);
                 } catch (Throwable) {
                     // the store is only a shortcut: requests read the database again after STORE_SECONDS
                 }
@@ -101,17 +109,56 @@ final class CacheVersions
 
         try {
             $stored = Cache::get(self::STORE_KEY);
-            if (is_array($stored)) {
-                return array_map('strval', $stored);
+            if (is_array($stored) && is_array($stored['versions'] ?? null) && is_numeric($stored['at'] ?? null)) {
+                $age = (float) now()->format('U.u') - (float) $stored['at'];
+                if ($age <= self::STALE_SECONDS) {
+                    if ($age > self::STORE_SECONDS) {
+                        $at = (float) $stored['at'];
+                        defer(static fn () => self::revalidate($at));
+                    }
+
+                    return array_map('strval', $stored['versions']);
+                }
             }
             $versions = self::read();
             // only if no bump wrote newer versions meanwhile
-            Cache::add(self::STORE_KEY, $versions, self::STORE_SECONDS);
+            if (! Cache::add(self::STORE_KEY, self::stored($versions), self::STALE_SECONDS)) {
+                self::revalidate(is_array($stored) && is_numeric($stored['at'] ?? null) ? (float) $stored['at'] : null, $versions);
+            }
 
             return $versions;
         } catch (Throwable) {
             return self::read();
         }
+    }
+
+    /**
+     * After the response: the versions from the database into the store — unless a bump put newer ones there since the
+     * entry read at $at.
+     *
+     * @param  array<string, string>|null  $versions  already read
+     */
+    private static function revalidate(?float $at, ?array $versions = null): void
+    {
+        try {
+            $versions ??= self::read();
+            $current = Cache::get(self::STORE_KEY);
+            $currentAt = is_array($current) && is_numeric($current['at'] ?? null) ? (float) $current['at'] : null;
+            if ($currentAt === null || $currentAt === $at) {
+                Cache::put(self::STORE_KEY, self::stored($versions), self::STALE_SECONDS);
+            }
+        } catch (Throwable) {
+            // the store is only a shortcut
+        }
+    }
+
+    /**
+     * @param  array<string, string>  $versions
+     * @return array{versions: array<string, string>, at: float}
+     */
+    private static function stored(array $versions): array
+    {
+        return ['versions' => $versions, 'at' => (float) now()->format('U.u')];
     }
 
     /** Whether HTTP requests take the versions from the cache store (not when that store is the database itself). */

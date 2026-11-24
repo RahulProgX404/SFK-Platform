@@ -15,6 +15,8 @@
 @endphp
 
 <div @class(['sfk-dash-cell sfk-dash-span-12' => $ranges === null, 'sfk-personal-wrap' => $ranges !== null])>
+    {{-- live: redrawn when what it reads changes (DashboardCard::liveTables(), DataPulse) --}}
+    @include('core::filament.live-data', ['tables' => $this::liveTables()])
     @if ($shown)
         <style>
             .sfk-personal-wrap { display: flex; }

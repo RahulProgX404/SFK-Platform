@@ -493,15 +493,55 @@ final class OrderForm
 
     private static function partner(string $name, string $relationship, bool $customers = false): Select
     {
+        // speed (pass 2026-11-24): 製版先 / 製造先 / データ / フィルム each read the same list and their chosen 取引先
+        // again — the preloaded options (the newest PRELOAD, as Filament's own preload) are read once per request and
+        // kind, a chosen 取引先 among them takes its name from there; searching still asks the relationship
         return Select::make($name)
             ->label(OrderLayout::label($name))
-            ->relationship($relationship, 'name', fn (Builder $query): Builder => PartnerResource::visibleOr($customers
-                ? $query->where(fn (Builder $q) => $q->where('is_customer', true)->orWhere('is_other', true))
-                : $query->where('is_supplier', true), self::keptPartners())->orderByDesc('id'))
+            ->relationship($relationship, 'name', fn (Builder $query): Builder => self::partnerQuery($query, $customers))
+            ->options(fn (): array => self::partnerPreload($customers))
+            ->getOptionLabelUsing(fn (Select $component, mixed $value): ?string => is_scalar($value) && isset(self::partnerPreload($customers)[$value])
+                ? self::partnerPreload($customers)[$value]
+                : $component->getSelectedRecord()?->getAttribute('name'))
             ->searchable(['name', 'short_name', 'name_kana'])
             ->preload()
             ->placeholder('-----')
             ->live();
+    }
+
+    /** Options a partner select shows before anything is typed (Filament's options limit of a searchable select). */
+    private const PRELOAD = 50;
+
+    /**
+     * 取引先 a partner select offers: customers (得意先, also その他) or suppliers, that the user may see plus those their
+     * 受注 already use, newest first.
+     *
+     * @param  Builder<Partner>  $query
+     * @return Builder<Partner>
+     */
+    private static function partnerQuery(Builder $query, bool $customers): Builder
+    {
+        return PartnerResource::visibleOr($customers
+            ? $query->where(fn (Builder $q) => $q->where('is_customer', true)->orWhere('is_other', true))
+            : $query->where('is_supplier', true), self::keptPartners())->orderByDesc('id');
+    }
+
+    /** @return array<int|string, string> id => name of the preloaded options, once per request, user and kind */
+    private static function partnerPreload(bool $customers): array
+    {
+        return self::partnerPreloadOf($customers, (int) auth()->id());
+    }
+
+    /**
+     * @param  int  $userId  part of the once() key: a request that changes user never sees another user's choices
+     * @return array<int|string, string>
+     */
+    private static function partnerPreloadOf(bool $customers, int $userId): array
+    {
+        // suppliers: the newest of the rows' list (supplierChoices(), the same query and order), read anyway
+        return $customers
+            ? once(fn (): array => self::partnerQuery(Partner::query(), true)->limit(self::PRELOAD)->pluck('name', 'id')->all())
+            : array_slice(self::supplierChoicesOf($userId), 0, self::PRELOAD, true);
     }
 
     private static function quantity(string $name, string $label): TextInput

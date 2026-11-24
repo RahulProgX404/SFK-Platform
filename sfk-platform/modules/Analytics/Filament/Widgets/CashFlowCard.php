@@ -8,8 +8,14 @@ use Modules\Analytics\Application\SalesDashboard;
 use Modules\Analytics\Filament\Dashboard\DashboardCard;
 use Modules\Analytics\Filament\Dashboard\DashboardTips;
 use Modules\Core\Filament\Support\Tip;
+use Modules\MasterData\Models\Partner;
 use Modules\Purchasing\Filament\Resources\Payments\PaymentResource;
+use Modules\Purchasing\Models\Payment;
 use Modules\Sales\Filament\Resources\Receipts\ReceiptResource;
+use Modules\Sales\Models\Invoice;
+use Modules\Sales\Models\Receipt;
+use Modules\Sales\Models\ReceiptLine;
+use Modules\Sales\Models\Sale;
 
 /**
  * 入出金 (row 1, end; design_ref cash-flow.png, Cash Flow): 入金 of 21. 売入金管理 (入金日), 出金 of 07. 支払入力 (支払日) and
@@ -20,6 +26,16 @@ final class CashFlowCard extends DashboardCard
     protected static ?int $sort = 3;
 
     protected string $view = 'analytics::widgets.cash-flow';
+
+    /**
+     * Live: what the card reads — 21. 売入金管理 (入金), 07. 支払入力 (出金) and, 個人, the 入金待ち / 期限超過 of their sales.
+     *
+     * @return list<string>
+     */
+    public static function liveTables(): array
+    {
+        return self::tablesOf(Receipt::class, ReceiptLine::class, Payment::class, Sale::class, Invoice::class, Partner::class);
+    }
 
     public static function canView(): bool
     {

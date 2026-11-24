@@ -328,4 +328,10 @@ final class ListSales extends AppListRecords
             Notification::make()->danger()->title($exception->getMessage())->persistent()->send();
         }
     }
+
+    /** Speed: the 売上先 and the 受注's 得意先 are both 取引先: one query for the page (was one each) (AppListRecords::batchedTableRelations). */
+    protected function batchedTableRelations(): array
+    {
+        return ['customer', 'order.customer'];
+    }
 }

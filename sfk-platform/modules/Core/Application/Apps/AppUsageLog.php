@@ -7,6 +7,7 @@ namespace Modules\Core\Application\Apps;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Application\Realtime\DataPulse;
 use Modules\Core\Models\AppUsage;
 
 /**
@@ -32,6 +33,8 @@ final class AppUsageLog
         }
 
         AppUsage::query()->upsert([$values], ['user_id', 'app_code'], $update);
+        // no model events (one statement): the user's open dashboard learns it from their own stamp (最近表示した項目)
+        DataPulse::touchedBy(DataPulse::APP_USAGE, $user->id);
     }
 
     /**

@@ -22,7 +22,9 @@ use Filament\Support\Exceptions\Cancel;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Filament\View\PanelsRenderHook;
+use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -48,6 +50,7 @@ use Modules\Core\Application\History\RecordHistory;
 use Modules\Core\Application\Records\RecordDeletion;
 use Modules\Core\Application\Records\RecordValidator;
 use Modules\Core\Application\Records\RecordVersion;
+use Modules\Core\Application\Records\RelationBatch;
 use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Application\Views\ListViewInvalid;
@@ -181,6 +184,38 @@ abstract class AppListRecords extends ListRecords
     public function filterFields(): array
     {
         return [];
+    }
+
+    /**
+     * Speed (pass 2026-11-24): belongs-to relations of the rows (or dotted paths, "order.customer") that point at the same
+     * table several times — e.g. 受注's 得意先 / 製版先 / 製造先 … all in 取引先, or the users of 申請管理. The table's eager
+     * loads of them are taken off and they are loaded with ONE query per related table for the page of rows
+     * (RelationBatch) — each eager load was a round trip of its own on every click (page, sort, search).
+     *
+     * @return list<string>
+     */
+    protected function batchedTableRelations(): array
+    {
+        return [];
+    }
+
+    /**
+     * The page of rows, with batchedTableRelations() loaded per related table.
+     *
+     * @param  Builder<Model>  $query
+     * @return Paginator<int, Model>|CursorPaginator<int, Model>
+     */
+    protected function paginateTableQuery(Builder $query): Paginator|CursorPaginator
+    {
+        $paths = $this->batchedTableRelations();
+        if ($paths === []) {
+            return parent::paginateTableQuery($query);
+        }
+
+        $records = parent::paginateTableQuery($query->without($paths));
+        RelationBatch::loadMany(array_filter($records->items(), fn (mixed $record): bool => $record instanceof Model), $paths, loadRest: true);
+
+        return $records;
     }
 
     /**

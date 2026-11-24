@@ -32,4 +32,10 @@ final class ListLeaveRequests extends AppListRecords
     {
         return LeaveRequestsTable::inlineFields();
     }
+
+    /** Speed: 申請者 / 作業者 / 作成者 / 承認者 are all users: one query for the page (was one each) (AppListRecords::batchedTableRelations). */
+    protected function batchedTableRelations(): array
+    {
+        return ['applicant', 'worker', 'creator', 'approver'];
+    }
 }

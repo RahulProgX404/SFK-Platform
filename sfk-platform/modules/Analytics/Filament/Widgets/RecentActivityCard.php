@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Analytics\Filament\Widgets;
 
+use Illuminate\Notifications\DatabaseNotification;
 use Modules\Analytics\Application\ActivityFeed;
 use Modules\Analytics\Filament\Dashboard\DashboardCard;
+use Modules\Core\Models\RecordComment;
+use Modules\Core\Models\RecordVersion;
 
 /**
  * 最近のアクティビティ (every user; design_ref quick-actions.png, Recent Activity): only what concerns the user — their
@@ -21,6 +24,16 @@ final class RecentActivityCard extends DashboardCard
     public const LIMIT = 10;
 
     protected string $view = 'analytics::widgets.recent-activity';
+
+    /**
+     * Live: what the card reads — the user's 通知, 変更履歴 and コメント.
+     *
+     * @return list<string>
+     */
+    public static function liveTables(): array
+    {
+        return self::tablesOf(DatabaseNotification::class, RecordVersion::class, RecordComment::class);
+    }
 
     /** @return array<string, mixed> */
     protected function getViewData(): array

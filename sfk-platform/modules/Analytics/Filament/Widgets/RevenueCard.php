@@ -7,6 +7,9 @@ namespace Modules\Analytics\Filament\Widgets;
 use Modules\Analytics\Filament\Dashboard\DashboardCard;
 use Modules\Analytics\Filament\Dashboard\DashboardTips;
 use Modules\Analytics\Filament\Pages\SalesAnalysis;
+use Modules\Analytics\Models\SalesForecast;
+use Modules\Analytics\Models\SalesPlan;
+use Modules\Sales\Models\Sale;
 
 /**
  * 売上合計 (row 1; design_ref Revenue.png, Total Revenue): the sales of the period, the change against the period before,
@@ -17,6 +20,17 @@ final class RevenueCard extends DashboardCard
     protected static ?int $sort = 1;
 
     protected string $view = 'analytics::widgets.revenue';
+
+    /**
+     * Live: what the card reads — 06. 売上入力 (売上合計, 前期間比, the days the data covers), 25. 販売先別売上計画 (売上目標) and 売上分析's 予想
+     * (個人).
+     *
+     * @return list<string>
+     */
+    public static function liveTables(): array
+    {
+        return self::tablesOf(Sale::class, SalesPlan::class, SalesForecast::class);
+    }
 
     public static function canView(): bool
     {

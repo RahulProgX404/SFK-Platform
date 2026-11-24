@@ -63,7 +63,8 @@ return [
 
     'providers' => [
         'users' => [
-            'driver' => 'eloquent',
+            // Eloquent, the session's user read through the reference cache (Modules\Core\Auth\CachedUserProvider)
+            'driver' => 'sfk-eloquent',
             'model' => env('AUTH_MODEL', User::class),
         ],
 

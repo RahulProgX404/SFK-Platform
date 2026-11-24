@@ -9,6 +9,8 @@
 @endphp
 
 <div class="sfk-dash-cell sfk-dash-span-4 is-fit">
+    {{-- live: redrawn when what it reads changes (DashboardCard::liveTables(), DataPulse) --}}
+    @include('core::filament.live-data', ['tables' => $this::liveTables()])
     <section class="sfk-dash-card" aria-labelledby="sfk-top-workers-title">
         <header class="sfk-dash-card-head">
             <div class="sfk-dash-card-titles">

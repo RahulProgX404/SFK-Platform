@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Analytics\Filament\Widgets;
 
+use App\Models\User;
 use Modules\Analytics\Application\TeamDashboard;
 use Modules\Analytics\Filament\Dashboard\DashboardCard;
 use Modules\HumanResources\Filament\Resources\LeaveRequests\LeaveRequestResource;
+use Modules\HumanResources\Models\LeaveRequest;
 
 /**
  * 休暇・勤怠予定 (row 3, every user — in 全体 row 4, next to 最近のアクティビティ; design_ref Recent Transactions): who is
@@ -18,6 +20,16 @@ final class AbsencesCard extends DashboardCard
     protected static ?int $sort = 10;
 
     protected string $view = 'analytics::widgets.absences';
+
+    /**
+     * Live: what the card reads — 16. 申請管理 of today and tomorrow (who).
+     *
+     * @return list<string>
+     */
+    public static function liveTables(): array
+    {
+        return self::tablesOf(LeaveRequest::class, User::class);
+    }
 
     /** people of room a day: the card keeps that height with fewer or none (ghost rows); more scroll inside the day */
     public const ROWS_PER_DAY = 4;

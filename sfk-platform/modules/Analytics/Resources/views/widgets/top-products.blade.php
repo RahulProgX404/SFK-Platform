@@ -10,6 +10,8 @@
 
 {{-- not is-fit: as high as 売上の推移 and 上位の売上先 of the same row (user 2026-11-18) --}}
 <div class="sfk-dash-cell sfk-dash-span-20p">
+    {{-- live: redrawn when what it reads changes (DashboardCard::liveTables(), DataPulse) --}}
+    @include('core::filament.live-data', ['tables' => $this::liveTables()])
     <style>
         .sfk-products { display: flex; flex-direction: column; gap: var(--sfk-space-4); margin: 0; padding: 0; list-style: none; }
         .sfk-products-item { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 6px var(--sfk-space-2); }

@@ -13,6 +13,7 @@ use Modules\Analytics\Filament\Dashboard\DashboardCard;
 use Modules\Analytics\Filament\Dashboard\TrendChart;
 use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Support\Tip;
+use Modules\Sales\Models\Sale;
 
 /**
  * 売上の推移 (row 2; bug.md 2026-11-07 / 2026-11-09 / 2026-11-11, personal-growth.png): the sales per month of the chosen
@@ -34,6 +35,16 @@ final class SalesTrendCard extends DashboardCard
     protected static ?int $sort = 4;
 
     protected string $view = 'analytics::widgets.sales-trend';
+
+    /**
+     * Live: what the card reads — 06. 売上入力 per month.
+     *
+     * @return list<string>
+     */
+    public static function liveTables(): array
+    {
+        return self::tablesOf(Sale::class);
+    }
 
     public static function canView(): bool
     {

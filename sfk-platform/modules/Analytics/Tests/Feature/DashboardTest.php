@@ -13,6 +13,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Livewire\Livewire;
 use Modules\Analytics\Application\ActivityFeed;
 use Modules\Analytics\Application\PersonalOverview;
@@ -40,7 +41,9 @@ use Modules\Analytics\Filament\Widgets\WorkTrendCard;
 use Modules\Analytics\Models\SalesForecast;
 use Modules\Analytics\Models\SalesPlan;
 use Modules\Core\Application\Apps\AppUsageLog;
+use Modules\Core\Application\Notifications\NotificationPulse;
 use Modules\Core\Application\Notifications\SystemNotification;
+use Modules\Core\Application\Realtime\DataPulse;
 use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\AppStatus;
 use Modules\Core\Domain\Apps\PermissionSubject;
@@ -66,6 +69,7 @@ use Modules\Sales\Models\Sale;
 use Modules\Settings\Filament\Resources\Users\Pages\EditUser;
 use Modules\Settings\Filament\Resources\Users\Pages\ViewUser;
 use Modules\Settings\Filament\Resources\Users\UserResource;
+use Symfony\Component\Finder\SplFileInfo;
 
 beforeEach(function () {
     Filament::setCurrentPanel('erp');
@@ -947,4 +951,81 @@ it('lists only the 10 latest activities, newest first (2026-11-14)', function ()
     Livewire::test(RecentActivityCard::class)
         ->assertSeeInOrder(['お知らせ12', 'お知らせ11', 'お知らせ03'])
         ->assertDontSee(['お知らせ02', 'お知らせ01']);
+});
+
+it('keeps every card of the dashboard live for every user: a change in its apps moves its stamp, the open card redraws (2026-11-24)', function () {
+    // 16. 申請管理 open to everyone in a space the employee belongs to
+    $app = new BusinessApp(['code' => 'leave-request', 'name' => '16. 申請管理']);
+    $app->forceFill(['status' => AppStatus::Published])->save();
+    $app->permissions()->create(['subject_type' => PermissionSubject::Everyone, AppAbility::View->column() => true]);
+    $space = Space::query()->create(['panel_id' => 'erp', 'name' => '総務スペース']);
+    $app->spaces()->attach($space);
+    $space->users()->attach($this->employee->id);
+    config(['core.reference_cache' => true]);
+    $pulse = fn (User $user): array => (array) $this->get(NotificationPulse::url($user->id))->assertOk()->json('x.d');
+    $marker = fn (string $html): array => json_decode(html_entity_decode((string) str($html)->after('data-sfk-live="')->before('"')), true);
+    $filters = ['from' => '2026-10-01', 'to' => '2026-10-31'];
+    DataPulse::flush();
+
+    // every card says what it reads, all of it is watched, and its own component carries the marker
+    $widgets = collect(File::files(__DIR__.'/../../Filament/Widgets'))
+        ->map(fn (SplFileInfo $file): string => 'Modules\\Analytics\\Filament\\Widgets\\'.$file->getFilenameWithoutExtension())
+        ->filter(fn (string $class): bool => is_subclass_of($class, DashboardCard::class))->sort()->values()->all();
+    expect($widgets)->toBe(collect(DashboardCard::CARDS)->sort()->values()->all());
+    $this->actingAs($this->admin);
+    foreach (DashboardCard::CARDS as $card) {
+        expect($card::liveTables())->toContain(DataPulse::REFERENCE)
+            ->and(DataPulse::watched())->toContain(...$card::liveTables());
+        $html = Livewire::test($card, ['pageFilters' => $filters])->html();
+        expect(array_keys($marker($html)))->toBe($card::liveTables());
+    }
+    expect(RevenueCard::liveTables())->toContain('sales', 'sales_plans', 'sales_forecasts')
+        ->and(SalesOverviewCard::liveTables())->toContain('sales', 'invoices', 'receipts', 'partners')
+        ->and(CashFlowCard::liveTables())->toContain('receipts', 'receipt_lines', 'payments')
+        ->and(TopWorkersCard::liveTables())->toContain('daily_reports', 'users')
+        ->and(AbsencesCard::liveTables())->toContain('leave_requests')
+        ->and(QuickActionsCard::liveTables())->toContain('leave_requests', 'consumable_orders', DataPulse::APP_USAGE)
+        ->and(RecentActivityCard::liveTables())->toContain('notifications', 'record_versions', 'record_comments')
+        ->and(PersonalOverviewCard::liveTables())->toContain('daily_reports', 'leave_requests');
+
+    // the page itself follows who may see what (cards, 新規作成, アプリ), outside the cards
+    $page = Livewire::test(PortalPage::class)->html();
+    expect(array_keys($marker((string) str($page)->before('class="sfk-dash"'))))->toBe([DataPulse::REFERENCE]);
+
+    // a sale saved on another screen: only what reads 売上 moves, after the request; the open card shows the new total
+    $before = $pulse($this->admin);
+    $revenue = Livewire::test(RevenueCard::class, ['pageFilters' => $filters])->assertSee('¥200,000');
+    Sale::query()->create(['customer_id' => $this->alpha->id, 'sold_on' => '2026-10-21', 'delivery_due_on' => '2026-10-21', 'product_name' => '長3封筒', 'amount' => 50000])
+        ->assignees()->attach($this->staff->id);
+    DataPulse::flush();
+    $after = $pulse($this->admin);
+    expect($after['sales'])->not->toBe($before['sales'])
+        ->and($after['leave_requests'])->toBe($before['leave_requests'])
+        ->and($after['daily_reports'])->toBe($before['daily_reports']);
+    $revenue->call('$refresh')->assertSee('¥250,000');
+
+    // 申請管理 → 休暇・勤怠予定 and クイックアクション, for an employee as for an administrator
+    $this->actingAs($this->employee);
+    $absences = Livewire::test(AbsencesCard::class)->assertDontSee('営業 二郎');
+    tap(LeaveRequest::query()->create(['request_type' => '休暇申請', 'applicant_id' => $this->other->id, 'category' => '有給休暇', 'target_on' => '2026-11-05', 'reason' => '私用']),
+        fn (LeaveRequest $leave) => $leave->forceFill(['status' => LeaveRequestStatus::Approved])->save());
+    DataPulse::flush();
+    expect($pulse($this->employee)['leave_requests'])->not->toBe($after['leave_requests']);
+    $absences->call('$refresh')->assertSee('営業 二郎');
+
+    // 日報 → 作業者ランキング, 個人の概要, 勤務時間・収入の推移
+    DailyReport::query()->create(['worked_on' => '2026-10-05', 'user_id' => $this->staff->id, 'produced' => '1000', 'processing_rate' => '2']);
+    DataPulse::flush();
+    expect($pulse($this->admin)['daily_reports'])->not->toBe($after['daily_reports']);
+
+    // 最近表示した項目: the apps a user opens move only their own stamp (no model events: stamped by AppUsageLog)
+    $mine = $pulse($this->admin)[DataPulse::APP_USAGE];
+    $theirs = $pulse($this->employee)[DataPulse::APP_USAGE];
+    app(AppUsageLog::class)->touch($this->employee, 'sales-entry');
+    expect($pulse($this->employee)[DataPulse::APP_USAGE])->not->toBe($theirs)
+        ->and($pulse($this->admin)[DataPulse::APP_USAGE])->toBe($mine);
+    DataPulse::touched(DataPulse::APP_USAGE); // never stamped for everyone
+    DataPulse::flush();
+    expect($pulse($this->admin)[DataPulse::APP_USAGE])->toBe($mine)
+        ->and(DataPulse::versions([DataPulse::APP_USAGE]))->toBe([DataPulse::APP_USAGE => '']);
 });

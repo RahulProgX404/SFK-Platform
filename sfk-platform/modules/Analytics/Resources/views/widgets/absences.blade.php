@@ -7,6 +7,8 @@
 @endphp
 
 <div class="sfk-dash-cell sfk-dash-span-{{ $span }} sfk-dash-t-half is-fit">
+    {{-- live: redrawn when what it reads changes (DashboardCard::liveTables(), DataPulse) --}}
+    @include('core::filament.live-data', ['tables' => $this::liveTables()])
     <style>
         .sfk-absence-days { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--sfk-space-3); }
         .sfk-absence-day { min-width: 0; padding: var(--sfk-space-3); border-radius: var(--sfk-radius-lg); box-shadow: inset 0 0 0 1px var(--sfk-line-soft); }

@@ -15,6 +15,8 @@
 
 {{-- tablets: a third of the row becomes a row of its own under 最近表示した項目 · 休暇・勤怠予定 --}}
 <div @class(['sfk-dash-cell', 'sfk-dash-span-'.$span, 'is-fit', 'sfk-dash-t-full' => $span === 4])>
+    {{-- live: redrawn when what it reads changes (DashboardCard::liveTables(), DataPulse) --}}
+    @include('core::filament.live-data', ['tables' => $this::liveTables()])
     <style>
         .sfk-activity { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--sfk-space-8); }
         .sfk-activity ol { margin: 0; padding: 0; list-style: none; }

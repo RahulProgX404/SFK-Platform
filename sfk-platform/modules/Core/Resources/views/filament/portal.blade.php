@@ -1412,6 +1412,10 @@
         }
     </style>
 
+    {{-- live: who may see what changed (財務分析を表示, アクセス権, apps) — the page redraws its cards, 新規作成 and アプリ;
+         each card follows its own tables (DashboardCard::liveTables(), DataPulse) --}}
+    @include('core::filament.live-data', ['tables' => [\Modules\Core\Application\Realtime\DataPulse::REFERENCE]])
+
     {{-- the cards --}}
     <div class="sfk-dash">
         @foreach ($this->dashboardWidgets() as $widget)

@@ -9,6 +9,8 @@
 @endphp
 
 <div @class(["sfk-dash-cell sfk-dash-span-4", "sfk-dash-t-full" => $personal])>
+    {{-- live: redrawn when what it reads changes (DashboardCard::liveTables(), DataPulse) --}}
+    @include('core::filament.live-data', ['tables' => $this::liveTables()])
     <style>
         .sfk-revenue { display: flex; flex-direction: column; gap: var(--sfk-space-4); height: 100%; padding: var(--sfk-space-5); border-radius: var(--sfk-radius-xl); background: linear-gradient(160deg, var(--sfk-primary) 0%, #0b5aa3 100%); box-shadow: 0 8px 20px rgba(5, 70, 126, .2); color: #fff; }
         .sfk-revenue-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sfk-space-3); }

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\Analytics\Filament\Widgets;
 
 use Modules\Analytics\Filament\Dashboard\DashboardCard;
+use Modules\MasterData\Models\Partner;
+use Modules\Sales\Models\Sale;
 
 /** 上位の売上先 (row 2, 30%, bug.md 2026-11-11; design_ref top-customers.png): the five customers with the most sales in the period. */
 final class TopCustomersCard extends DashboardCard
@@ -15,6 +17,16 @@ final class TopCustomersCard extends DashboardCard
     public const ROWS = 5;
 
     protected string $view = 'analytics::widgets.top-customers';
+
+    /**
+     * Live: what the card reads — 06. 売上入力 per 売上先 (01. 取引先マスタ names).
+     *
+     * @return list<string>
+     */
+    public static function liveTables(): array
+    {
+        return self::tablesOf(Sale::class, Partner::class);
+    }
 
     public static function canView(): bool
     {

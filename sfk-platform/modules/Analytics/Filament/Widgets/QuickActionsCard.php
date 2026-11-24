@@ -11,11 +11,15 @@ use Modules\Analytics\Application\TeamDashboard;
 use Modules\Analytics\Filament\Dashboard\DashboardCard;
 use Modules\Core\Application\Apps\AppUsageLog;
 use Modules\Core\Application\Cache\DataCache;
+use Modules\Core\Application\Realtime\DataPulse;
 use Modules\Core\Filament\AppResource;
 use Modules\Core\Models\AppUsage;
 use Modules\Core\Models\BusinessApp;
 use Modules\HumanResources\Application\HrActionNotAllowed;
+use Modules\HumanResources\Models\LeaveRequest;
+use Modules\MasterData\Models\Partner;
 use Modules\Purchasing\Application\PurchasingActionNotAllowed;
+use Modules\Purchasing\Models\ConsumableOrder;
 
 /**
  * クイックアクション (row 3, every user; design_ref quick-actions.png): what waits for this user and is done with one
@@ -29,6 +33,17 @@ final class QuickActionsCard extends DashboardCard
     protected static ?int $sort = 9;
 
     protected string $view = 'analytics::widgets.quick-actions';
+
+    /**
+     * Live: what the card reads — what waits for the user in 16. 申請管理 and 20. 消耗品発注 (発注先, who) and, when nothing waits,
+     * the apps and records they opened last (their own stamp, DataPulse::APP_USAGE).
+     *
+     * @return list<string>
+     */
+    public static function liveTables(): array
+    {
+        return [...self::tablesOf(LeaveRequest::class, ConsumableOrder::class, Partner::class, User::class), DataPulse::APP_USAGE];
+    }
 
     /** Row 3: last — first for users without 財務分析を表示 (bug.md 2026-11-06). */
     public static function getSort(): int

@@ -116,4 +116,10 @@ final class ListOrders extends AppListRecords
             $record->assignees()->sync($assignees);
         }
     }
+
+    /** Speed: 得意先 / 製版先 / 製造先 / データ入稿先 / フィルム先 are all 取引先: one query for the page (was one each) (AppListRecords::batchedTableRelations). */
+    protected function batchedTableRelations(): array
+    {
+        return ['customer', 'plateSupplier', 'manufacturer', 'dataSupplier', 'filmSupplier'];
+    }
 }
