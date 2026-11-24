@@ -8,10 +8,14 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Application\Users\UserAccountService;
+use Modules\Settings\Filament\Resources\Users\Pages\Concerns\HasUserFormPanes;
 use Modules\Settings\Filament\Resources\Users\UserResource;
 
+/** Laid out like プロフィール (HasUserFormPanes): the 設定 menu of the form's parts, キャンセル / 登録. */
 final class CreateUser extends CreateRecord
 {
+    use HasUserFormPanes;
+
     protected static string $resource = UserResource::class;
 
     protected static ?string $title = 'ユーザーを登録';
@@ -29,6 +33,15 @@ final class CreateUser extends CreateRecord
         $this->generatedPassword = $issued->generatedPassword;
 
         return $issued->user;
+    }
+
+    /** キャンセル on the left, 登録 on the right (as プロフィール; no 「保存して、続けて作成」). */
+    protected function getFormActions(): array
+    {
+        return [
+            $this->getCancelFormAction()->label('キャンセル'),
+            $this->getCreateFormAction()->label('登録'),
+        ];
     }
 
     protected function getCreatedNotification(): Notification

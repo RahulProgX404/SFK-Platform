@@ -14,16 +14,32 @@ use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Access\EmployeeDataAccess;
 use Modules\Core\Application\Users\UserAccountService;
 use Modules\Settings\Filament\Resources\Users\Actions\ResetPasswordAction;
+use Modules\Settings\Filament\Resources\Users\Pages\Concerns\HasUserFormPanes;
 use Modules\Settings\Filament\Resources\Users\UserResource;
 
-/** @property User $record */
+/**
+ * Laid out like プロフィール (HasUserFormPanes): the 設定 menu of the form's parts, キャンセル / 変更を保存.
+ *
+ * @property User $record
+ */
 final class EditUser extends EditRecord
 {
+    use HasUserFormPanes;
+
     protected static string $resource = UserResource::class;
 
     public function getTitle(): string
     {
         return "{$this->record->name} さんの編集";
+    }
+
+    /** キャンセル on the left, 変更を保存 on the right (as プロフィール). */
+    protected function getFormActions(): array
+    {
+        return [
+            $this->getCancelFormAction()->label('キャンセル'),
+            $this->getSaveFormAction()->label('変更を保存'),
+        ];
     }
 
     protected function getHeaderActions(): array

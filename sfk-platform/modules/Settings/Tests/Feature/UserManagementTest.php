@@ -5,6 +5,7 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Arr;
 use Livewire\Livewire;
+use Modules\Core\Application\Users\UserAccountService;
 use Modules\Core\Domain\People\EmploymentStatus;
 use Modules\Core\Models\EmployeeCategory;
 use Modules\Core\Models\Position;
@@ -162,6 +163,122 @@ it('edits a user and forces a password change when the admin sets a new password
     $user->refresh();
     expect($user->employment_status)->toBe(EmploymentStatus::Retired)
         ->and($user->must_change_password)->toBeTrue();
+});
+
+it('creates a manager with the マネージャー check box, unticked by default', function () {
+    Livewire::test(CreateUser::class)
+        ->assertSchemaStateSet(['is_manager' => false])
+        ->fillForm([
+            'name' => '山田 部長',
+            'email' => 'yamada@example.test',
+            'employment_status' => 'active',
+            'is_manager' => true,
+            ...employeeMasterFields(),
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    Livewire::test(CreateUser::class)
+        ->fillForm(['name' => '一般', 'email' => 'ippan@example.test', 'employment_status' => 'active', ...employeeMasterFields()])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(User::query()->where('email', 'yamada@example.test')->firstOrFail()->isManager())->toBeTrue()
+        ->and(User::query()->where('email', 'ippan@example.test')->firstOrFail()->isManager())->toBeFalse();
+});
+
+it('ticks and unticks マネージャー on the edit page and shows it on the user page', function () {
+    $user = User::factory()->inCategories((int) EmployeeCategory::query()->value('id'))->create(Arr::except(employeeMasterFields(), 'employee_category_ids'));
+
+    Livewire::test(EditUser::class, ['record' => $user->getRouteKey()])
+        ->assertSchemaStateSet(['is_manager' => false])
+        ->fillForm(['is_manager' => true])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($user->fresh()->isManager())->toBeTrue();
+    Livewire::test(ViewUser::class, ['record' => $user->getRouteKey()])->assertSee('マネージャー');
+
+    Livewire::test(EditUser::class, ['record' => $user->getRouteKey()])
+        ->assertSchemaStateSet(['is_manager' => true])
+        ->fillForm(['is_manager' => false])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($user->fresh()->isManager())->toBeFalse();
+});
+
+it('sets マネージャー only through the account service, never by mass assignment', function () {
+    $user = User::factory()->create();
+
+    expect((new User(['is_manager' => true]))->is_manager)->toBeFalse();
+
+    $user->fill(['is_manager' => true])->save();
+    expect($user->fresh()->isManager())->toBeFalse();
+
+    // an update that does not mention it keeps it
+    $service = app(UserAccountService::class);
+    $service->update($user, ['is_manager' => true], actor: $this->admin);
+    $service->update($user->fresh(), ['name' => '別名'], actor: $this->admin);
+    expect($user->fresh()->isManager())->toBeTrue();
+});
+
+it('lays the edit page out like プロフィール: the 設定 menu of the parts, キャンセル and 変更を保存', function () {
+    $user = User::factory()->inCategories((int) EmployeeCategory::query()->value('id'))->create(Arr::except(employeeMasterFields(), 'employee_category_ids'));
+
+    $this->get("/settings/users/{$user->id}/edit")
+        ->assertOk()
+        ->assertSee('sfk-profile-nav', false)
+        ->assertSeeInOrder(['設定', 'アカウント', '権限', '基本情報', '従業員マスタ情報', '住所・連絡先', '備考', 'ユーザー設定'])
+        ->assertSee('sfk-profile-pane', false)
+        ->assertSeeInOrder(['キャンセル', '変更を保存']);
+
+    Livewire::test(EditUser::class, ['record' => $user->getRouteKey()])->assertSet('pane', 'account');
+
+    Livewire::withQueryParams(['tab' => 'employee'])->test(EditUser::class, ['record' => $user->getRouteKey()])
+        ->assertSet('pane', 'employee');
+    Livewire::withQueryParams(['tab' => 'nope'])->test(EditUser::class, ['record' => $user->getRouteKey()])
+        ->assertSet('pane', 'account');
+});
+
+it('saves the parts of the edit page together and reports errors of a part that is not open', function () {
+    $user = User::factory()->inCategories((int) EmployeeCategory::query()->value('id'))->create(Arr::except(employeeMasterFields(), 'employee_category_ids'));
+
+    Livewire::test(EditUser::class, ['record' => $user->getRouteKey()])
+        ->fillForm(['name' => '新しい名前', 'is_manager' => true, 'last_name' => '佐藤', 'address' => '大阪府', 'notes' => 'メモ'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $user->refresh();
+    expect($user->name)->toBe('新しい名前')
+        ->and($user->isManager())->toBeTrue()
+        ->and($user->last_name)->toBe('佐藤')
+        ->and($user->address)->toBe('大阪府')
+        ->and($user->notes)->toBe('メモ');
+
+    // the open part is アカウント; the error is in 従業員マスタ情報
+    Livewire::test(EditUser::class, ['record' => $user->getRouteKey()])
+        ->fillForm(['worker_code' => ''])
+        ->call('save')
+        ->assertHasFormErrors(['worker_code' => 'required']);
+});
+
+it('lays the create page out like プロフィール too, with キャンセル and 登録', function () {
+    $this->get('/settings/users/create')
+        ->assertOk()
+        ->assertSee('sfk-profile-nav', false)
+        ->assertSeeInOrder(['設定', 'アカウント', '権限', '基本情報', '従業員マスタ情報', '住所・連絡先', '備考', 'ユーザー設定'])
+        ->assertSeeInOrder(['キャンセル', '登録'])
+        ->assertDontSee('保存して、続けて作成');
+
+    Livewire::withQueryParams(['tab' => 'contact'])->test(CreateUser::class)->assertSet('pane', 'contact');
+    Livewire::withQueryParams(['tab' => 'nope'])->test(CreateUser::class)->assertSet('pane', 'account');
+
+    // the open part is アカウント; the missing codes are in 従業員マスタ情報
+    Livewire::test(CreateUser::class)
+        ->fillForm(['name' => '新人', 'email' => 'shinjin@example.test', 'employment_status' => 'active', ...employeeMasterFields(['worker_code' => ''])])
+        ->call('create')
+        ->assertHasFormErrors(['worker_code' => 'required']);
 });
 
 it('resets a password from the user page', function () {

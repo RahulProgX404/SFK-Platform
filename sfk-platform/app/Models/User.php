@@ -31,8 +31,8 @@ use Modules\Core\Models\Space;
  * One user base for the whole platform. Which dashboards (panels) a user may open is decided by their own
  * `dashboards`, their 従業員カテゴリ and their ユーザー種別 (`user_type`) — see DashboardAccess. What a user may do in the system
  * is their ユーザー種別; their duty in the company is 従業員カテゴリ, their designation 役職 (optional).
- * `user_type` is not mass assignable: it is set by UserAccountService / SuperAdminProvisioner after
- * the authorization checks. The employee profile (氏名, 在籍状況, 役職 …)
+ * `user_type` and `is_manager` are not mass assignable: they are set by UserAccountService / SuperAdminProvisioner
+ * after the authorization checks. The employee profile (氏名, 在籍状況, 役職 …)
  * lives on the same record (SYSTEM_BRAIN APP_02 "Employee ↔ system user link"). The employee-master
  * codes, category and hourly rates are administrator-only; the rates are confidential and hidden from
  * serialization — see {@see EmployeeDataAccess}. The user is also the record of the app 02. 従業員マスタ and takes its
@@ -58,6 +58,7 @@ use Modules\Core\Models\Space;
  * @property int|null $list_page_size 表示件数 of the app lists (blank = 60, AppListRecords::DEFAULT_PAGE_SIZE)
  * @property bool $show_financial_analysis 財務分析を表示 (set by administrators)
  * @property string $financial_scope 財務分析の範囲: overall (全体) | personal (個人のみ) — with 財務分析を表示
+ * @property bool $is_manager マネージャー (set by administrators in ユーザー管理; not mass assignable)
  * @property list<int>|null $app_order the user's own order of the apps in the アプリ panel (app ids)
  */
 #[Fillable([
@@ -90,6 +91,7 @@ class User extends Authenticatable implements FilamentUser, HasRecordComments
         'must_change_password' => false,
         'managed_by_env' => false,
         'financial_scope' => self::FINANCE_OVERALL,
+        'is_manager' => false,
     ];
 
     public function canAccessPanel(Panel $panel): bool
@@ -143,6 +145,15 @@ class User extends Authenticatable implements FilamentUser, HasRecordComments
     public function seesOverallFinance(): bool
     {
         return $this->seesFinancialAnalysis() && ($this->isSuperAdmin() || $this->financial_scope !== self::FINANCE_PERSONAL);
+    }
+
+    /**
+     * マネージャー (user, 2026-11-24): ticked by an administrator in ユーザー管理. Ask this — never a 役職 or 従業員カテゴリ
+     * name — for what managers may do beyond other users.
+     */
+    public function isManager(): bool
+    {
+        return (bool) $this->is_manager;
     }
 
     /** Whether this user may create, edit, reset and delete the given user (ユーザー種別 hierarchy). */
@@ -214,6 +225,7 @@ class User extends Authenticatable implements FilamentUser, HasRecordComments
             'must_change_password' => 'boolean',
             'managed_by_env' => 'boolean',
             'show_financial_analysis' => 'boolean',
+            'is_manager' => 'boolean',
             'app_order' => 'array',
             'password_changed_at' => 'datetime',
             'last_login_at' => 'datetime',

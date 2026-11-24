@@ -73,6 +73,11 @@ It stays inside the app: ダッシュボード設定 (スペース, アプリの
 共通管理, ユーザー管理, 会社カレンダー and 通知 for administrators follow ユーザー種別 only, and so do 作業単価 / 残業単価
 (EmployeeDataAccess, confidential pay). During メンテナンス中 アプリ管理 falls away like the other abilities that change data.
 
+**マネージャー** (`users.is_manager`, user 2026-11-24): a check box administrators tick in ユーザー管理 (create / edit;
+shown on the user's page). Managers will get additional permissions; ask `User::isManager()` for them — never a 役職 or
+従業員カテゴリ name. It is not mass assignable: only `UserAccountService` sets it (an update without the key keeps it).
+It grants nothing yet.
+
 ## Which records (`Modules\Core\Access\RecordAccess`)
 
 Like the legacy system's レコードのアクセス権, on top of the app permissions (they only narrow them; administrators are not

@@ -18,6 +18,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Js;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -39,28 +40,74 @@ use Modules\Settings\Filament\Resources\Users\UserResource;
  * below them, so 従業員マスタ情報 is administrator-only (SYSTEM_BRAIN APP_02, 11_PERMISSIONS §3).
  * `employee_category_ids`, `space_ids` and `generated_password` are not columns (UserAccountService / display only).
  * スペース (employees only) lists the spaces of the dashboards the user will open; the space's アクセス権 then
- * applies to the employee in its apps (AppAccess).
+ * applies to the employee in its apps (AppAccess). マネージャー (`is_manager`) marks the users who get additional
+ * permissions (User::isManager()); UserAccountService saves it.
  */
 final class UserForm
 {
-    public static function configure(Schema $schema): Schema
+    /**
+     * The parts of the form, in order: key => [label, icon]. With `$panes` (登録 / 編集, laid out like プロフィール) they
+     * are the 設定 menu and one is shown at a time.
+     */
+    public const PANES = [
+        'account' => ['アカウント', 'heroicon-o-key'],
+        'permissions' => ['権限', 'heroicon-o-shield-check'],
+        'profile' => ['基本情報', 'heroicon-o-identification'],
+        'employee' => ['従業員マスタ情報', 'heroicon-o-briefcase'],
+        'contact' => ['住所・連絡先', 'heroicon-o-map-pin'],
+        'notes' => ['備考', 'heroicon-o-chat-bubble-left-ellipsis'],
+    ];
+
+    /** Alpine variable of the open part (settings::pages.user-form). */
+    public const PANE_JS_VARIABLE = 'sfkPane';
+
+    /**
+     * `$panes`: one part at a time, switched in the browser (settings::pages.user-form). The others stay in the form —
+     * rendered, validated and saved together, so nothing typed in another part is lost — and a part with an error
+     * opens itself (Filament dispatches `expand` on the ancestors of the first error).
+     */
+    public static function configure(Schema $schema, bool $panes = false): Schema
     {
+        $sections = [
+            'account' => self::accountSection(),
+            'permissions' => self::permissionsSection(),
+            'profile' => self::profileSection(),
+            'employee' => self::employeeMasterSection(),
+            'contact' => self::contactSection(),
+            'notes' => Section::make('備考')
+                ->icon(Heroicon::OutlinedChatBubbleLeftEllipsis)
+                ->collapsible()
+                ->schema([
+                    Textarea::make('notes')
+                        ->hiddenLabel()
+                        ->rows(4)
+                        ->maxLength(2000),
+                ]),
+        ];
+
+        if ($panes) {
+            foreach ($sections as $key => $section) {
+                $sections[$key] = self::asPane($section, $key);
+            }
+        }
+
         return $schema
             ->columns(1)
-            ->components([
-                self::accountSection(),
-                self::profileSection(),
-                self::employeeMasterSection(),
-                self::contactSection(),
-                Section::make('備考')
-                    ->icon(Heroicon::OutlinedChatBubbleLeftEllipsis)
-                    ->collapsible()
-                    ->schema([
-                        Textarea::make('notes')
-                            ->hiddenLabel()
-                            ->rows(4)
-                            ->maxLength(2000),
-                    ]),
+            ->components(array_values($sections));
+    }
+
+    /** Shown only while its menu entry is chosen; never collapsed (the menu is the way to it). */
+    private static function asPane(Section $section, string $key): Section
+    {
+        $variable = self::PANE_JS_VARIABLE;
+        $value = Js::from($key)->toHtml();
+
+        return $section
+            ->collapsible(false)
+            ->visibleJs("{$variable} === {$value}")
+            ->extraAttributes([
+                'class' => 'sfk-profile-pane',
+                'x-on:expand' => "{$variable} = {$value}",
             ]);
     }
 
@@ -118,6 +165,21 @@ final class UserForm
                     ->default(EmploymentStatus::Active->value)
                     ->required()
                     ->native(false),
+            ]);
+    }
+
+    /** What the user may do: マネージャー, dashboards, spaces and the money of the dashboard. */
+    private static function permissionsSection(): Section
+    {
+        return Section::make('権限')
+            ->icon(Heroicon::OutlinedShieldCheck)
+            ->columns(2)
+            ->schema([
+                // managers get additional permissions (User::isManager())
+                Checkbox::make('is_manager')
+                    ->label('マネージャー')
+                    ->default(false)
+                    ->columnSpanFull(),
                 CheckboxList::make('dashboards')
                     ->label('利用可能なダッシュボード')
                     ->options(fn (): array => DashboardAccess::grantableOptions())

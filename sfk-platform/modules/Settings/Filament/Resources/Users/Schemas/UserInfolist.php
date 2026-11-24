@@ -43,6 +43,9 @@ final class UserInfolist
                             ->badge()
                             ->formatStateUsing(fn ($state): string => UserPresenter::typeLabel($state))
                             ->color(fn ($state): string => UserPresenter::typeColor($state)),
+                        IconEntry::make('is_manager')
+                            ->label('マネージャー')
+                            ->boolean(),
                         TextEntry::make('dashboards')
                             ->label('利用可能なダッシュボード')
                             ->state(fn (User $record): array => array_map(

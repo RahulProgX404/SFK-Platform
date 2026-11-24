@@ -29,6 +29,7 @@ use Modules\Core\Models\EmployeeCategory;
  * can open (own + 従業員カテゴリ, after this save); memberships in spaces of other dashboards are kept. The spaces of
  * their 従業員カテゴリ follow the categories (SpaceMembership). Only employees are space members (as on スペース), so
  * a user who stops being an employee leaves all spaces. Leaving a space drops their 個人 row of its アクセス権.
+ * マネージャー (`is_manager`) is not mass assignable on User; it is set here only when given (an update without it keeps it).
  */
 final class UserAccountService
 {
@@ -39,6 +40,7 @@ final class UserAccountService
     {
         $type = $this->assignableType($attributes['user_type'] ?? null, $actor, UserType::Employee);
         unset($attributes['user_type']);
+        [$attributes, $isManager] = $this->extractManager($attributes);
         $attributes = $this->withGrantableDashboards($attributes);
         [$attributes, $categoryIds] = $this->extractCategories($attributes);
         [$attributes, $spaceIds] = $this->extractSpaces($attributes);
@@ -46,7 +48,12 @@ final class UserAccountService
 
         $user = new User($attributes);
         $user->password = $generated ?? (string) $password;
-        $user->forceFill(['user_type' => $type, 'must_change_password' => true, 'managed_by_env' => false])->save();
+        $user->forceFill([
+            'user_type' => $type,
+            'is_manager' => $isManager ?? false,
+            'must_change_password' => true,
+            'managed_by_env' => false,
+        ])->save();
         if ($categoryIds !== null) {
             $user->employeeCategories()->sync($categoryIds);
             ReferenceCache::bump(); // their dashboards and access follow the categories
@@ -62,6 +69,7 @@ final class UserAccountService
         $this->authorizeManage($user, $actor);
         $type = $this->assignableType($attributes['user_type'] ?? null, $actor);
         unset($attributes['user_type']);
+        [$attributes, $isManager] = $this->extractManager($attributes);
         $attributes = $this->withGrantableDashboards($attributes);
         [$attributes, $categoryIds] = $this->extractCategories($attributes);
         [$attributes, $spaceIds] = $this->extractSpaces($attributes);
@@ -69,6 +77,9 @@ final class UserAccountService
         $user->fill($attributes);
         if ($type !== null) {
             $user->forceFill(['user_type' => $type]);
+        }
+        if ($isManager !== null) {
+            $user->forceFill(['is_manager' => $isManager]);
         }
         if (filled($password)) {
             $this->applyTemporaryPassword($user, (string) $password);
@@ -139,6 +150,24 @@ final class UserAccountService
         }
 
         return $type;
+    }
+
+    /**
+     * Takes `is_manager` (マネージャー) out of the attributes; null when not given.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return array{0: array<string, mixed>, 1: bool|null}
+     */
+    private function extractManager(array $attributes): array
+    {
+        if (! array_key_exists('is_manager', $attributes)) {
+            return [$attributes, null];
+        }
+
+        $isManager = filter_var($attributes['is_manager'], FILTER_VALIDATE_BOOLEAN);
+        unset($attributes['is_manager']);
+
+        return [$attributes, $isManager];
     }
 
     /**

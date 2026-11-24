@@ -2528,6 +2528,11 @@
         min-height: 42px;
     }
 
+    /* one part at a time (ユーザーの登録 / 編集, settings::pages.user-form): no rule above the part shown */
+    .sfk-profile-main .fi-grid-col .fi-section.sfk-profile-pane {
+        border-top: 0;
+    }
+
     /* ---- the record side panel (コメント | 変更履歴) -------------------------------------------------------------- */
     .sfk-record-sidebar,
     .sfk-record-sidebar-collapsed {
