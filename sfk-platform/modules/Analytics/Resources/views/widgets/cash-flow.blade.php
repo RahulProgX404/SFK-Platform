@@ -18,21 +18,6 @@
 <div class="sfk-dash-cell sfk-dash-span-3">
     {{-- live: redrawn when what it reads changes (DashboardCard::liveTables(), DataPulse) --}}
     @include('core::filament.live-data', ['tables' => $this::liveTables()])
-    <style>
-        .sfk-cash-rows { display: flex; flex-direction: column; margin: 0; }
-        .sfk-cash-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sfk-space-3); padding: var(--sfk-space-3) 0; }
-        .sfk-cash-row + .sfk-cash-row { border-top: 1px solid var(--sfk-line-soft); }
-        .sfk-cash-row dt { display: flex; align-items: center; gap: var(--sfk-space-2); color: var(--sfk-text); font-size: var(--sfk-fs-body); }
-        .sfk-cash-icon { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: var(--sfk-radius); background: var(--sfk-tone-soft); color: var(--sfk-tone); }
-        .sfk-cash-icon .fi-icon { width: 16px; height: 16px; }
-        .sfk-cash-row dd { margin: 0; color: var(--sfk-ink); font-size: var(--sfk-fs-label); font-weight: var(--sfk-fw-semibold); font-variant-numeric: tabular-nums; white-space: nowrap; }
-        .sfk-cash-net { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sfk-space-3); margin-top: auto; padding: var(--sfk-space-3) var(--sfk-space-4); border-radius: var(--sfk-radius-lg); background: var(--sfk-success-soft); }
-        .sfk-cash-net.is-minus { background: var(--sfk-danger-soft); }
-        .sfk-cash-net span { color: var(--sfk-text); font-size: var(--sfk-fs-small); font-weight: var(--sfk-fw-semibold); }
-        .sfk-cash-net strong { color: var(--sfk-success); font-size: var(--sfk-fs-figure); font-weight: var(--sfk-fw-bold); font-variant-numeric: tabular-nums; white-space: nowrap; }
-        .sfk-cash-net.is-minus strong { color: var(--sfk-danger-text, var(--sfk-danger)); }
-    </style>
-
     <section class="sfk-dash-card sfk-cash" aria-labelledby="sfk-cash-title">
         <header class="sfk-dash-card-head">
             <div class="sfk-dash-card-titles">

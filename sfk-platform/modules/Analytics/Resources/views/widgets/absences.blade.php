@@ -9,18 +9,6 @@
 <div class="sfk-dash-cell sfk-dash-span-{{ $span }} sfk-dash-t-half is-fit">
     {{-- live: redrawn when what it reads changes (DashboardCard::liveTables(), DataPulse) --}}
     @include('core::filament.live-data', ['tables' => $this::liveTables()])
-    <style>
-        .sfk-absence-days { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--sfk-space-3); }
-        .sfk-absence-day { min-width: 0; padding: var(--sfk-space-3); border-radius: var(--sfk-radius-lg); box-shadow: inset 0 0 0 1px var(--sfk-line-soft); }
-        .sfk-absence-day h3 { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sfk-space-2); margin: 0 0 var(--sfk-space-1); color: var(--sfk-ink); font-size: var(--sfk-fs-body); font-weight: var(--sfk-fw-bold); }
-        .sfk-absence-day h3 small { color: var(--sfk-muted); font-size: var(--sfk-fs-small); font-weight: var(--sfk-fw-regular); font-variant-numeric: tabular-nums; }
-        .sfk-absence-day.is-today { background: var(--sfk-primary-soft); box-shadow: none; }
-        .sfk-absence-chip { flex: none; padding: 1px 8px; border-radius: 9999px; background: var(--sfk-tone-soft); color: var(--sfk-tone); font-size: var(--sfk-fs-badge); font-weight: var(--sfk-fw-semibold); white-space: nowrap; }
-        /* four people of room a day (the card's height); more scroll inside the day */
-        .sfk-dash-stack > .sfk-absence-days .sfk-dash-people { max-height: calc({{ \Modules\Analytics\Filament\Widgets\AbsencesCard::ROWS_PER_DAY }} * 50px); overflow-y: auto; scrollbar-width: thin; }
-        .sfk-absence-none { margin: 0; padding: var(--sfk-space-1) 0; color: var(--sfk-muted); font-size: var(--sfk-fs-small); }
-    </style>
-
     <section class="sfk-dash-card" aria-labelledby="sfk-absences-title">
         <header class="sfk-dash-card-head">
             <div class="sfk-dash-card-titles">
@@ -32,7 +20,7 @@
             @endif
         </header>
 
-        <div class="sfk-dash-stack">
+        <div class="sfk-dash-stack" style="--sfk-absence-rows: {{ \Modules\Analytics\Filament\Widgets\AbsencesCard::ROWS_PER_DAY }}">
             @include('analytics::widgets.partials.ghost', ['kind' => 'absences', 'rows' => \Modules\Analytics\Filament\Widgets\AbsencesCard::ROWS_PER_DAY])
             <div class="sfk-absence-days">
             @foreach (['today' => '今日', 'tomorrow' => '明日'] as $key => $label)

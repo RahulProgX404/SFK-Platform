@@ -5,14 +5,13 @@ declare(strict_types=1);
 namespace Modules\Orders\Providers;
 
 use App\Modules\ModuleServiceProvider;
-use Filament\Support\Facades\FilamentView;
 use Filament\Support\Icons\Heroicon;
-use Filament\View\PanelsRenderHook;
 use Modules\Core\Application\Legacy\LegacyImporter;
 use Modules\Core\Application\Notifications\NotificationKind;
 use Modules\Core\Application\Notifications\NotificationKinds;
 use Modules\Core\Application\Records\RecordCards;
 use Modules\Core\Filament\Records\RecordTabs;
+use Modules\Core\Filament\Support\ThemeAssets;
 use Modules\MasterData\Filament\Resources\Partners\Pages\ViewPartner;
 use Modules\Orders\Application\FaxImport\ClaudeFaxOrderReader;
 use Modules\Orders\Application\FaxImport\FaxOrderReader;
@@ -59,7 +58,7 @@ final class OrdersServiceProvider extends ModuleServiceProvider
             check: OrderDueCheck::class,
         ));
 
-        // look of the app's own parts (sub-tables, 過去の受注履歴検索, 受注書 preview)
-        FilamentView::registerRenderHook(PanelsRenderHook::HEAD_END, fn (): string => view('orders::filament.styles')->render());
+        // look of the app's own parts (sub-tables, 過去の受注履歴検索, 受注書 preview): part of the cached theme, not of every page
+        ThemeAssets::extend('orders::filament.styles');
     }
 }

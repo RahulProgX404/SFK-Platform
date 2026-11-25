@@ -41,6 +41,7 @@ final class AnalyticsServiceProvider extends ModuleServiceProvider
         // their styles are part of the cached theme, not of the Livewire components a live redraw sends again
         ThemeAssets::extend('analytics::filament.analysis-styles');
         ThemeAssets::extend('analytics::widgets.partials.trend-style');
+        ThemeAssets::extend('analytics::widgets.partials.card-styles');
 
         // 個人の概要 on the page of a user (ユーザー管理, 02. 従業員マスタ): for the person and administrators (作業単価)
         Livewire::component('analytics.user-overview-card', UserOverviewCard::class);

@@ -18,32 +18,6 @@
     {{-- live: redrawn when what it reads changes (DashboardCard::liveTables(), DataPulse) --}}
     @include('core::filament.live-data', ['tables' => $this::liveTables()])
     @if ($shown)
-        <style>
-            .sfk-personal-wrap { display: flex; }
-            .sfk-personal-wrap > * { flex: 1; min-width: 0; }
-            .sfk-personal { position: relative; display: flex; flex-direction: column; gap: var(--sfk-space-4); padding: var(--sfk-space-5) var(--sfk-space-6); overflow: hidden; border-radius: var(--sfk-radius-xl); background: radial-gradient(circle at 78% 120%, rgba(91, 150, 230, .55), transparent 55%), linear-gradient(115deg, #071a33 0%, #0b2c57 38%, var(--sfk-primary) 72%, #2c6cc0 100%); box-shadow: 0 10px 24px rgba(5, 70, 126, .22); color: #fff; }
-            /* the stars and the wire hill of overview.png */
-            .sfk-personal::before { content: ""; position: absolute; inset: 0; background-image: radial-gradient(rgba(255, 255, 255, .55) 1px, transparent 1.5px), radial-gradient(rgba(255, 255, 255, .3) 1px, transparent 1.5px); background-position: 0 0, 37px 23px; background-size: 140px 90px, 90px 70px; opacity: .45; pointer-events: none; }
-            .sfk-personal-mesh { position: absolute; right: 0; bottom: 0; width: min(42%, 380px); height: 100%; color: rgba(255, 255, 255, .28); pointer-events: none; }
-            .sfk-personal-head { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sfk-space-3); }
-            .sfk-personal-title { margin: 0; font-size: var(--sfk-fs-heading); font-weight: var(--sfk-fw-bold); }
-            .sfk-personal-tools { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sfk-space-2); }
-            .sfk-personal-period { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--sfk-radius); background: rgba(255, 255, 255, .14); color: rgba(255, 255, 255, .92); font-size: var(--sfk-fs-badge); font-variant-numeric: tabular-nums; white-space: nowrap; }
-            .sfk-personal-period .fi-icon { width: 14px; height: 14px; }
-            .sfk-personal-range { height: 30px; padding: 0 28px 0 10px; border: 0; border-radius: var(--sfk-radius); background-color: rgba(255, 255, 255, .16); color: #fff; font: inherit; font-size: var(--sfk-fs-small); }
-            .sfk-personal-range option { color: var(--sfk-ink); }
-            .sfk-personal-range:focus { outline: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, .5); }
-            .sfk-personal-figures { position: relative; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--sfk-space-4); margin: 0; }
-            .sfk-personal-figure dt { display: flex; align-items: center; gap: var(--sfk-space-2); color: rgba(255, 255, 255, .88); font-size: var(--sfk-fs-label); font-weight: var(--sfk-fw-medium); }
-            .sfk-personal-figure dt .fi-icon { width: 18px; height: 18px; flex: none; }
-            .sfk-personal-figure dd { margin: 6px 0 0; font-size: 1.25rem; font-weight: var(--sfk-fw-bold); font-variant-numeric: tabular-nums; line-height: 1.3; overflow-wrap: anywhere; }
-            .sfk-personal-figure dd small { margin-left: 3px; color: rgba(255, 255, 255, .8); font-size: var(--sfk-fs-small); font-weight: var(--sfk-fw-medium); }
-            @media (max-width: 767px) {
-                .sfk-personal { padding: var(--sfk-space-4); }
-                .sfk-personal-figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-            }
-        </style>
-
         <section class="sfk-personal" aria-labelledby="sfk-personal-title-{{ $this->getId() }}">
             <svg class="sfk-personal-mesh" viewBox="0 0 380 150" preserveAspectRatio="xMaxYMax meet" fill="none" stroke="currentColor" stroke-width=".8" aria-hidden="true">
                 @for ($i = 0; $i < 9; $i++)

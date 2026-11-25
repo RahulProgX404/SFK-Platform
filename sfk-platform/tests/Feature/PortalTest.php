@@ -9,6 +9,7 @@
 use App\Models\User;
 use Filament\Facades\Filament;
 use Livewire\Livewire;
+use Modules\Analytics\Filament\Widgets\AbsencesCard;
 use Modules\Core\Application\Apps\AppUsageLog;
 use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\AppStatus;
@@ -339,10 +340,16 @@ it('keeps the dashboard\'s styles in the cached theme, out of the page and its L
 
     // the dashboard, the quick entries and the スペース wizard (Core), 売上分析 / 日報分析 and the 12-month charts (Analytics)
     expect($css)->toContain('.sfk-dashboard-page {', '.sfk-apps .sfk-empty {', '.sfk-qe {', '.sfk-sw {', '.sfk-an {', '.sfk-growth-tools {')
+        // the dashboard cards' own styles (analytics::widgets.partials.card-styles), 休暇・勤怠予定's rows from its markup
+        ->toContain('.sfk-revenue {', '.sfk-cash-net {', '.sfk-activity {', 'max-height: calc(var(--sfk-absence-rows) * 50px)')
+        // 04. 受注入力's parts, once in the theme instead of in every page's head
+        ->toContain('.sfk-order-label {')
         // the dashboard's rule for its empty スペース list stays inside the アプリ panel (設定 → アプリ has its own)
         ->not->toMatch('/(^|\})\s*\.sfk-empty \{/');
 
-    $this->actingAs($this->admin)->get('/erp')->assertOk()->assertDontSee('.sfk-dashboard-page {', false);
+    $this->actingAs($this->admin)->get('/erp')->assertOk()
+        ->assertDontSee(['.sfk-dashboard-page {', '.sfk-revenue {', '.sfk-order-label {'], false)
+        ->assertSee('--sfk-absence-rows: '.AbsencesCard::ROWS_PER_DAY, false);
     Livewire::test(PortalPage::class)->call('$refresh')->assertDontSee('.sfk-dash {', false);
 });
 

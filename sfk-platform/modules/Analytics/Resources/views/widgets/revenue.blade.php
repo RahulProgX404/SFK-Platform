@@ -11,37 +11,6 @@
 <div @class(["sfk-dash-cell sfk-dash-span-4", "sfk-dash-t-full" => $personal])>
     {{-- live: redrawn when what it reads changes (DashboardCard::liveTables(), DataPulse) --}}
     @include('core::filament.live-data', ['tables' => $this::liveTables()])
-    <style>
-        .sfk-revenue { display: flex; flex-direction: column; gap: var(--sfk-space-4); height: 100%; padding: var(--sfk-space-5); border-radius: var(--sfk-radius-xl); background: linear-gradient(160deg, var(--sfk-primary) 0%, #0b5aa3 100%); box-shadow: 0 8px 20px rgba(5, 70, 126, .2); color: #fff; }
-        .sfk-revenue-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sfk-space-3); }
-        .sfk-revenue-title { margin: 0; font-size: var(--sfk-fs-heading); font-weight: var(--sfk-fw-bold); }
-        .sfk-revenue-caption { display: flex; align-items: center; gap: 6px; margin-top: 4px; color: rgba(255, 255, 255, .85); font-size: var(--sfk-fs-badge); font-variant-numeric: tabular-nums; }
-        .sfk-revenue-caption .sfk-dash-tag { background: rgba(255, 255, 255, .2); color: #fff; }
-        .sfk-revenue-amount { margin: 0; font-size: 22px; font-weight: var(--sfk-fw-bold); line-height: 1.2; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-        .sfk-revenue-sub { margin: 4px 0 0; color: rgba(255, 255, 255, .78); font-size: var(--sfk-fs-small); font-variant-numeric: tabular-nums; }
-        .sfk-revenue-compare { display: flex; flex-direction: column; gap: 6px; padding-top: var(--sfk-space-3); border-top: 1px solid rgba(255, 255, 255, .2); font-size: var(--sfk-fs-small); font-variant-numeric: tabular-nums; }
-        .sfk-revenue-compare-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px var(--sfk-space-2); }
-        .sfk-revenue .sfk-dash-trend { background: #fff; }
-        .sfk-revenue-diff { color: #fff; font-weight: var(--sfk-fw-semibold); white-space: nowrap; }
-        .sfk-revenue-diff small { margin-right: 4px; color: rgba(255, 255, 255, .78); font-size: var(--sfk-fs-badge); font-weight: var(--sfk-fw-regular); }
-        .sfk-revenue-baseline { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px var(--sfk-space-3); margin: 0; color: rgba(255, 255, 255, .82); }
-        .sfk-revenue-baseline dt small { margin-left: 4px; font-size: var(--sfk-fs-badge); }
-        .sfk-revenue-baseline dd { margin: 0; color: #fff; font-weight: var(--sfk-fw-semibold); white-space: nowrap; }
-        .sfk-revenue-note { display: flex; align-items: center; gap: 6px; margin: 0; padding: 4px 8px; border-radius: var(--sfk-radius); background: rgba(255, 255, 255, .14); color: #fff; font-size: var(--sfk-fs-badge); }
-        .sfk-revenue-note .fi-icon { width: 14px; height: 14px; flex: none; }
-        .sfk-revenue-target { padding: var(--sfk-space-3) var(--sfk-space-4); border-radius: var(--sfk-radius-lg); background: rgba(255, 255, 255, .12); }
-        .sfk-revenue-target-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sfk-space-3); font-size: var(--sfk-fs-small); }
-        .sfk-revenue-target-row strong { font-size: var(--sfk-fs-label); font-weight: var(--sfk-fw-bold); font-variant-numeric: tabular-nums; white-space: nowrap; }
-        .sfk-revenue-bar { height: 8px; margin: var(--sfk-space-2) 0 6px; overflow: hidden; border-radius: 9999px; background: rgba(255, 255, 255, .22); }
-        .sfk-revenue-bar i { display: block; height: 100%; border-radius: 9999px; background: #fff; }
-        .sfk-revenue-target-note { display: flex; justify-content: space-between; gap: var(--sfk-space-3); color: rgba(255, 255, 255, .82); font-size: var(--sfk-fs-badge); font-variant-numeric: tabular-nums; }
-        .sfk-revenue-target-note b { color: #fff; font-weight: var(--sfk-fw-bold); }
-        .sfk-revenue-more { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; margin-top: auto; color: #fff; font-size: var(--sfk-fs-small); font-weight: var(--sfk-fw-semibold); text-decoration: none; opacity: .92; }
-        .sfk-revenue-more:hover { opacity: 1; text-decoration: underline; }
-        .sfk-revenue .sfk-tip-term:focus-visible, .sfk-revenue [data-sfk-tip]:focus-visible { outline-color: #fff; }
-        .sfk-revenue-more .fi-icon { width: 16px; height: 16px; }
-    </style>
-
     <section class="sfk-revenue" aria-labelledby="sfk-revenue-title">
         <div class="sfk-revenue-head">
             <div>

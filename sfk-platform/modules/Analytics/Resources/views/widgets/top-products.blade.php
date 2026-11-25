@@ -12,18 +12,6 @@
 <div class="sfk-dash-cell sfk-dash-span-20p">
     {{-- live: redrawn when what it reads changes (DashboardCard::liveTables(), DataPulse) --}}
     @include('core::filament.live-data', ['tables' => $this::liveTables()])
-    <style>
-        .sfk-products { display: flex; flex-direction: column; gap: var(--sfk-space-4); margin: 0; padding: 0; list-style: none; }
-        .sfk-products-item { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 6px var(--sfk-space-2); }
-        .sfk-products-item .sfk-dash-rankno { grid-row: span 3; align-self: start; }
-        .sfk-products-name { display: -webkit-box; overflow: hidden; color: var(--sfk-ink); font-size: var(--sfk-fs-body); font-weight: var(--sfk-fw-semibold); line-height: 1.35; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; min-height: calc(2em * 1.35); }
-        .sfk-products-bar { height: 10px; overflow: hidden; border-radius: 9999px; background: var(--sfk-line-soft); }
-        .sfk-products-bar i { display: block; height: 100%; border-radius: 9999px; }
-        .sfk-products-figure { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0 var(--sfk-space-2); }
-        .sfk-products-amount { color: var(--sfk-ink); font-size: var(--sfk-fs-label); font-weight: var(--sfk-fw-bold); font-variant-numeric: tabular-nums; white-space: nowrap; }
-        .sfk-products-count { color: var(--sfk-muted); font-size: var(--sfk-fs-badge); font-variant-numeric: tabular-nums; white-space: nowrap; }
-    </style>
-
     <section class="sfk-dash-card" aria-labelledby="sfk-products-title">
         <header class="sfk-dash-card-head">
             <div class="sfk-dash-card-titles">

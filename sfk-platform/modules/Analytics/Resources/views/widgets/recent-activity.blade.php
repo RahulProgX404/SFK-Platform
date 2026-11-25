@@ -17,27 +17,6 @@
 <div @class(['sfk-dash-cell', 'sfk-dash-span-'.$span, 'is-fit', 'sfk-dash-t-full' => $span === 4])>
     {{-- live: redrawn when what it reads changes (DashboardCard::liveTables(), DataPulse) --}}
     @include('core::filament.live-data', ['tables' => $this::liveTables()])
-    <style>
-        .sfk-activity { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--sfk-space-8); }
-        .sfk-activity ol { margin: 0; padding: 0; list-style: none; }
-        .sfk-activity-item { position: relative; display: flex; gap: var(--sfk-space-3); padding-bottom: var(--sfk-space-3); }
-        .sfk-activity-item::before { content: ""; position: absolute; left: 15px; top: 34px; bottom: 2px; width: 2px; border-radius: 2px; background: linear-gradient(180deg, var(--sfk-tone-soft), transparent); }
-        .sfk-activity-item:last-child::before { display: none; }
-        .sfk-activity-icon { position: relative; z-index: 1; display: grid; place-items: center; width: 32px; height: 32px; flex: none; border-radius: 9999px; background: var(--sfk-tone); color: #fff; }
-        .sfk-activity-icon .fi-icon { width: 16px; height: 16px; }
-        .sfk-activity-text { flex: 1; min-width: 0; padding-top: 4px; }
-        .sfk-activity-head { display: flex; align-items: baseline; justify-content: space-between; gap: 2px var(--sfk-space-3); }
-        .sfk-activity-head strong { flex: 1; min-width: 0; overflow: hidden; color: var(--sfk-ink); font-size: var(--sfk-fs-label); font-weight: var(--sfk-fw-semibold); text-overflow: ellipsis; white-space: nowrap; }
-        .sfk-activity-head time { display: flex; flex: none; align-items: baseline; margin-left: auto; gap: 6px; color: var(--sfk-text); font-size: var(--sfk-fs-badge); line-height: 1.35; white-space: nowrap; }
-        .sfk-activity-head time small { color: var(--sfk-muted); font-size: var(--sfk-fs-badge); font-variant-numeric: tabular-nums; }
-        .sfk-activity-body { display: block; margin-top: 2px; overflow: hidden; color: var(--sfk-text); font-size: var(--sfk-fs-small); text-overflow: ellipsis; white-space: nowrap; }
-        a.sfk-activity-text { color: inherit; text-decoration: none; }
-        a.sfk-activity-text:hover strong { color: var(--sfk-primary); }
-        .sfk-activity.is-single { grid-template-columns: minmax(0, 1fr); }
-        @media (max-width: 1023px) { .sfk-activity { grid-template-columns: minmax(0, 1fr); } }
-        @media (max-width: 480px) { .sfk-activity-head time { flex-direction: column; align-items: flex-end; gap: 0; } }
-    </style>
-
     <section class="sfk-dash-card" aria-labelledby="sfk-activity-title">
         <header class="sfk-dash-card-head">
             <h2 class="sfk-dash-card-title" id="sfk-activity-title">最近のアクティビティ</h2>

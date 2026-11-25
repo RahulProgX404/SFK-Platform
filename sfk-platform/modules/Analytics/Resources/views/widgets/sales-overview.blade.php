@@ -13,38 +13,6 @@
 <div class="sfk-dash-cell sfk-dash-span-{{ $span }}">
     {{-- live: redrawn when what it reads changes (DashboardCard::liveTables(), DataPulse) --}}
     @include('core::filament.live-data', ['tables' => $this::liveTables()])
-    <style>
-        .sfk-overview-kpis { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--sfk-space-4); }
-        .sfk-overview-kpi { min-width: 0; }
-        .sfk-overview-kpi + .sfk-overview-kpi { padding-left: var(--sfk-space-4); border-left: 1px solid var(--sfk-line-soft); }
-        .sfk-overview-label { margin: 0; color: var(--sfk-muted); font-size: var(--sfk-fs-small); }
-        .sfk-overview-value { margin: 2px 0 4px; color: var(--sfk-ink); font-size: 20px; font-weight: var(--sfk-fw-bold); line-height: 1.25; font-variant-numeric: tabular-nums; white-space: nowrap; }
-        .sfk-overview-value small { margin-left: 2px; color: var(--sfk-muted); font-size: var(--sfk-fs-small); font-weight: var(--sfk-fw-medium); }
-        .sfk-overview-count-row { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--sfk-space-3); }
-        .sfk-overview-spark { display: flex; align-items: flex-end; gap: 3px; width: 84px; height: 30px; flex: none; }
-        .sfk-overview-spark i { flex: 1; min-height: 3px; border-radius: 2px 2px 0 0; background: var(--sfk-primary); opacity: .3; }
-        .sfk-overview-spark i:last-of-type { opacity: .85; }
-        .sfk-overview-spark i.is-nodata { height: 100% !important; border: 1px dashed var(--sfk-line-strong); border-bottom: 0; background: transparent; opacity: 1; }
-        .sfk-overview-compare { display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--sfk-space-2); }
-        .sfk-overview-baseline { display: block; margin-top: 4px; color: var(--sfk-muted); font-size: var(--sfk-fs-badge); font-variant-numeric: tabular-nums; }
-        .sfk-overview-baseline b { color: var(--sfk-text); font-weight: var(--sfk-fw-semibold); }
-        .sfk-overview-bar { display: flex; gap: 2px; height: 10px; margin: var(--sfk-space-5) 0 var(--sfk-space-4); overflow: hidden; border-radius: 9999px; background: var(--sfk-line-soft); }
-        .sfk-overview-bar span { height: 100%; background: var(--sfk-tone); }
-        .sfk-overview-statuses { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sfk-space-3); margin: 0; }
-        .sfk-overview-status { min-width: 0; padding-left: var(--sfk-space-3); border-left: 3px solid var(--sfk-tone); }
-        .sfk-overview-status dt { color: var(--sfk-text); font-size: var(--sfk-fs-small); font-weight: var(--sfk-fw-medium); white-space: nowrap; }
-        .sfk-overview-status dd { margin: 2px 0 0; }
-        .sfk-overview-status-amount { display: block; overflow: hidden; color: var(--sfk-ink); font-size: var(--sfk-fs-label); font-weight: var(--sfk-fw-bold); font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
-        .sfk-overview-status-note { display: block; color: var(--sfk-muted); font-size: var(--sfk-fs-badge); font-variant-numeric: tabular-nums; white-space: nowrap; }
-        .sfk-overview-status.is-alert .sfk-overview-status-amount { color: var(--sfk-danger-text, var(--sfk-danger)); }
-        .sfk-tone-slate { --sfk-tone: #64748b; --sfk-tone-soft: #f1f5f9; }
-        @media (max-width: 640px) {
-            .sfk-overview-kpis { grid-template-columns: minmax(0, 1fr); }
-            .sfk-overview-kpi + .sfk-overview-kpi { padding: var(--sfk-space-3) 0 0; border-top: 1px solid var(--sfk-line-soft); border-left: 0; }
-            .sfk-overview-statuses { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: var(--sfk-space-4); }
-        }
-    </style>
-
     <section class="sfk-dash-card" aria-labelledby="sfk-overview-title">
         <header class="sfk-dash-card-head">
             <div class="sfk-dash-card-titles">
