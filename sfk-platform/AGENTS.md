@@ -37,7 +37,10 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   must survive running again, and elements appended to the body must check `isConnected`. A new cache gets a test with
   `config(['core.reference_cache' => true])` that changes are seen (`ReferenceCacheTest`).
 - Speed: nothing large goes into every page — panel CSS / JS live in the theme views served as one cached file
-  (`ThemeAssets`), big data of a dialog is fetched when it opens (e.g. 絞り込む). CSS: no `:has()` whose argument
+  (`ThemeAssets`), big data of a dialog is fetched when it opens (e.g. 絞り込む). A screen drawn by a Livewire component
+  (dashboard, quick entries, wizards, 分析) keeps its styles in a view of their own in the theme (`ThemeAssets::SCREEN_STYLES`,
+  other modules `ThemeAssets::extend()`), scoped to its own classes — never a `<style>` inside the component, which every
+  Livewire update would send again (the dashboard's were ~40 KB, 2026-11-25). CSS: no `:has()` whose argument
   changes while the page is used (`[aria-expanded]`, `:checked`, a class Alpine toggles) and no `:not(:has(…))` on common
   wrappers — each such change makes the browser restyle the whole page (60–210 ms per click, measured 2026-11-20); use a
   class the element already carries or `:focus-within`. Filament's own such rules are replaced when its stylesheet is
@@ -63,7 +66,9 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   organizations; never gate features on a category or 役職 name.
 - Screens of an app (feature) extend `Modules\Core\Filament\AppResource` (app permissions, spaces, status) and its
   pages extend `Modules\Core\Filament\AppPages\App{List,Create,Edit,View}Record(s)` (the shared app screen design) —
-  see `docs/permissions.md`.
+  see `docs/permissions.md`. Their parts are traits by feature (`AppPages\Concerns\Lists\*`: インライン編集, 検索, 絞り込む,
+  表示件数, カレンダー, エクスポート, legacy buttons, 一括削除; `Concerns\Records\*`: コメント, 変更履歴, 帳票, ‹ ›) — add to
+  the one a change belongs to.
 - Components (SFK UI, `core::filament.ui`, included by the theme and the login layout): our own styles for check boxes,
   radio buttons, option lists, switches, tooltips, attachments, collapsible groups, multi-select chips, drop-down
   options and read-only tables, whose design language follows KUC (Cybozu's MIT UI component library — see
@@ -123,6 +128,8 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   チェックリスト as cards), the optional fields (追加情報), defaults, the record form's rules and `create()`; the engine
   keeps 戻る / 次へ, the check (a tap on a row goes back to its step, 次へ there returns to the check), フィールドのアクセス権,
   再利用, 変更履歴 and opens the saved record. Look: `core::filament.quick-entry-styles` (shared with QuickDailyReport).
+  The walk (steps, 戻る / 次へ, the check, 追加情報, the jump to the first error, 再利用, フィールドのアクセス権) is Core
+  `Filament\QuickEntry\StepPanel`, which QuickEntry and 08's QuickDailyReport both extend — never a copy of it.
   An app that is one screen (`AppResource::isSingleScreen()`, e.g. 12. 製袋予定管理's 製袋予定表 board) shows only its first
   view — no 一覧 tabs, 絞り込む or toolbar — with ⚙ (administrators: アプリの権限 only) in place of 新規.
   Every table on a record / form / dialog has the dark header row
@@ -131,7 +138,8 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   e.g. 受注 / 請求書 / 売掛明細 on 01. 取引先マスタ, `ViewPartner::TABS`), read through the providing app's `onlyVisible()`;
   fields shown in such a head respect フィールドのアクセス権. Its summary cards (of the record and of its tabs) are only for
   users who see everyone's money (`User::seesOverallFinance()`, as the app lists' summary cards).
-- Field order (create, edit and record page — one layout per app, `<App>Layout` rows): related fields in labelled
+- Field order (create, edit and record page — one layout per app, `<App>Layout` rows, built as
+  `RecordSections::cards($main, $make, $footer, $developer)` — 開発者用フィールド for super admins): related fields in labelled
   groups (string rows = group headings, left out when nothing under them is shown), the most important first (who /
   when / what, then details, amounts, notes and attachments; derived and internal fields last), each row filling the
   12-column grid of the 1,500 px canvas (125 px a column: 250 dates / amounts / codes, 375 users / selects, 500–750
@@ -158,7 +166,8 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   an input, and never leave an editable field looking disabled.
 - App lists are filtered only through the shared 絞り込む dialog (legacy design, `design_ref/filter1-3.png`): return the
   app's fields from `filterFields()` on its `AppListRecords` page (`Modules\Core\Application\Filters\FilterField`:
-  text / textarea / number / date / dateTime / choice / user, `relationship()` or `query()` for special storage). Do not
+  text / textarea / number / date / dateTime / choice / user, `relationship()` or `query()` for special storage, and
+  `relatedText($relation, $column)` for the number of a related record, e.g. 注番 `('order', 'order_number')`). Do not
   add Filament table `->filters()`. 適用 filters for the session, 保存 (administrators) stores a list view.
 - 一覧 (list views) follow the legacy view settings: an app's list page supplies `listColumns()` (all columns, order of
   （すべて）), `defaultListViews()` (`Modules\Core\Application\Views\ListView::table()/calendar()`, from SYSTEM_BRAIN
@@ -208,7 +217,8 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
   - related-record sections of a record (e.g. 見積履歴 / 納品履歴 / 請求履歴) stay empty when there are no records —
     never a message such as 「関連するレコードはありません。」;
   - user names in lists and records use `Modules\Core\Filament\Support\UserPopup` (`->html()`, list cells
-    `->disabledClick()`) for the ユーザー情報 popup; 印刷する (print view) needs nothing per app;
+    `->disabledClick()`; the user of a belongs-to relation: `->state(UserPopup::of('creator'))`) for the ユーザー情報
+    popup; 印刷する (print view) needs nothing per app;
   - 帳票出力 (PrintCreator replacement, `docs/documents.md`) needs nothing per app: アプリの設定 → 帳票出力 (templates from
     uploaded PDFs, designer, 出力設定) and the buttons / 上部スペース on the list and record pages come from Core. Its
     fields are read from the app's record page (infolist), so keep every printable field and table there; tables
@@ -243,7 +253,7 @@ Requirements come from the reverse-engineered knowledge base `../SYSTEM_BRAIN` (
 - 社内メッセージ (Messaging module, `docs/messaging.md`): every read / write / download asks `MessagingAccess` (404 for
   ids that are not the user's); real time = cache pulses (`Signals`), optionally pushed through Realtime; models that change no
   dashboard figure implement Core `Cache\OutsideDataCache`; a module adds to every page's script only through
-  `ThemeAssets::extend()` (small) and to the page pulse through `PulseChannels` (cache reads only).
+  `ThemeAssets::extend()` (small scripts; screen styles as above) and to the page pulse through `PulseChannels` (cache reads only).
 - A Filament action put straight into a Blade view (`{{ $this->fooAction }}`, `{{ ($page->fooAction)([...]) }}`) is drawn
   even when it is hidden — disabled, but visible. Wrap it: `@if (($a = ($this->fooAction)([...]))->isVisible()) {{ $a }} @endif`.
 - プロフィール: employees see only 一般設定 (their own 氏名 / 住所・連絡先); 通知設定, 従業員マスタ情報, パスワード設定 and

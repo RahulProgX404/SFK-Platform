@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Filament\Records\RecordSections;
 use Modules\Core\Filament\Records\RecordTable;
 use Modules\Core\Filament\Support\AppFormat;
+use Modules\Core\Filament\Support\UserPopup;
 use Modules\HumanResources\Domain\HrChoices;
 use Modules\HumanResources\Domain\HrFields;
 use Modules\HumanResources\Domain\SafetyChecks\ChecklistTemplate;
@@ -98,11 +99,11 @@ final class SafetyCheckLayout
 
         return match ($name) {
             // user names open the ユーザー情報 popup
-            'user_id' => $entry->state(Employees::popup('user'))->html(),
-            'employee_id' => $entry->state(Employees::popup('employee'))->html(),
+            'user_id' => $entry->state(UserPopup::of('user'))->html(),
+            'employee_id' => $entry->state(UserPopup::of('employee'))->html(),
             'checked_on' => $entry->date('Y-m-d'),
             'items' => self::itemsEntry(),
-            'creator', 'updater' => $entry->state(Employees::popup($name))->html(),
+            'creator', 'updater' => $entry->state(UserPopup::of($name))->html(),
             'created_at', 'updated_at' => $entry->dateTime('Y-m-d H:i'),
             default => $entry,
         };
@@ -114,15 +115,7 @@ final class SafetyCheckLayout
      */
     private static function components(callable $make, bool $withFooter): array
     {
-        $components = [RecordSections::section(self::MAIN, $make)];
-        if ($withFooter) {
-            $components[] = RecordSections::section(self::FOOTER, $make);
-        }
-        if (auth()->user() instanceof User && auth()->user()->isSuperAdmin()) {
-            $components[] = RecordSections::section(self::DEVELOPER, $make, '開発者用フィールド', collapsed: true);
-        }
-
-        return $components;
+        return RecordSections::cards(self::MAIN, $make, $withFooter ? self::FOOTER : null, self::DEVELOPER);
     }
 
     private static function itemsForm(): Repeater

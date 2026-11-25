@@ -5,75 +5,48 @@ declare(strict_types=1);
 namespace Modules\Core\Filament\AppPages;
 
 use App\Models\User;
-use BackedEnum;
-use Carbon\CarbonImmutable;
 use Closure;
-use DateTimeInterface;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
-use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\RenderHook;
 use Filament\Schemas\Components\View as ViewComponent;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
-use Filament\Support\Exceptions\Cancel;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Contracts\Pagination\CursorPaginator;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema as DatabaseSchema;
-use Illuminate\Support\HtmlString;
-use Illuminate\Support\Js;
-use Livewire\Attributes\Locked;
-use Livewire\Attributes\Renderless;
 use Livewire\Attributes\Session;
 use Livewire\Attributes\Url;
 use Livewire\Livewire;
 use Modules\Core\Access\FieldAccess;
 use Modules\Core\Application\Cache\ReferenceCache;
-use Modules\Core\Application\Documents\AppDocuments;
-use Modules\Core\Application\Documents\PrintJobs;
-use Modules\Core\Application\Export\ListCsvExport;
 use Modules\Core\Application\Filters\FilterField;
-use Modules\Core\Application\Filters\RecordFilterQuery;
-use Modules\Core\Application\History\HasRecordHistory;
-use Modules\Core\Application\History\RecordHistory;
-use Modules\Core\Application\Records\RecordDeletion;
-use Modules\Core\Application\Records\RecordValidator;
-use Modules\Core\Application\Records\RecordVersion;
 use Modules\Core\Application\Records\RelationBatch;
-use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
-use Modules\Core\Application\Views\ListViewInvalid;
 use Modules\Core\Application\Views\ListViewSchema;
 use Modules\Core\Application\Views\ListViewService;
-use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\FieldAccessLevel;
-use Modules\Core\Domain\Documents\OutputDelivery;
-use Modules\Core\Domain\Documents\OutputMode;
 use Modules\Core\Domain\Documents\OutputPlacement;
-use Modules\Core\Domain\Filters\FilterCondition;
-use Modules\Core\Domain\Filters\FilterFieldType;
-use Modules\Core\Domain\Filters\FilterOperator;
-use Modules\Core\Domain\Filters\RecordFilter;
-use Modules\Core\Domain\Search\SearchText;
 use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
-use Modules\Core\Filament\Support\DeleteImpact;
-use Modules\Core\Filament\Support\DocumentNameField;
+use Modules\Core\Filament\AppPages\Concerns\Lists\BulkDeletion;
+use Modules\Core\Filament\AppPages\Concerns\Lists\CalendarView;
+use Modules\Core\Filament\AppPages\Concerns\Lists\InlineEditing;
+use Modules\Core\Filament\AppPages\Concerns\Lists\LegacyButtons;
+use Modules\Core\Filament\AppPages\Concerns\Lists\ListExports;
+use Modules\Core\Filament\AppPages\Concerns\Lists\ListFilters;
+use Modules\Core\Filament\AppPages\Concerns\Lists\ListPagination;
+use Modules\Core\Filament\AppPages\Concerns\Lists\ListSearch;
 use Modules\Core\Filament\Support\MenuButtons;
 use Modules\Core\Filament\Support\SummaryCard;
 use Modules\Core\Filament\Tables\InlineField;
-use Modules\Core\Models\DocumentOutput;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Record list of an app (design_ref/app-index.png): the app name with the home link and the description popup,
@@ -94,26 +67,24 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * cells of inlineFields() into inputs (Tables\AppTextColumn) with 保存 / キャンセル, saved like the edit screen (rules
  * of the fields, 変更履歴). 一括削除 — 「…」 → 一括削除 (administrators with 削除) deletes every record of the list
  * as filtered and searched.
+ *
+ * The parts live in Concerns\Lists: InlineEditing, ListSearch, ListFilters, ListPagination, CalendarView, ListExports,
+ * LegacyButtons and BulkDeletion; this class keeps the views, the table and what an app overrides.
  */
 abstract class AppListRecords extends ListRecords
 {
+    use BulkDeletion;
+    use CalendarView;
     use HasAppChrome;
-
-    /** 表示件数 choices; blank = DEFAULT_PAGE_SIZE */
-    public const PAGE_SIZES = [20, 40, 60, 80, 100, 200, 300];
-
-    /** 60 (user 2026-11-18; was 100): a 100-row list took ~2.5× the server and browser time of a short one (docs/performance.md) */
-    public const DEFAULT_PAGE_SIZE = 60;
-
-    /** Most records drawn on one calendar month. */
-    public const CALENDAR_LIMIT = 1000;
+    use InlineEditing;
+    use LegacyButtons;
+    use ListExports;
+    use ListFilters;
+    use ListPagination;
+    use ListSearch;
 
     #[Url(as: 'view')]
     public string $listView = '';
-
-    /** カレンダー形式: the month shown (Y-m); blank = this month */
-    #[Url(as: 'month')]
-    public string $calendarMonth = '';
 
     /** ?new=1: the app's quick-create panel opens with the list (AppResource::newRecordUrl) */
     #[Url(as: 'new')]
@@ -127,34 +98,8 @@ abstract class AppListRecords extends ListRecords
     #[Url(as: 'created')]
     public ?string $createdRecord = null;
 
-    /** @var array<string, mixed>|null 適用 conditions (RecordFilter::toArray()); null = those of the view */
-    #[Session]
-    public ?array $appFilter = null;
-
-    /**
-     * 検索: the one column searched (the icon right of the search box); null = the app's searchable columns. Kept for
-     * the signed-in user until they log out (searchColumns()), so another user starts from the default.
-     */
-    #[Locked]
-    public ?string $searchColumn = null;
-
-    /** Session key of the chosen search columns: user id => list page => column (cleared at login and logout). */
-    public const SEARCH_COLUMNS_SESSION = 'sfk_search_columns';
-
-    /** インライン編集: key of the row being edited */
-    public ?string $inlineRecordKey = null;
-
-    /** インライン編集: 更新日時 of the row when it was opened (RecordVersion) */
-    #[Locked]
-    public ?string $inlineVersion = null;
-
-    /** @var array<string, mixed> インライン編集: values of the row being edited, by field */
-    public array $inlineData = [];
-
     /** @var list<ListView>|null */
     private ?array $views = null;
-
-    private ?bool $rowActionsEnabled = null;
 
     /**
      * Every column the app's list can show (name => label), in the order of （すべて）.
@@ -245,110 +190,6 @@ abstract class AppListRecords extends ListRecords
     public function inlineFields(): array
     {
         return [];
-    }
-
-    public function inlineField(string $name): ?InlineField
-    {
-        foreach ($this->allowedInlineFields() as $field) {
-            if ($field->name === $name) {
-                return $field;
-            }
-        }
-
-        return null;
-    }
-
-    /** その他の設定 → インライン編集: the pencil and × at the end of the rows. */
-    public function rowActionsEnabled(): bool
-    {
-        return $this->rowActionsEnabled ??= $this->appSetting('inline_edit_enabled');
-    }
-
-    public function isInlineEditing(Model $record): bool
-    {
-        return $this->inlineRecordKey !== null && $this->inlineRecordKey === (string) $record->getKey();
-    }
-
-    /** The pencil of a row: its cells become inputs. */
-    public function startInlineEdit(Model|string $record): void
-    {
-        $record = $this->inlineRecord($record instanceof Model ? (string) $record->getKey() : $record);
-        $this->resetErrorBag();
-
-        if ($record === null) {
-            $this->cancelInlineEdit();
-
-            return;
-        }
-
-        $this->inlineRecordKey = (string) $record->getKey();
-        $this->inlineData = $this->inlineEditState($record);
-        $this->inlineVersion = RecordVersion::of($record);
-    }
-
-    /** 保存 of the row being edited: checked with the fields' rules, saved and kept in the 変更履歴. */
-    public function saveInlineEdit(): void
-    {
-        $record = $this->inlineRecord($this->inlineRecordKey);
-        if ($record === null) {
-            $this->cancelInlineEdit();
-
-            return;
-        }
-
-        $rules = [];
-        $attributes = [];
-        foreach ($this->allowedInlineFields() as $field) {
-            foreach ($field->rules($record) as $path => $fieldRules) {
-                $rules['inlineData.'.$path] = $fieldRules;
-            }
-            $attributes['inlineData.'.$field->name] = $this->listColumns()[$field->name] ?? $field->name;
-            $attributes['inlineData.'.$field->name.'.*'] = $attributes['inlineData.'.$field->name];
-        }
-
-        /** @var array<string, mixed> $data */
-        $data = $this->validate($rules, [], $attributes)['inlineData'] ?? [];
-
-        // optimistic locking (RecordVersion): someone else saved the row since it was opened
-        if (! RecordVersion::unchanged($record, $this->inlineVersion)) {
-            Notification::make()->danger()->persistent()->title(RecordVersion::CONFLICT)->send();
-            $this->cancelInlineEdit();
-
-            return;
-        }
-
-        // the app's RecordRules (e.g. unique per person and month), for the fields changed here only — whatever else a
-        // legacy record lacks does not keep this edit from being saved
-        $recordRules = $this->appResource()::recordRules();
-        if ($recordRules !== null) {
-            $fields = array_map(fn (InlineField $field): string => $field->name, $this->allowedInlineFields());
-            RecordValidator::throwIfAny(RecordValidator::split($recordRules, [...$recordRules->values($record), ...$data], $record, 'inlineData', $fields)[0]);
-        }
-        foreach ($this->allowedInlineFields() as $field) {
-            $data[$field->name] = match (true) {
-                $field->isBoolean() => (bool) ($data[$field->name] ?? false),
-                $field->isMultiple() => array_values((array) ($data[$field->name] ?? [])),
-                default => blank($data[$field->name] ?? null) ? null : $data[$field->name],
-            };
-        }
-
-        DB::transaction(function () use ($record, $data): void {
-            $this->saveInlineRecord($record, $data);
-
-            if ($record instanceof HasRecordHistory && $this->appSetting('record_history_enabled')) {
-                $user = auth()->user();
-                app(RecordHistory::class)->record($record, $user instanceof User ? $user->id : null);
-            }
-        });
-
-        $this->cancelInlineEdit();
-    }
-
-    public function cancelInlineEdit(): void
-    {
-        $this->inlineRecordKey = null;
-        $this->inlineData = [];
-        $this->resetErrorBag();
     }
 
     public function listViewSchema(): ListViewSchema
@@ -537,192 +378,6 @@ abstract class AppListRecords extends ListRecords
         return SummaryCard::make($label, $value, $kind, $tone, $icon);
     }
 
-    /**
-     * The columns of the current 一覧 the search can look in one at a time (name => label): the app's searchable
-     * columns and the fields of 絞り込む (text, number, date, choice, user).
-     *
-     * @return array<string, string>
-     */
-    public function searchColumnOptions(?Table $table = null): array
-    {
-        $searchable = $this->defaultSearchColumns($table);
-        $fields = $this->filterFieldMap();
-        $labels = $this->listColumns();
-        $options = [];
-        foreach ($this->viewColumns() as $name) {
-            if (in_array($name, $searchable, true) || isset($fields[$name])) {
-                $options[$name] = $labels[$name] ?? $name;
-            }
-        }
-
-        return $options;
-    }
-
-    /** @return list<string> the columns the search looks in when no column is chosen (the app's searchable columns) */
-    public function defaultSearchColumns(?Table $table = null): array
-    {
-        $columns = [];
-        foreach (($table ?? $this->getTable())->getColumns() as $name => $column) {
-            if (! $column->isHidden() && $column->isGloballySearchable()) {
-                $columns[] = (string) $name;
-            }
-        }
-
-        return $columns;
-    }
-
-    /** The column chosen for the search, or null for the app's searchable columns (the first column when it has none). */
-    public function activeSearchColumn(): ?string
-    {
-        $options = $this->searchColumnOptions();
-        if ($this->searchColumn !== null && isset($options[$this->searchColumn])) {
-            return $this->searchColumn;
-        }
-
-        return $this->defaultSearchColumns() === [] ? array_key_first($options) : null;
-    }
-
-    /** The icon right of the search box: search one column (null = the app's searchable columns). */
-    public function setSearchColumn(?string $name): void
-    {
-        $this->searchColumn = $name !== null && isset($this->searchColumnOptions()[$name]) ? $name : null;
-        $this->cancelInlineEdit();
-        $this->resetPage($this->getTablePaginationPageName());
-
-        $user = auth()->id();
-        if ($user !== null) {
-            $stored = (array) session(self::SEARCH_COLUMNS_SESSION, []);
-            $stored[$user] = [...self::searchColumns(), static::class => $this->searchColumn];
-            session([self::SEARCH_COLUMNS_SESSION => $stored]);
-        }
-    }
-
-    /** @return array<string, string|null> the signed-in user's chosen search columns, by list page */
-    private static function searchColumns(): array
-    {
-        $user = auth()->id();
-        $stored = (array) session(self::SEARCH_COLUMNS_SESSION, []);
-
-        return $user !== null && is_array($stored[$user] ?? null) ? $stored[$user] : [];
-    }
-
-    /**
-     * Each word of the search (SearchText::words()) must be found — in the chosen column, else in one of the app's
-     * searchable columns; every comparison is on the normalized forms (SearchQuery).
-     *
-     * @param  Builder<Model>  $query
-     */
-    private function applySearch(Builder $query, string $search): void
-    {
-        $column = $this->activeSearchColumn();
-
-        foreach (SearchText::words($search) as $word) {
-            $query->where(function (Builder $query) use ($column, $word): void {
-                if ($column !== null) {
-                    $this->searchOneColumn($query, $column, $word);
-
-                    return;
-                }
-
-                $isFirst = true;
-                foreach ($this->getTable()->getColumns() as $tableColumn) {
-                    if (! $tableColumn->isHidden() && $tableColumn->isGloballySearchable()) {
-                        $tableColumn->applySearchConstraint($query, $word, $isFirst);
-                    }
-                }
-                if ($isFirst) {
-                    $query->whereRaw('1 = 0');
-                }
-            });
-        }
-    }
-
-    /** @param  Builder<Model>  $query */
-    private function searchOneColumn(Builder $query, string $name, string $word): void
-    {
-        $column = $this->getTable()->getColumn($name);
-        if ($column !== null && $column->isGloballySearchable()) {
-            $isFirst = true;
-            $column->applySearchConstraint($query, $word, $isFirst);
-
-            return;
-        }
-
-        $field = $this->filterFieldMap()[$name] ?? null;
-        if ($field === null) {
-            $query->whereRaw('1 = 0');
-
-            return;
-        }
-
-        $condition = fn (FilterOperator $operator, array $values): FilterCondition => new FilterCondition($field->name, $field->type, $operator, $values);
-        $custom = $field->getQuery();
-        $relationship = $field->getRelationship();
-        $qualified = fn (Builder $query, string $column): string => $query->qualifyColumn($column);
-
-        switch ($field->type) {
-            case FilterFieldType::Text:
-            case FilterFieldType::Textarea:
-                match (true) {
-                    $custom !== null => $custom($query, $condition(FilterOperator::Contains, [$word])),
-                    $relationship !== null => $query->whereHas($relationship, fn (Builder $q) => SearchQuery::where($q, $qualified($q, (string) $field->getRelatedColumn()), $word)),
-                    default => SearchQuery::where($query, $qualified($query, $field->getColumn()), $word),
-                };
-
-                return;
-            case FilterFieldType::Number:
-                $number = str_replace([',', '円', '¥', '\\'], '', $word);
-                if (! is_numeric($number)) {
-                    $query->whereRaw('1 = 0');
-                } elseif ($custom !== null) {
-                    $custom($query, $condition(FilterOperator::Equals, [$number]));
-                } else {
-                    self::castContains($query, $qualified($query, $field->getColumn()), $number);
-                }
-
-                return;
-            case FilterFieldType::Date:
-            case FilterFieldType::DateTime:
-                $custom === null
-                    ? self::castContains($query, $qualified($query, $field->getColumn()), self::searchDate($word))
-                    : $query->whereRaw('1 = 0');
-
-                return;
-            case FilterFieldType::Choice:
-            case FilterFieldType::User:
-                // the options whose label has the word
-                $values = array_map('strval', array_keys(array_filter(
-                    $field->getOptions(),
-                    fn (string $label): bool => array_filter(SearchText::variants($word), fn (string $form): bool => str_contains(SearchText::normalize($label), $form)) !== [],
-                )));
-                match (true) {
-                    $values === [] => $query->whereRaw('1 = 0'),
-                    $custom !== null => $custom($query, $condition(FilterOperator::In, $values)),
-                    $relationship !== null => $query->whereHas($relationship, fn (Builder $q) => $q->whereIn($qualified($q, (string) $field->getRelatedColumn()), $values)),
-                    default => $query->whereIn($qualified($query, $field->getColumn()), $values),
-                };
-
-                return;
-        }
-    }
-
-    /** @param  Builder<Model>  $query */
-    private static function castContains(Builder $query, string $column, string $text): void
-    {
-        $query->whereRaw('CAST('.$query->getQuery()->getGrammar()->wrap($column)." AS TEXT) LIKE ? ESCAPE '!'", ['%'.SearchQuery::escapeLike($text).'%']);
-    }
-
-    /** A date as typed (2026/10/5, 2026年10月, 10/05 …) in the stored form: parts joined by -, months and days 2 digits. */
-    private static function searchDate(string $word): string
-    {
-        $parts = preg_split('/[\/.\-年月日]+/u', $word, flags: PREG_SPLIT_NO_EMPTY) ?: [];
-        if (count($parts) < 2) {
-            return $word;
-        }
-
-        return implode('-', array_map(fn (string $part): string => ctype_digit($part) && strlen($part) === 1 ? '0'.$part : $part, $parts));
-    }
-
     /** A click on the sorted column's header switches 昇順 ⇄ 降順 (it does not go back to the default order). */
     public function sortTable(?string $column = null, ?string $direction = null): void
     {
@@ -751,186 +406,6 @@ abstract class AppListRecords extends ListRecords
             ViewComponent::make('core::filament.app-list-scrollbar')->visible(fn (): bool => $this->currentView()->isTable()),
             RenderHook::make(PanelsRenderHook::RESOURCE_PAGES_LIST_RECORDS_TABLE_AFTER),
         ]);
-    }
-
-    /** 表示件数 of the signed-in user. */
-    public function pageSize(): int
-    {
-        $user = auth()->user();
-        $size = $user instanceof User ? (int) $user->list_page_size : 0;
-
-        return in_array($size, self::PAGE_SIZES, true) ? $size : self::DEFAULT_PAGE_SIZE;
-    }
-
-    public function setPageSize(int $size): void
-    {
-        $user = auth()->user();
-        if (! $user instanceof User || ! in_array($size, self::PAGE_SIZES, true)) {
-            return;
-        }
-
-        $user->forceFill(['list_page_size' => $size])->save();
-        $this->tableRecordsPerPage = $size;
-        $this->resetTable();
-    }
-
-    /** The 条件 / ソート in effect: applied in this session, else those of the view. */
-    public function activeFilter(): RecordFilter
-    {
-        $schema = $this->listViewSchema();
-
-        return RecordFilter::fromArray($this->appFilter ?? $this->currentView()->filter, $schema->filterTypes(), $schema->sortableFields());
-    }
-
-    /**
-     * Static data of the 絞り込む dialog (core::filament.app-filter). Renderless: opening the dialog changes nothing on
-     * the page — without it, the whole list was drawn again and sent back with the data (~1 MB, as long as a reload of a
-     * 100-row list; docs/performance.md).
-     *
-     * @return array{fields: list<array<string, mixed>>, sortable: list<array{name: string, label: string}>, canSave: bool}
-     */
-    #[Renderless]
-    public function filterDialog(): array
-    {
-        return [
-            ...self::filterEditorConfig($this->allowedFilterFields()),
-            'canSave' => $this->canSaveListViews(),
-        ];
-    }
-
-    /**
-     * Fields and ソート choices of a 条件 / ソート editor (the 絞り込む dialog and the 一覧 screen).
-     *
-     * @param  list<FilterField>  $fields
-     * @return array{fields: list<array<string, mixed>>, sortable: list<array{name: string, label: string}>}
-     */
-    public static function filterEditorConfig(array $fields): array
-    {
-        return [
-            'fields' => array_map(fn (FilterField $field): array => $field->toDialog(), $fields),
-            'sortable' => array_values(array_map(
-                fn (FilterField $field): array => ['name' => $field->name, 'label' => $field->label],
-                array_filter($fields, fn (FilterField $field): bool => $field->isSortable()),
-            )),
-        ];
-    }
-
-    /**
-     * Content the dialog opens with: the filter in effect; ソート defaults to the list's default order.
-     *
-     * @return array<string, mixed>
-     */
-    public function appFilterState(): array
-    {
-        $state = $this->activeFilter()->toArray();
-
-        $default = $this->getTable()->getDefaultSortColumn();
-        if ($state['sorts'] === [] && $default !== null && in_array($default, $this->listViewSchema()->sortableFields(), true)) {
-            $state['sorts'] = [['field' => $default, 'direction' => $this->getTable()->getDefaultSortDirection() === 'desc' ? 'desc' : 'asc']];
-        }
-
-        return $state;
-    }
-
-    /** 適用: filters the list with the dialog content for this session. */
-    public function applyAppFilter(mixed $data): void
-    {
-        $schema = $this->listViewSchema();
-        $this->appFilter = RecordFilter::fromArray($data, $schema->filterTypes(), $schema->sortableFields())->toArray();
-        $this->resetPage();
-    }
-
-    /** 保存 (administrators): stores the dialog content as a new 一覧 with the current view's layout; returns an error. */
-    public function saveAppFilter(mixed $data, mixed $name): ?string
-    {
-        $app = $this->appResource()::app();
-
-        if (! $this->canSaveListViews() || $app === null) {
-            return '一覧を保存する権限がありません。';
-        }
-
-        $current = $this->currentView();
-        $user = auth()->user();
-
-        try {
-            $view = app(ListViewService::class)->save($app, null, [
-                'name' => $name,
-                'type' => $current->type->value,
-                'columns' => $current->isBuiltIn() ? array_keys($this->listColumns()) : $current->columns,
-                'dateField' => $current->dateField,
-                'titleField' => $current->titleField,
-                'filter' => $data,
-            ], $this->listViewSchema(), $user instanceof User ? $user->id : null);
-        } catch (ListViewInvalid $invalid) {
-            return $invalid->errors['name'] ?? (array_values($invalid->errors)[0] ?? null);
-        }
-
-        $this->views = null;
-        $this->listView = (string) $view->id;
-        $this->appFilter = null;
-        $this->resetTable();
-
-        Notification::make()->title('一覧を保存しました')->success()->send();
-
-        return null;
-    }
-
-    /** @return array{from: int, to: int, total: int, previous: bool, next: bool, current: int, pages: list<int|null>}|null pages: null = 「…」 */
-    public function appPager(): ?array
-    {
-        if (! $this->currentView()->isTable()) {
-            return null;
-        }
-
-        $records = $this->getTableRecords();
-
-        if (! $records instanceof LengthAwarePaginator || $records->total() === 0) {
-            return null;
-        }
-
-        return [
-            'from' => (int) $records->firstItem(),
-            'to' => (int) $records->lastItem(),
-            'total' => $records->total(),
-            'previous' => $records->currentPage() > 1,
-            'next' => $records->hasMorePages(),
-            'current' => $records->currentPage(),
-            'pages' => self::pageNumbers($records->currentPage(), $records->lastPage()),
-        ];
-    }
-
-    /**
-     * The page buttons: the first and the last page and two on each side of the current one; null (「…」) for a gap.
-     *
-     * @return list<int|null>
-     */
-    public static function pageNumbers(int $current, int $last): array
-    {
-        $pages = [];
-        foreach (range(1, max(1, $last)) as $page) {
-            if ($page === 1 || $page === $last || abs($page - $current) <= 2) {
-                $pages[] = $page;
-            } elseif (end($pages) !== null) {
-                $pages[] = null;
-            }
-        }
-
-        return $pages;
-    }
-
-    public function gotoAppPage(int $page): void
-    {
-        $this->gotoPage(max(1, $page), $this->getTablePaginationPageName());
-    }
-
-    public function previousAppPage(): void
-    {
-        $this->previousPage($this->getTablePaginationPageName());
-    }
-
-    public function nextAppPage(): void
-    {
-        $this->nextPage($this->getTablePaginationPageName());
     }
 
     /**
@@ -968,83 +443,6 @@ abstract class AppListRecords extends ListRecords
         return view('core::filament.app-list-footer', ['page' => $this]);
     }
 
-    public function calendarMonthStart(): CarbonImmutable
-    {
-        if (preg_match('/^(\d{4})-(0[1-9]|1[0-2])$/', $this->calendarMonth, $m) === 1) {
-            return CarbonImmutable::create((int) $m[1], (int) $m[2], 1) ?? CarbonImmutable::now()->startOfMonth();
-        }
-
-        return CarbonImmutable::now()->startOfMonth();
-    }
-
-    public function shiftCalendarMonth(int $months): void
-    {
-        $this->calendarMonth = $this->calendarMonthStart()->addMonthsNoOverflow(max(-1200, min(1200, $months)))->format('Y-m');
-    }
-
-    public function showCurrentCalendarMonth(): void
-    {
-        $this->calendarMonth = '';
-    }
-
-    /**
-     * カレンダー形式: six weeks (Sunday first) around the shown month with the records of each day (filtered like the
-     * list), each with its タイトル and the link to the record.
-     *
-     * @return list<list<array{date: CarbonImmutable, inMonth: bool, isToday: bool, records: list<array{title: string, url: string|null}>}>>
-     */
-    public function calendarWeeks(): array
-    {
-        $view = $this->currentView();
-        $fields = $this->filterFieldMap();
-        $dateField = $fields[(string) $view->dateField] ?? null;
-        $titleField = $fields[(string) $view->titleField] ?? null;
-
-        $first = $this->calendarMonthStart();
-        $start = $first->subDays($first->dayOfWeek);
-        $end = $start->addWeeks(6);
-
-        $byDay = [];
-        if ($dateField !== null) {
-            $query = $this->getFilteredSortedTableQuery();
-            if ($query !== null) {
-                $column = $query->qualifyColumn($dateField->getColumn());
-                $format = $dateField->type === FilterFieldType::Date ? 'Y-m-d' : 'Y-m-d H:i:s';
-                $records = $query->where($column, '>=', $start->format($format))->where($column, '<', $end->format($format))
-                    ->limit(self::CALENDAR_LIMIT)->get();
-
-                foreach ($records as $record) {
-                    $date = $record->getAttribute($dateField->getColumn());
-                    if ($date === null) {
-                        continue;
-                    }
-                    $title = $titleField !== null ? $record->getAttribute($titleField->getColumn()) : $record->getKey();
-                    $byDay[CarbonImmutable::parse($date)->format('Y-m-d')][] = [
-                        'title' => $title instanceof BackedEnum ? (string) $title->value : (string) $title,
-                        'url' => $this->appResource()::hasPage('view') ? $this->appResource()::getUrl('view', ['record' => $record]) : null,
-                    ];
-                }
-            }
-        }
-
-        $weeks = [];
-        for ($week = 0; $week < 6; $week++) {
-            $days = [];
-            for ($weekday = 0; $weekday < 7; $weekday++) {
-                $date = $start->addDays($week * 7 + $weekday);
-                $days[] = [
-                    'date' => $date,
-                    'inMonth' => $date->month === $first->month,
-                    'isToday' => $date->isToday(),
-                    'records' => $byDay[$date->format('Y-m-d')] ?? [],
-                ];
-            }
-            $weeks[] = $days;
-        }
-
-        return $weeks;
-    }
-
     /**
      * The app's legacy buttons, エクスポート (帳票出力) and ⚙: the app's option actions (e.g. ファイルに書き出す), 一括削除
      * and the shortcuts of アプリの設定 (administrators).
@@ -1078,153 +476,6 @@ abstract class AppListRecords extends ListRecords
     }
 
     /**
-     * 「ファイルに書き出す」 (legacy ファイル書き出し, ListCsvExport) for users with the app's ファイル書き出し permission: the list as
-     * filtered, searched and sorted, with its database columns the user may see. An app with its own export (an option
-     * action named `export`, e.g. 01. 取引先マスタ) keeps it instead.
-     */
-    private function exportCsvAction(): Action
-    {
-        return Action::make('exportCsv')
-            ->label('ファイルに書き出す')
-            ->icon(Heroicon::OutlinedArrowDownTray)
-            ->visible(fn (): bool => $this->appResource()::appCan(AppAbility::Export)
-                && ! in_array('export', array_map(fn (Action $action): string => (string) $action->getName(), $this->optionActions()), true))
-            ->action(fn (): StreamedResponse => app(ListCsvExport::class)->download(
-                ($query = $this->getFilteredSortedTableQuery()) instanceof Builder ? $query : $this->appResource()::getEloquentQuery(),
-                $this->exportColumns(),
-                $this->appResource()::displayName(),
-            ));
-    }
-
-    /** @return array<string, string> the database columns of the list the user may see (attribute => label), id first */
-    public function exportColumns(): array
-    {
-        $model = $this->appResource()::getEloquentQuery()->getModel();
-        $stored = self::databaseColumns($model);
-        $hidden = $this->hiddenFields();
-        $columns = in_array($model->getKeyName(), $stored, true) ? [$model->getKeyName() => 'レコード番号'] : [];
-        foreach ($this->listColumns() as $name => $label) {
-            if (in_array($name, $stored, true) && ! in_array($name, $hidden, true)) {
-                $columns[$name] = $label;
-            }
-        }
-
-        return $columns;
-    }
-
-    /**
-     * The app's legacy list buttons (「ボタンをメニュー位置に配置する」 一覧画面メニューの右側), drawn as buttons right of 一覧 /
-     * 絞り込む (core::filament.app-header). A button working on the checked rows goes through onCheckedRows().
-     *
-     * @return list<Action>
-     */
-    protected function menuActions(): array
-    {
-        return [];
-    }
-
-    /**
-     * A menu button working on the rows checked in the list (legacy 「一覧で選択されたレコードを取得する」): its action gets
-     * them as `$records`. The app's table shows the check boxes (`Table::selectable()`) for whoever sees such a button.
-     */
-    protected static function onCheckedRows(Action $action): Action
-    {
-        $name = $action->getName();
-
-        // the checked rows live in the table's Alpine component: mount the action through it so they are sent along
-        return $action->accessSelectedRecords()
-            ->alpineClickHandler(
-                "(t => t ? Alpine.\$data(t).mountAction('{$name}') : \$wire.mountAction('{$name}'))(\$wire.\$el.querySelector('[x-data^=filamentTable]'))",
-            )
-            // nothing checked: the legacy warning instead of the dialog
-            ->mountUsing(function (Action $action, ?Schema $schema): void {
-                if ($action->getSelectedRecords()->isEmpty()) {
-                    Notification::make()->warning()->title('レコードを選択してください。')->send();
-
-                    throw new Cancel;
-                }
-
-                $schema?->fill();
-            });
-    }
-
-    /**
-     * A checked-row button that needs certain records ($scope, e.g. sales with a 納品書): disabled while the rows it
-     * would work on — the checked rows, or the list as filtered and searched when none is checked — hold none of them.
-     * The checked rows are judged in the browser ($store.sfkChecked) against the list's records outside $scope; with
-     * more than NEEDS_ROWS_LIMIT of those, checked rows always leave the button on (its action still checks them).
-     *
-     * @param  Closure(Builder<Model>): mixed  $scope
-     */
-    protected function needsRows(Action $action, Closure $scope): Action
-    {
-        return $action->extraAttributes(fn (): array => ['x-bind:disabled' => $this->needsRowsExpression($scope)], merge: true);
-    }
-
-    private const NEEDS_ROWS_LIMIT = 2000;
-
-    /** @var array<string, string> needsRows() expressions of this request, by the scope's query */
-    private array $needsRowsExpressions = [];
-
-    /** @param  Closure(Builder<Model>): mixed  $scope */
-    private function needsRowsExpression(Closure $scope): string
-    {
-        $query = $this->getFilteredTableQuery();
-        if (! $query instanceof Builder) {
-            return 'false';
-        }
-
-        $matching = $query->clone()->where(fn (Builder $query) => $scope($query));
-        $memo = $matching->toRawSql();
-        if (isset($this->needsRowsExpressions[$memo])) {
-            return $this->needsRowsExpressions[$memo];
-        }
-
-        if (! $matching->exists()) {
-            return $this->needsRowsExpressions[$memo] = 'true';
-        }
-
-        $keyName = $query->getModel()->getQualifiedKeyName();
-        $others = $query->clone()->reorder()->whereNot(fn (Builder $query) => $scope($query))
-            ->limit(self::NEEDS_ROWS_LIMIT + 1)->pluck($keyName)->map(fn (mixed $key): string => (string) $key)->all();
-
-        return $this->needsRowsExpressions[$memo] = count($others) > self::NEEDS_ROWS_LIMIT
-            ? 'false'
-            : '(c => c.count > 0 && ! c.all && c.keys.every(k => '.Js::from($others).'.includes(k)))($store.sfkChecked)';
-    }
-
-    /**
-     * エクスポート (帳票出力, アプリの設定 → 帳票出力): an entry per 出力設定 of the list — for the records of the list as
-     * filtered and searched (asking 「N件のレコードを出力しますか？」), or for the checked rows. 出力設定 with the same
-     * ボタン名 are one entry with a sub-menu of their サブボタン名. A ZIP whose ファイル名 has 「{ユーザー選択}」 asks for
-     * the field of the names.
-     *
-     * @return list<Action|ActionGroup>
-     */
-    private function exportActions(): array
-    {
-        $listed = collect([...$this->documentOutputsAt(OutputPlacement::ListMenu), ...$this->documentOutputsAt(OutputPlacement::ListSpace)])
-            ->unique('id')->values()->all();
-
-        $entries = [];
-        foreach (AppDocuments::groups($listed) as $group) {
-            $entries[] = MenuButtons::exportEntry(array_map(
-                fn (DocumentOutput $output): Action => $this->listedDocumentAction(Action::make('documentList'.$output->id), fn (): DocumentOutput => $output)
-                    ->label(count($group) > 1 ? $output->optionLabel() : $output->name),
-                $group,
-            ), $group[0]->name);
-        }
-        foreach (AppDocuments::groups($this->documentOutputsAt(OutputPlacement::ListChecked)) as $group) {
-            $entries[] = MenuButtons::exportEntry(array_map(
-                fn (DocumentOutput $output): Action => $this->checkedDocumentAction($output, count($group) > 1 ? $output->optionLabel() : $output->name.'（選択したレコード）'),
-                $group,
-            ), $group[0]->name.'（選択したレコード）');
-        }
-
-        return $entries;
-    }
-
-    /**
      * ⚙ → the shortcuts of アプリの設定 (administrators, HasAppChrome::appSettingsMenu()) under a divider.
      *
      * @return list<ActionGroup>
@@ -1237,339 +488,6 @@ abstract class AppListRecords extends ListRecords
         }
 
         return $links === [] ? [] : [ActionGroup::make($links)->dropdown(false)];
-    }
-
-    private function checkedDocumentAction(DocumentOutput $output, string $label): Action
-    {
-        $action = Action::make('documentChecked'.$output->id)->label($label)->icon(Heroicon::OutlinedPrinter);
-        if ($output->asksForNameField(forList: true)) {
-            $action->modalIcon(Heroicon::OutlinedPrinter)
-                ->modalWidth('md')
-                ->modalHeading($output->name)
-                ->modalSubmitActionLabel('出力する')
-                ->modalCancelActionLabel('キャンセル')
-                ->schema([DocumentNameField::make($this->appResource())]);
-        }
-
-        return self::onCheckedRows($action->action(function (Collection $records, array $data) use ($output): void {
-            if ($records->count() > DocumentOutput::MAX_RECORDS) {
-                Notification::make()->danger()->title(DocumentOutput::MAX_RECORDS.'件以下になるようにレコードを選択してください。')->send();
-
-                return;
-            }
-
-            $this->openDocuments($output, $records->map(fn (Model $record): int|string => $record->getKey())->values()->all(), self::chosenField($data));
-        }));
-    }
-
-    /** @param  array<string, mixed>  $data */
-    private static function chosenField(array $data): ?string
-    {
-        return is_string($data['name_field'] ?? null) && $data['name_field'] !== '' ? $data['name_field'] : null;
-    }
-
-    /** @return list<DocumentOutput> the 出力設定 the user gets at the place */
-    private function documentOutputsAt(OutputPlacement $placement): array
-    {
-        $user = auth()->user();
-
-        return AppDocuments::at($this->appResource()::app(), $user instanceof User ? $user : null, $placement);
-    }
-
-    /**
-     * A 出力 of the listed records: asks 「N件のレコードを出力しますか？」 (nothing listed, or more than the limit: a
-     * message instead), then opens the 帳票.
-     *
-     * @param  Closure(array<string, mixed>): ?DocumentOutput  $output
-     */
-    private function listedDocumentAction(Action $action, Closure $output): Action
-    {
-        return $action
-            ->icon(Heroicon::OutlinedPrinter)
-            ->modalIcon(Heroicon::OutlinedPrinter)
-            ->modalWidth('md')
-            ->modalHeading(fn (): string => number_format($this->getFilteredTableQuery()?->count() ?? 0).'件のレコードを出力しますか？')
-            ->modalSubmitActionLabel('出力する')
-            ->modalCancelActionLabel('キャンセル')
-            // a ZIP named with 「{ユーザー選択}」: which field
-            ->schema(fn (array $arguments): array => $output($arguments)?->asksForNameField(forList: true) === true
-                ? [DocumentNameField::make($this->appResource())]
-                : [])
-            ->mountUsing(function (array $arguments, ?Schema $schema) use ($output): void {
-                $count = $output($arguments) === null ? 0 : ($this->getFilteredTableQuery()?->count() ?? 0);
-                if ($count === 0) {
-                    Notification::make()->warning()->title('出力するレコードがありません。')->send();
-
-                    throw new Cancel;
-                }
-                if ($count > DocumentOutput::MAX_RECORDS) {
-                    Notification::make()->danger()->title(DocumentOutput::MAX_RECORDS.'件以下になるように絞り込んでください。')->send();
-
-                    throw new Cancel;
-                }
-
-                $schema?->fill();
-            })
-            ->action(function (array $arguments, array $data) use ($output): void {
-                $document = $output($arguments);
-                $query = $this->getFilteredSortedTableQuery();
-                if ($document === null || $query === null) {
-                    return;
-                }
-
-                $this->openDocuments($document, $query->limit(DocumentOutput::MAX_RECORDS)->pluck($query->getModel()->getQualifiedKeyName())->all(), self::chosenField($data));
-            });
-    }
-
-    /**
-     * Keeps the records for the 出力設定 (PrintJobs) and opens their 帳票 in a new tab, or downloads it.
-     *
-     * @param  list<int|string>  $keys
-     * @param  string|null  $nameField  the field chosen for 「{ユーザー選択}」 of the ファイル名
-     */
-    private function openDocuments(DocumentOutput $output, array $keys, ?string $nameField = null): void
-    {
-        $user = auth()->user();
-        if (! $user instanceof User) {
-            return;
-        }
-
-        $url = route('core.documents.print', ['token' => app(PrintJobs::class)->store($user->id, $output->id, $keys, $nameField)]);
-        $opens = $output->delivery === OutputDelivery::Open && $output->mode === OutputMode::Merged;
-
-        $this->js($opens ? 'window.open('.Js::from($url).', "_blank")' : 'window.location.href = '.Js::from($url));
-    }
-
-    /**
-     * The legacy text under the list menu (「メニュー位置に文字を表示する」 一覧画面メニューの下側) as button label =>
-     * explanation, shown in the collapsible 「ボタンの説明」 panel; empty for none.
-     *
-     * @return array<string, string>
-     */
-    public function menuHelp(): array
-    {
-        return [];
-    }
-
-    /** 一括削除: on in その他の設定, for administrators who may delete the app's records. */
-    public function canBulkDelete(): bool
-    {
-        return $this->appSetting('bulk_delete_enabled') && $this->isAppAdministrator() && $this->appResource()::canDeleteAny();
-    }
-
-    /**
-     * 「…」 → 一括削除 / 選択したレコードを削除 (red): with no row checked it deletes every record of the list as
-     * filtered and searched (一括削除: on in その他の設定, administrators), with rows checked only those (users with
-     * 削除). It asks twice — how many and what goes with them, then that it cannot be undone (confirmBulkDelete).
-     */
-    private function bulkDeleteAction(): Action
-    {
-        return Action::make('bulkDelete')
-            // the label follows the checked rows ($store.sfkCheckedRows)
-            ->label(new HtmlString('<span x-show="$store.sfkCheckedRows === 0">一括削除</span><span x-show="$store.sfkCheckedRows > 0" x-cloak>選択したレコードを削除</span>'))
-            ->icon(Heroicon::OutlinedTrash)
-            ->color('danger')
-            ->visible(fn (): bool => $this->appResource()::canDeleteAny())
-            // without 一括削除 the item is there for checked rows only
-            ->extraAttributes(fn (): array => $this->canBulkDelete() ? [] : ['x-show' => '$store.sfkCheckedRows > 0'])
-            // mounted through the table, so the checked rows come along
-            ->accessSelectedRecords()
-            ->alpineClickHandler("(t => t ? Alpine.\$data(t).mountAction('bulkDelete') : \$wire.mountAction('bulkDelete'))(\$wire.\$el.querySelector('[x-data^=filamentTable]'))")
-            ->mountUsing(function (Action $action): void {
-                if ($action->getSelectedRecords()->isNotEmpty()) {
-                    return;
-                }
-                if (! $this->canBulkDelete()) {
-                    Notification::make()->warning()->title('レコードを選択してください。')->send();
-
-                    throw new Cancel;
-                }
-                if (($this->getFilteredTableQuery()?->count() ?? 0) === 0) {
-                    Notification::make()->warning()->title('削除するレコードがありません。')->send();
-
-                    throw new Cancel;
-                }
-            })
-            ->modalIcon(Heroicon::OutlinedExclamationTriangle)
-            ->modalIconColor('danger')
-            ->modalWidth('md')
-            ->modalHeading(fn (Action $action): string => $action->getSelectedRecords()->isNotEmpty()
-                ? '選択した'.$action->getSelectedRecords()->count().'件のレコードを削除しますか？'
-                : number_format($this->getFilteredTableQuery()?->count() ?? 0).'件のレコードを一括削除しますか？')
-            ->modalDescription(fn (Action $action): HtmlString => $action->getSelectedRecords()->isNotEmpty()
-                ? DeleteImpact::description($this->appResource()::getModel(), $action->getSelectedRecords()->map(fn (Model $record): int|string => $record->getKey())->values()->all())
-                : DeleteImpact::description($this->appResource()::getModel(), $this->bulkDeleteKeys(['all' => true]),
-                    '一覧に表示されているすべてのレコード（絞り込み・検索の結果）が削除されます。'.DeleteImpact::PARTS))
-            ->modalSubmitAction(fn (Action $action): Action => $action->label('削除する')->color('danger'))
-            ->modalCancelActionLabel('キャンセル')
-            ->action(fn (Action $action) => $this->replaceMountedAction('confirmBulkDelete', $action->getSelectedRecords()->isNotEmpty()
-                ? ['keys' => $action->getSelectedRecords()->map(fn (Model $record): int|string => $record->getKey())->values()->all()]
-                : ['all' => true]));
-    }
-
-    /** 一括削除 / 選択したレコードを削除, second step: 「この操作は取り消せません」, then the records are deleted. */
-    public function confirmBulkDeleteAction(): Action
-    {
-        return Action::make('confirmBulkDelete')
-            ->visible(fn (array $arguments): bool => $this->appResource()::canDeleteAny() && (! ($arguments['all'] ?? false) || $this->canBulkDelete()))
-            ->requiresConfirmation()
-            ->color('danger')
-            ->modalIcon(Heroicon::OutlinedTrash)
-            ->modalIconColor('danger')
-            ->modalWidth('md')
-            ->modalHeading(fn (array $arguments): string => '本当に'.number_format(count($this->bulkDeleteKeys($arguments))).'件のレコードを削除しますか？')
-            ->modalDescription('この操作は取り消せません。')
-            ->modalSubmitActionLabel('削除する')
-            ->modalCancelActionLabel('キャンセル')
-            ->action(function (array $arguments): void {
-                $this->deleteRecords($this->bulkDeleteKeys($arguments));
-                $this->deselectAllTableRecords();
-            });
-    }
-
-    /**
-     * The records a 一括削除 / 選択したレコードを削除 is about: the checked ones, or every record of the list as filtered
-     * and searched (一括削除 only).
-     *
-     * @param  array<string, mixed>  $arguments
-     * @return list<int|string>
-     */
-    private function bulkDeleteKeys(array $arguments): array
-    {
-        if (! ($arguments['all'] ?? false)) {
-            return array_values(array_filter((array) ($arguments['keys'] ?? []), is_scalar(...)));
-        }
-
-        $query = $this->canBulkDelete() ? $this->getFilteredTableQuery() : null;
-
-        return $query === null ? [] : $query->pluck($query->getModel()->getQualifiedKeyName())->all();
-    }
-
-    /**
-     * Deletes the records the user may delete, one by one so their parts go with them; records other records still
-     * use are kept (RecordDeletion) and counted in the message.
-     *
-     * @param  list<int|string>  $keys
-     */
-    private function deleteRecords(array $keys): void
-    {
-        $resource = $this->appResource();
-        $deletion = app(RecordDeletion::class);
-        $deleted = 0;
-        $kept = [];
-
-        // one transaction (R4): an error part way through deletes nothing; records that may not go are only kept
-        DB::transaction(function () use ($keys, $resource, $deletion, &$deleted, &$kept): void {
-            foreach (array_chunk($keys, 200) as $chunk) {
-                foreach ($resource::getEloquentQuery()->whereKey($chunk)->get() as $record) {
-                    if (! $resource::canDelete($record)) {
-                        continue;
-                    }
-
-                    $reason = $deletion->delete($record);
-                    $reason === null ? $deleted++ : $kept[] = $reason;
-                }
-            }
-        });
-
-        $this->cancelInlineEdit();
-        $this->resetPage($this->getTablePaginationPageName());
-
-        Notification::make()->title($deleted.'件のレコードを削除しました')->success()->send();
-        if ($kept !== []) {
-            Notification::make()->danger()->persistent()
-                ->title(count($kept).'件のレコードは他のレコードで使われているため削除できませんでした')
-                ->body($kept[0])
-                ->send();
-        }
-    }
-
-    /**
-     * Values the inputs of インライン編集 start with; add the record's related data here (e.g. selected users).
-     *
-     * @return array<string, mixed>
-     */
-    protected function inlineEditState(Model $record): array
-    {
-        $state = [];
-        $columns = $record->getAttributes();
-        foreach ($this->allowedInlineFields() as $field) {
-            // columns only: related data (e.g. selected users) is added by the app
-            $value = array_key_exists($field->name, $columns) ? $record->getAttribute($field->name) : null;
-            $state[$field->name] = match (true) {
-                $value instanceof BackedEnum => (string) $value->value,
-                $value instanceof DateTimeInterface => $value->format('Y-m-d'),
-                $field->isBoolean() => (bool) $value,
-                $field->isMultiple() => array_values((array) $value),
-                default => $value,
-            };
-        }
-
-        return $state;
-    }
-
-    /**
-     * Saves the checked values of インライン編集 (inside a transaction); override for related data.
-     *
-     * @param  array<string, mixed>  $data
-     */
-    protected function saveInlineRecord(Model $record, array $data): void
-    {
-        $record->fill($data)->save();
-    }
-
-    /** The record behind a row key, when インライン編集 is on, the app has inline fields and the user may edit it. */
-    private function inlineRecord(?string $key): ?Model
-    {
-        if ($key === null || ! $this->rowActionsEnabled() || $this->allowedInlineFields() === []) {
-            return null;
-        }
-
-        $resource = $this->appResource();
-        $record = $resource::getEloquentQuery()->whereKey($key)->first();
-
-        return $record !== null && $resource::canEdit($record) ? $record : null;
-    }
-
-    /**
-     * @param  Builder<Model>  $query
-     * @return Builder<Model>
-     */
-    protected function applyFiltersToTableQuery(Builder $query, bool $isResolvingRecord = false): Builder
-    {
-        $query = parent::applyFiltersToTableQuery($query, $isResolvingRecord);
-
-        if ($isResolvingRecord) {
-            return $query;
-        }
-
-        $user = auth()->user();
-
-        return RecordFilterQuery::filter($query, $this->activeFilter(), $this->filterFieldMap(), $user instanceof User ? $user->id : null, CarbonImmutable::now());
-    }
-
-    /**
-     * ソート of 絞り込む / of the view replaces the default order; a click on a column header still wins.
-     *
-     * @param  Builder<Model>  $query
-     * @return Builder<Model>
-     */
-    protected function applySortingToTableQuery(Builder $query): Builder
-    {
-        $filter = $this->activeFilter();
-
-        if (blank($this->getTableSortColumn()) && $filter->sorts !== []) {
-            return RecordFilterQuery::sort($query, $filter, $this->filterFieldMap())
-                ->orderBy($query->getModel()->getQualifiedKeyName());
-        }
-
-        return parent::applySortingToTableQuery($query);
-    }
-
-    /** Managing 一覧 is app management: administrators and アプリ管理 of the app (AppAccess::manages()). */
-    protected function canSaveListViews(): bool
-    {
-        return $this->isAppAdministrator() && $this->filterFields() !== [];
     }
 
     /** @return list<string> */
@@ -1585,17 +503,6 @@ abstract class AppListRecords extends ListRecords
 
         // from the cache between requests (each schema lookup is a round trip; migrations bump it)
         return $columns[$table] ??= ReferenceCache::remember('columns:'.$table, fn (): array => DatabaseSchema::getColumnListing($table));
-    }
-
-    /** @return array<string, FilterField> */
-    private function filterFieldMap(): array
-    {
-        $fields = [];
-        foreach ($this->allowedFilterFields() as $field) {
-            $fields[$field->name] = $field;
-        }
-
-        return $fields;
     }
 
     /**
@@ -1620,17 +527,5 @@ abstract class AppListRecords extends ListRecords
     protected function hiddenFields(): array
     {
         return array_keys(array_filter($this->fieldLevels(), fn (FieldAccessLevel $level): bool => ! $level->canView()));
-    }
-
-    /** @return list<FilterField> the 絞り込む fields the user may see */
-    private function allowedFilterFields(): array
-    {
-        return array_values(array_filter($this->filterFields(), fn (FilterField $field): bool => $this->fieldLevel($field->name)->canView()));
-    }
-
-    /** @return list<InlineField> the インライン編集 fields the user may change */
-    private function allowedInlineFields(): array
-    {
-        return array_values(array_filter($this->inlineFields(), fn (InlineField $field): bool => $this->fieldLevel($field->name)->canEdit()));
     }
 }

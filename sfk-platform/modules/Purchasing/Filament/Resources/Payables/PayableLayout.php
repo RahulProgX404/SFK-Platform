@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Purchasing\Filament\Resources\Payables;
 
-use App\Models\User;
 use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
-use Illuminate\Support\HtmlString;
 use Modules\Core\Domain\Calendar\YearMonth;
 use Modules\Core\Filament\Records\RecordSections;
 use Modules\Core\Filament\Support\AppFormat;
@@ -106,9 +104,7 @@ final class PayableLayout
             $name === 'month_purchases' => View::make('core::filament.related-table')->viewData(fn (PayableMonth $record): array => self::monthPurchases($record)),
             $name === 'month_payments' => View::make('core::filament.related-table')->viewData(fn (PayableMonth $record): array => self::monthPayments($record)),
             $name === 'month_start' => $entry->date('Y-m-d'),
-            $name === 'creator', $name === 'updater' => $entry->state(fn (PayableMonth $record): HtmlString => UserPopup::html(
-                $record->getRelationValue($name) instanceof User ? $record->getRelationValue($name) : null,
-            ))->html(),
+            $name === 'creator', $name === 'updater' => $entry->state(UserPopup::of($name))->html(),
             $name === 'created_at', $name === 'updated_at' => $entry->dateTime('Y-m-d H:i'),
             default => $entry,
         };
@@ -120,15 +116,7 @@ final class PayableLayout
      */
     private static function components(callable $make, bool $withFooter): array
     {
-        $components = [RecordSections::section(self::MAIN, $make)];
-        if ($withFooter) {
-            $components[] = RecordSections::section(self::FOOTER, $make);
-        }
-        if (auth()->user() instanceof User && auth()->user()->isSuperAdmin()) {
-            $components[] = RecordSections::section(self::DEVELOPER, $make, '開発者用フィールド', collapsed: true);
-        }
-
-        return $components;
+        return RecordSections::cards(self::MAIN, $make, $withFooter ? self::FOOTER : null, self::DEVELOPER);
     }
 
     /**

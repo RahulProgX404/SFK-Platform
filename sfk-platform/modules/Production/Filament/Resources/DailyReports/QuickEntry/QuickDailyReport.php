@@ -9,17 +9,14 @@ use Closure;
 use Filament\Notifications\Notification;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
-use Livewire\Attributes\Locked;
-use Livewire\Component;
-use Modules\Core\Access\FieldAccess;
 use Modules\Core\Application\History\RecordHistory;
 use Modules\Core\Application\Search\SearchQuery;
-use Modules\Core\Domain\Apps\FieldAccessLevel;
 use Modules\Core\Domain\People\EmploymentStatus;
+use Modules\Core\Filament\QuickEntry\StepPanel;
 use Modules\Core\Filament\Support\VisibleChoice;
 use Modules\MasterData\Domain\Consumables\ConsumableKind;
 use Modules\MasterData\Models\Consumable;
@@ -39,12 +36,13 @@ use Modules\Production\Models\DailyReport;
  * (新規作成) — that asks for the essential fields one step at a time (STEPS: 注番, 機械名 with the job's machines first,
  * 開始 / 終了 / 休憩, 日種別 + 勤務種別, 出来上, 作業人数, 回数, 品質チェック, ケガ), then shows them for a check:
  * この内容で登録 saves, 追加情報を入力 adds the optional fields (DETAIL_FIELDS) first. 作業日 is today and 作業者 the
- * signed-in user unless changed there. Choices advance by themselves; typed values with 次へ / Enter. The rules are those
- * of the record form (BR-PR-05; 終了 after 開始); the figures follow from the model (TaskCosting, 勤務種別 残業 = overtime
- * from 開始 to 終了). Fields the user may not edit (フィールドのアクセス権) are left out and keep their defaults. After the
- * save the list opens with the new record marked (?created=). レコードを再利用する opens it with the copy (?duplicate=).
+ * signed-in user unless changed there. Choices advance by themselves; typed values with 次へ / Enter (the walk, the
+ * check and 再利用 are Core StepPanel's, as in every quick entry). The rules are those of the record form (BR-PR-05; 終了
+ * after 開始); the figures follow from the model (TaskCosting, 勤務種別 残業 = overtime from 開始 to 終了). Fields the user
+ * may not edit (フィールドのアクセス権) are left out and keep their defaults. After the save the list opens with the new
+ * record marked (?created=). レコードを再利用する opens it with the copy (?duplicate=).
  */
-final class QuickDailyReport extends Component
+final class QuickDailyReport extends StepPanel
 {
     /** The steps of the essential fields, in order => their fields. */
     public const STEPS = [
@@ -60,12 +58,6 @@ final class QuickDailyReport extends Component
         'quality' => ['quality_checks'],
         'damage' => ['damaged_before', 'damaged_after'],
     ];
-
-    /** The check of the entered values (この内容で登録 / 追加情報を入力). */
-    public const REVIEW = 'review';
-
-    /** 追加情報を入力: the optional fields. */
-    public const DETAILS = 'details';
 
     /** The optional fields, in the order of the record form. */
     public const DETAIL_FIELDS = ['worked_on', 'user_id', 'changeover_minutes', 'cardboard_id', 'cardboard_used', 'partition_id', 'partition_used', 'glue',
@@ -87,106 +79,12 @@ final class QuickDailyReport extends Component
     private const DECIMALS = ['produced', 'crew', 'changeover_count', 'damaged_before', 'damaged_after', 'changeover_minutes', 'cardboard_used', 'partition_used',
         'glue_cost'];
 
-    #[Locked]
-    public string $app = 'daily-report';
-
-    public bool $open = false;
-
-    /** The step shown: a key of STEPS, REVIEW or DETAILS. */
-    public string $screen = 'order';
-
-    /** forward | back: the way the step slides in. */
-    public string $direction = 'forward';
-
-    /** @var array<string, mixed> */
-    public array $data = [];
-
+    /** 注番・品名 search of the 注番 step; emptied on every new screen. */
     public string $orderSearch = '';
 
-    public function mount(string $app = 'daily-report', bool $open = false, ?string $duplicate = null): void
+    public static function resource(): string
     {
-        $this->app = $app;
-        $this->data = $this->defaults();
-        $this->screen = $this->steps()[0] ?? self::REVIEW;
-
-        if ($open && DailyReportResource::canCreate()) {
-            $this->open = true;
-            $copy = $this->duplicateSource($duplicate);
-            if ($copy !== null) {
-                $this->data = $this->copyOf($copy);
-                $this->screen = self::REVIEW;
-            }
-        }
-    }
-
-    /** 新規 / 新規作成: a fresh task at the first step. */
-    public function start(): void
-    {
-        abort_unless(DailyReportResource::canCreate(), 403);
-
-        $this->resetErrorBag();
-        $this->data = $this->defaults();
-        $this->orderSearch = '';
-        $this->direction = 'forward';
-        $this->screen = $this->steps()[0] ?? self::REVIEW;
-        $this->open = true;
-    }
-
-    public function close(): void
-    {
-        $this->open = false;
-        $this->resetErrorBag();
-    }
-
-    /** The form sent (次へ / Enter, この内容で登録, 登録): the next step, or the save on the check and 追加情報. */
-    public function submit(): void
-    {
-        if (array_key_exists($this->screen, self::STEPS)) {
-            $this->next();
-
-            return;
-        }
-
-        $this->register();
-    }
-
-    /** 次へ (and Enter): the step's values are checked, then the next step (after the last one, the check). */
-    public function next(): void
-    {
-        if (array_key_exists($this->screen, self::STEPS)) {
-            $this->check(self::STEPS[$this->screen]);
-        }
-
-        $order = [...$this->steps(), self::REVIEW];
-        $at = array_search($this->screen, $order, true);
-        $this->direction = 'forward';
-        $this->screen = $order[$at === false ? 0 : min($at + 1, count($order) - 1)];
-    }
-
-    /** 戻る: the step before (from 追加情報, the check). */
-    public function back(): void
-    {
-        $this->resetErrorBag();
-        $this->direction = 'back';
-        if ($this->screen === self::DETAILS) {
-            $this->screen = self::REVIEW;
-
-            return;
-        }
-
-        $order = [...$this->steps(), self::REVIEW];
-        $at = array_search($this->screen, $order, true);
-        $this->screen = $order[$at === false ? 0 : max($at - 1, 0)];
-    }
-
-    /** A value of the check tapped: back to its step. */
-    public function goTo(string $screen): void
-    {
-        if (in_array($screen, [...$this->steps(), self::REVIEW, self::DETAILS], true)) {
-            $this->resetErrorBag();
-            $this->direction = 'back';
-            $this->screen = $screen;
-        }
+        return DailyReportResource::class;
     }
 
     /** A choice tapped (注番, 機械名, a time, 作業人数): kept, and on to the next step. */
@@ -206,20 +104,12 @@ final class QuickDailyReport extends Component
         $this->data['quality_checks'] = ProductionChoices::QUALITY_CHECKS;
     }
 
-    /** 追加情報を入力: the essential values are checked first. */
-    public function showDetails(): void
-    {
-        $this->check($this->stepFields(), jump: true);
-        $this->direction = 'forward';
-        $this->screen = self::DETAILS;
-    }
-
     /** この内容で登録 / 登録: saved; the list then shows the new record. */
     public function register(): void
     {
         abort_unless(DailyReportResource::canCreate(), 403);
 
-        $this->check([...$this->stepFields(), ...$this->detailFields()], jump: true);
+        $this->check([...$this->askedFields(), ...$this->detailFields()], jump: true);
 
         $report = DB::transaction(fn (): DailyReport => DailyReport::query()->create($this->attributesToSave()));
 
@@ -247,11 +137,6 @@ final class QuickDailyReport extends Component
     public function detailFields(): array
     {
         return array_values(array_filter(self::DETAIL_FIELDS, $this->editable(...)));
-    }
-
-    public function editable(string $field): bool
-    {
-        return ($this->levels()[$field] ?? FieldAccessLevel::Edit)->canEdit();
     }
 
     public function label(string $field): string
@@ -399,27 +284,30 @@ final class QuickDailyReport extends Component
         return $summary;
     }
 
-    /**
-     * 3 / 11 of the steps (the check and 追加情報 count as done).
-     *
-     * @return array{at: int, of: int, percent: int}
-     */
-    public function progress(): array
-    {
-        $steps = $this->steps();
-        $at = array_search($this->screen, $steps, true);
-        $done = $at === false ? count($steps) : $at + 1;
-
-        return ['at' => $done, 'of' => count($steps), 'percent' => $steps === [] ? 100 : (int) round($done / count($steps) * 100)];
-    }
-
     public function render(): View
     {
         return view('production::filament.quick-daily-report');
     }
 
+    protected function showing(string $screen, string $direction): void
+    {
+        $this->orderSearch = '';
+    }
+
+    /** @return list<string> */
+    protected function stepFields(string $step): array
+    {
+        return array_values(array_filter(self::STEPS[$step] ?? [], $this->editable(...)));
+    }
+
+    /** @return list<string> */
+    protected function detailFieldNames(): array
+    {
+        return $this->detailFields();
+    }
+
     /** @return array<string, mixed> */
-    private function defaults(): array
+    protected function defaults(): array
     {
         $user = auth()->user();
 
@@ -435,26 +323,11 @@ final class QuickDailyReport extends Component
     }
 
     /**
-     * レコードを再利用する: the record to copy — visible, and 「レコードの再利用」 on.
-     */
-    private function duplicateSource(?string $id): ?DailyReport
-    {
-        $app = DailyReportResource::app();
-        if ($id === null || preg_match('/^\d+$/', $id) !== 1 || ($app !== null && ! $app->record_duplicate_enabled)) {
-            return null;
-        }
-
-        $source = DailyReportResource::getEloquentQuery()->whereKey((int) $id)->first();
-
-        return $source instanceof DailyReport && DailyReportResource::canView($source) ? $source : null;
-    }
-
-    /**
      * The copy: the task's entered values, for today and without the status update (as the record form's copy).
      *
      * @return array<string, mixed>
      */
-    private function copyOf(DailyReport $source): array
+    protected function copyOf(Model $source): array
     {
         $data = $this->defaults();
         foreach (array_keys($data) as $field) {
@@ -474,36 +347,8 @@ final class QuickDailyReport extends Component
         return $data;
     }
 
-    /**
-     * Validates the fields (those the user may edit); with $jump the step of the first error is shown.
-     *
-     * @param  list<string>  $fields
-     */
-    private function check(array $fields, bool $jump = false): void
-    {
-        $rules = [];
-        foreach ($this->fieldRules() as $key => $rule) {
-            $field = explode('.', $key)[1];
-            if (in_array($field, $fields, true) && $this->editable($field)) {
-                $rules[$key] = $rule;
-            }
-        }
-
-        try {
-            $this->validate($rules, [], $this->validationLabels());
-        } catch (ValidationException $exception) {
-            if ($jump) {
-                $field = explode('.', (string) array_key_first($exception->errors()))[1] ?? '';
-                $this->direction = 'back';
-                $this->screen = $this->screenOf($field);
-            }
-
-            throw $exception;
-        }
-    }
-
     /** @return array<string, list<mixed>> the rules of the record form (DailyReportLayout), on `data.<field>` */
-    private function fieldRules(): array
+    protected function validationRules(): array
     {
         $number = ['nullable', 'numeric', 'decimal:0,4', 'min:-999999999999', 'max:999999999999'];
         $required = ['required', 'numeric', 'decimal:0,4', 'min:-999999999999', 'max:999999999999'];
@@ -553,7 +398,7 @@ final class QuickDailyReport extends Component
     }
 
     /** @return array<string, string> */
-    private function validationLabels(): array
+    protected function validationLabels(): array
     {
         $labels = [];
         foreach ([...array_merge(...array_values(self::STEPS)), ...self::DETAIL_FIELDS] as $field) {
@@ -562,23 +407,6 @@ final class QuickDailyReport extends Component
         $labels['data.quality_checks.*'] = $this->label('quality_checks');
 
         return $labels;
-    }
-
-    private function screenOf(string $field): string
-    {
-        foreach (self::STEPS as $step => $fields) {
-            if (in_array($field, $fields, true)) {
-                return $step;
-            }
-        }
-
-        return in_array($field, self::DETAIL_FIELDS, true) ? self::DETAILS : self::REVIEW;
-    }
-
-    /** @return list<string> */
-    private function stepFields(): array
-    {
-        return array_merge(...array_values(self::STEPS));
     }
 
     /**
@@ -624,15 +452,6 @@ final class QuickDailyReport extends Component
     private function workerId(): ?int
     {
         return is_numeric($this->data['user_id'] ?? null) ? (int) $this->data['user_id'] : null;
-    }
-
-    /** @return array<string, FieldAccessLevel> */
-    private function levels(): array
-    {
-        $user = auth()->user();
-        $app = DailyReportResource::app();
-
-        return $user instanceof User && $app !== null ? FieldAccess::levels($user, $app) : [];
     }
 
     private static function text(mixed $value): ?string

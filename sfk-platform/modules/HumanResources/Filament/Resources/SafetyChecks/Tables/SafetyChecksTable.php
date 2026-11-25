@@ -15,13 +15,13 @@ use Modules\Core\Domain\Filters\DateMode;
 use Modules\Core\Domain\Filters\FilterOperator;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\Support\AppFormat;
+use Modules\Core\Filament\Support\UserPopup;
 use Modules\Core\Filament\Tables\AppRecordActions;
 use Modules\Core\Filament\Tables\AppTextColumn;
 use Modules\Core\Filament\Tables\InlineField;
 use Modules\HumanResources\Domain\HrChoices;
 use Modules\HumanResources\Filament\Resources\SafetyChecks\SafetyCheckLayout;
 use Modules\HumanResources\Filament\Resources\SafetyChecks\SafetyCheckResource;
-use Modules\HumanResources\Filament\Support\Employees;
 use Modules\HumanResources\Models\SafetyCheck;
 use Modules\HumanResources\Models\SafetyCheckItem;
 
@@ -123,7 +123,7 @@ final class SafetyChecksTable
             $name === 'checked_on' => $column->date('Y-m-d'),
             $name === 'created_at' => $column->dateTime('Y-m-d H:i'),
             // user names open the ユーザー情報 popup, so the cell is not a link to the record
-            isset(self::USERS[$name]) => $column->state(Employees::popup(self::USERS[$name]))->html()->disabledClick()->sortable(query: $user($name)),
+            isset(self::USERS[$name]) => $column->state(UserPopup::of(self::USERS[$name]))->html()->disabledClick()->sortable(query: $user($name)),
             $name === 'items' => $column
                 ->state(fn (SafetyCheck $record): array => $record->items
                     ->map(fn (SafetyCheckItem $row): string => trim(AppFormat::number($row->number).' '.mb_strimwidth((string) $row->item, 0, 40, '…').': '.$row->answer))

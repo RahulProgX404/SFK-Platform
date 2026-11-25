@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Sales\Filament\Resources\Invoices;
 
-use App\Models\User;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
@@ -17,13 +16,13 @@ use Filament\Schemas\Schema;
 use Modules\Core\Domain\Billing\ClosingDay;
 use Modules\Core\Domain\Money\RoundingMode;
 use Modules\Core\Filament\Records\RecordSections;
+use Modules\Core\Filament\Support\AppFormat;
 use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
 use Modules\Sales\Domain\Documents\DocumentFields;
 use Modules\Sales\Domain\Documents\TaxBreakdown;
 use Modules\Sales\Domain\Sales\SaleChoices;
 use Modules\Sales\Filament\Resources\Documents\DocumentParts;
-use Modules\Sales\Filament\SalesFormat;
 use Modules\Sales\Models\Invoice;
 
 /**
@@ -91,15 +90,15 @@ final class InvoiceLayout
             'closing_day' => Select::make($name)->label($label)->placeholder('-----')->options(array_combine($days, $days))->native(false),
             'previous_amount', 'received_amount' => $amount(),
             'carried_amount' => TextEntry::make($name)->label($label)->placeholder('')
-                ->state(fn (Get $get): string => SalesFormat::yen((int) $get('previous_amount') - (int) $get('received_amount'))),
+                ->state(fn (Get $get): string => AppFormat::yen((int) $get('previous_amount') - (int) $get('received_amount'))),
             'purchase_total' => TextEntry::make($name)->label($label)->placeholder('')
-                ->state(fn (Get $get, ?Invoice $record): string => SalesFormat::yen(self::liveBreakdown($get, $record)->subtotal() + self::liveBreakdown($get, $record)->tax())),
+                ->state(fn (Get $get, ?Invoice $record): string => AppFormat::yen(self::liveBreakdown($get, $record)->subtotal() + self::liveBreakdown($get, $record)->tax())),
             'billed_total' => TextEntry::make($name)->label($label)->placeholder('')
-                ->state(fn (Get $get, ?Invoice $record): string => SalesFormat::yen((int) $get('previous_amount') - (int) $get('received_amount')
+                ->state(fn (Get $get, ?Invoice $record): string => AppFormat::yen((int) $get('previous_amount') - (int) $get('received_amount')
                     + self::liveBreakdown($get, $record)->subtotal() + self::liveBreakdown($get, $record)->tax())),
             'recent_invoices' => null,
             'master_closing_day' => TextEntry::make($name)->label($label)->placeholder('')->state(fn (Get $get): ?string => $customer($get)?->closing_day?->value),
-            'collection' => TextEntry::make($name)->label($label)->placeholder('')->state(fn (Get $get): ?string => SalesFormat::text($customer($get)?->getAttribute('collection_month'))),
+            'collection' => TextEntry::make($name)->label($label)->placeholder('')->state(fn (Get $get): ?string => AppFormat::text($customer($get)?->getAttribute('collection_month'))),
             'collection_day' => TextEntry::make($name)->label($label)->placeholder('')->state(fn (Get $get): ?string => $customer($get)?->getAttribute('collection_day')),
             'billing_month' => null,
             default => DocumentParts::input($name, DocumentFields::INVOICE, invoice: true),
@@ -111,15 +110,15 @@ final class InvoiceLayout
         $entry = TextEntry::make($name)->label(self::label($name))->placeholder('—');
 
         return match ($name) {
-            'previous_amount', 'received_amount', 'carried_amount', 'billed_total' => $entry->formatStateUsing(fn (mixed $state): string => SalesFormat::yen($state)),
-            'purchase_total' => $entry->state(fn (Invoice $record): string => SalesFormat::yen($record->purchaseTotal())),
+            'previous_amount', 'received_amount', 'carried_amount', 'billed_total' => $entry->formatStateUsing(fn (mixed $state): string => AppFormat::yen($state)),
+            'purchase_total' => $entry->state(fn (Invoice $record): string => AppFormat::yen($record->purchaseTotal())),
             'recent_invoices' => View::make('core::filament.related-table')
                 ->viewData(fn (Invoice $record): array => self::recentInvoices($record))
                 ->hidden(fn (mixed $livewire): bool => (bool) ($livewire->printMode ?? false)),
             'billing_month' => $entry->state(fn (Invoice $record): ?string => filled($record->billing_month)
-                ? $record->customer_id.'_'.SalesFormat::month($record->billing_month) : null),
+                ? $record->customer_id.'_'.AppFormat::month($record->billing_month) : null),
             'master_closing_day' => $entry->state(fn (Invoice $record): ?string => $record->customer?->closing_day?->value),
-            'collection' => $entry->state(fn (Invoice $record): ?string => SalesFormat::text($record->customer?->getAttribute('collection_month'))),
+            'collection' => $entry->state(fn (Invoice $record): ?string => AppFormat::text($record->customer?->getAttribute('collection_month'))),
             'collection_day' => $entry->state(fn (Invoice $record): ?string => $record->customer?->getAttribute('collection_day')),
             default => DocumentParts::entry($name, DocumentFields::INVOICE, invoice: true) ?? $entry,
         };
@@ -131,15 +130,7 @@ final class InvoiceLayout
      */
     private static function components(callable $make, bool $withFooter): array
     {
-        $components = [RecordSections::section(self::MAIN, $make)];
-        if ($withFooter) {
-            $components[] = RecordSections::section(self::FOOTER, $make);
-        }
-        if (auth()->user() instanceof User && auth()->user()->isSuperAdmin()) {
-            $components[] = RecordSections::section(self::DEVELOPER, $make, '開発者用フィールド', collapsed: true);
-        }
-
-        return $components;
+        return RecordSections::cards(self::MAIN, $make, $withFooter ? self::FOOTER : null, self::DEVELOPER);
     }
 
     private static function liveBreakdown(Get $get, ?Invoice $record): TaxBreakdown
@@ -170,10 +161,10 @@ final class InvoiceLayout
             'columns' => ['invoiced_on' => '請求日付', 'number' => '請求書番号', 'purchase_total' => '合計御買上金額', 'billed_total' => '御請求額'],
             'numeric' => ['purchase_total', 'billed_total'],
             'rows' => $invoices->map(fn (Invoice $row): array => [
-                'invoiced_on' => SalesFormat::date($row->invoiced_on),
+                'invoiced_on' => AppFormat::date($row->invoiced_on),
                 'number' => $row->number,
-                'purchase_total' => SalesFormat::yen($row->purchaseTotal()),
-                'billed_total' => SalesFormat::yen($row->billed_total),
+                'purchase_total' => AppFormat::yen($row->purchaseTotal()),
+                'billed_total' => AppFormat::yen($row->billed_total),
             ])->values()->all(),
             'urls' => $invoices->map(fn (Invoice $row): ?string => InvoiceResource::canView($row) ? InvoiceResource::getUrl('view', ['record' => $row]) : null)->values()->all(),
         ];

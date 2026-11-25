@@ -12,13 +12,13 @@ use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Application\Filters\FilterField;
 use Modules\Core\Application\Views\ListView;
 use Modules\Core\Filament\AppPages\AppListRecords;
+use Modules\Core\Filament\Support\UserPopup;
 use Modules\Core\Filament\Tables\AppRecordActions;
 use Modules\Core\Filament\Tables\AppTextColumn;
 use Modules\Core\Filament\Tables\InlineField;
 use Modules\HumanResources\Domain\HrChoices;
 use Modules\HumanResources\Filament\Resources\AlcoholChecks\AlcoholCheckLayout;
 use Modules\HumanResources\Filament\Resources\AlcoholChecks\AlcoholCheckResource;
-use Modules\HumanResources\Filament\Support\Employees;
 
 /**
  * Record list of 18. アルコールチェック with the legacy view 一覧 (SYSTEM_BRAIN APP_18 views.md: both checks, newest first);
@@ -126,7 +126,7 @@ final class AlcoholChecksTable
             str_ends_with($name, '_time') => $column->formatStateUsing(fn (mixed $state): string => is_string($state) ? substr($state, 0, 5) : ''),
             str_ends_with($name, '_notes') => $column->searchable()->limit(60),
             // user names open the ユーザー情報 popup, so the cell is not a link to the record
-            isset(AlcoholCheckLayout::USERS[$name]) => $column->state(Employees::popup(AlcoholCheckLayout::USERS[$name]))->html()->disabledClick()->sortable(query: $user($name)),
+            isset(AlcoholCheckLayout::USERS[$name]) => $column->state(UserPopup::of(AlcoholCheckLayout::USERS[$name]))->html()->disabledClick()->sortable(query: $user($name)),
             default => $column,
         };
     }

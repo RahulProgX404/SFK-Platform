@@ -24,6 +24,7 @@ use Modules\Core\Application\Files\Uploads;
 use Modules\Core\Domain\Money\RoundingMode;
 use Modules\Core\Domain\Tax\TaxRate;
 use Modules\Core\Filament\Records\RecordTable;
+use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Support\UserPopup;
 use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
@@ -31,7 +32,6 @@ use Modules\Sales\Domain\Documents\TaxBreakdown;
 use Modules\Sales\Domain\Sales\SaleChoices;
 use Modules\Sales\Filament\Resources\DeliveryNotes\DeliveryNoteResource;
 use Modules\Sales\Filament\Resources\Invoices\InvoiceResource;
-use Modules\Sales\Filament\SalesFormat;
 use Modules\Sales\Models\DeliveryNoteLine;
 use Modules\Sales\Models\InvoiceLine;
 
@@ -77,18 +77,18 @@ final class DocumentParts
             $name === 'assignees' => Select::make($name)->label($label)->placeholder('-----')->relationship('assignees', 'name')->multiple()->searchable()->preload(),
             $name === 'postal_code' => TextInput::make($name)->label($label)->maxLength(8)->regex('/^\d{3}-?\d{4}$/'),
             $name === 'address' => TextInput::make($name)->label($label)->maxLength(255),
-            $name === 'invoice_issuance' => TextEntry::make($name)->label($label)->placeholder('')->state(fn (Get $get): ?string => SalesFormat::text($customer($get)?->getAttribute('invoice_issuance'))),
-            $name === 'delivery_note_issuance' => TextEntry::make($name)->label($label)->placeholder('')->state(fn (Get $get): ?string => SalesFormat::text($customer($get)?->getAttribute('delivery_note_issuance'))),
+            $name === 'invoice_issuance' => TextEntry::make($name)->label($label)->placeholder('')->state(fn (Get $get): ?string => AppFormat::text($customer($get)?->getAttribute('invoice_issuance'))),
+            $name === 'delivery_note_issuance' => TextEntry::make($name)->label($label)->placeholder('')->state(fn (Get $get): ?string => AppFormat::text($customer($get)?->getAttribute('delivery_note_issuance'))),
             $name === 'subtotal' => TextEntry::make($name)->label($label)->placeholder('')
-                ->state(fn (Get $get, ?Model $record): string => SalesFormat::yen(self::liveBreakdown($get, $record)->subtotal())),
+                ->state(fn (Get $get, ?Model $record): string => AppFormat::yen(self::liveBreakdown($get, $record)->subtotal())),
             $name === 'tax_total', $name === 'tax_sum' => TextEntry::make($name)->label($label)->placeholder('')
-                ->state(fn (Get $get, ?Model $record): string => SalesFormat::yen(self::liveBreakdown($get, $record)->tax())),
+                ->state(fn (Get $get, ?Model $record): string => AppFormat::yen(self::liveBreakdown($get, $record)->tax())),
             isset(self::PER_RATE[$name]) => TextEntry::make($name)->label($label)->placeholder('')
                 ->state(function (Get $get, ?Model $record) use ($name): string {
                     [$rate, $subtotal] = self::PER_RATE[$name];
                     $breakdown = self::liveBreakdown($get, $record);
 
-                    return SalesFormat::yen($subtotal ? $breakdown->subtotalFor($rate) : $breakdown->taxFor($rate));
+                    return AppFormat::yen($subtotal ? $breakdown->subtotalFor($rate) : $breakdown->taxFor($rate));
                 }),
             $name === 'lines' => self::linesForm($labels, $invoice),
             $name === 'notes' => Textarea::make($name)->label($label)->rows(3)->maxLength(4000),
@@ -112,21 +112,21 @@ final class DocumentParts
 
         return match (true) {
             $name === 'customer_id' => $entry->state(fn (Model $record): ?string => $record->getRelationValue('customer')?->name),
-            $name === 'invoice_issuance', $name === 'delivery_note_issuance' => $entry->state(fn (Model $record): ?string => SalesFormat::text($record->getRelationValue('customer')?->getAttribute($name))),
-            $name === 'subtotal', $name === 'tax_total' => $entry->formatStateUsing(fn (mixed $state): string => SalesFormat::yen($state)),
-            $name === 'tax_sum' => $entry->state(fn (Model $record): string => SalesFormat::yen($record->getAttribute('tax_total'))),
+            $name === 'invoice_issuance', $name === 'delivery_note_issuance' => $entry->state(fn (Model $record): ?string => AppFormat::text($record->getRelationValue('customer')?->getAttribute($name))),
+            $name === 'subtotal', $name === 'tax_total' => $entry->formatStateUsing(fn (mixed $state): string => AppFormat::yen($state)),
+            $name === 'tax_sum' => $entry->state(fn (Model $record): string => AppFormat::yen($record->getAttribute('tax_total'))),
             isset(self::PER_RATE[$name]) => $entry->state(function (Model $record) use ($name): string {
                 [$rate, $subtotal] = self::PER_RATE[$name];
                 $breakdown = method_exists($record, 'taxBreakdown') ? $record->taxBreakdown() : TaxBreakdown::of([], RoundingMode::Truncate);
 
-                return SalesFormat::yen($subtotal ? $breakdown->subtotalFor($rate) : $breakdown->taxFor($rate));
+                return AppFormat::yen($subtotal ? $breakdown->subtotalFor($rate) : $breakdown->taxFor($rate));
             }),
             $name === 'lines' => self::linesEntry($labels, $invoice),
             $name === 'pdf_files' => $entry->state(fn (Model $record): array => array_map('basename', (array) $record->getAttribute('pdf_files')))->listWithLineBreaks(),
             $name === 'customer_code' => $entry->state(fn (Model $record): ?string => $record->getRelationValue('customer')?->code),
             // user names open the ユーザー情報 popup
             $name === 'assignees' => $entry->state(fn (Model $record): HtmlString => UserPopup::list($record->getRelationValue('assignees')))->html(),
-            $name === 'creator', $name === 'updater' => $entry->state(fn (Model $record): HtmlString => UserPopup::html($record->getRelationValue($name) instanceof User ? $record->getRelationValue($name) : null))->html(),
+            $name === 'creator', $name === 'updater' => $entry->state(UserPopup::of($name))->html(),
             $name === 'created_at', $name === 'updated_at' => $entry->dateTime('Y-m-d H:i'),
             in_array($name, ['sold_on', 'billing_due_on', 'invoiced_on'], true) => $entry->date('Y-m-d'),
             default => null,
@@ -188,11 +188,11 @@ final class DocumentParts
             'is_fsc' => TextEntry::make('is_fsc')->state(fn (Model $record): ?string => $record->getAttribute('is_fsc') ? SaleChoices::FSC_CODE : null),
             'product_name' => TextEntry::make('product_name'),
             'summary' => TextEntry::make('summary'),
-            'quantity' => TextEntry::make('quantity')->alignEnd()->formatStateUsing(fn (mixed $state): string => SalesFormat::number($state)),
+            'quantity' => TextEntry::make('quantity')->alignEnd()->formatStateUsing(fn (mixed $state): string => AppFormat::number($state)),
             'unit' => TextEntry::make('unit'),
-            'unit_price' => TextEntry::make('unit_price')->alignEnd()->formatStateUsing(fn (mixed $state): string => SalesFormat::price($state)),
+            'unit_price' => TextEntry::make('unit_price')->alignEnd()->formatStateUsing(fn (mixed $state): string => AppFormat::price($state)),
             'tax_rate' => TextEntry::make('tax_rate'),
-            'amount' => TextEntry::make('amount')->alignEnd()->formatStateUsing(fn (mixed $state): string => SalesFormat::yen($state)),
+            'amount' => TextEntry::make('amount')->alignEnd()->formatStateUsing(fn (mixed $state): string => AppFormat::yen($state)),
             'order_number' => TextEntry::make('order_number'),
             'month_day' => TextEntry::make('month_day')->state(fn (Model $record): string => method_exists($record, 'monthDay') ? $record->monthDay() : ''),
         ];

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Analytics\Filament\Resources\PastSales;
 
-use App\Models\User;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\TextInput;
@@ -13,7 +12,6 @@ use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\HtmlString;
 use Modules\Analytics\Domain\AnalyticsFields;
 use Modules\Analytics\Domain\FiscalYear;
 use Modules\Analytics\Models\PastSale;
@@ -85,9 +83,7 @@ final class PastSaleLayout
             $name === 'year_number' => $entry->state(fn (PastSale $record): ?string => $record->fiscal_month_start?->format('Y')),
             $name === 'date_number' => $entry->state(fn (PastSale $record): ?string => $record->fiscal_month_start?->format('Ymd')),
             $name === 'era' => $entry->state(fn (PastSale $record): ?string => $record->fiscal_month_start === null ? null : FiscalYear::era($record->fiscal_month_start)),
-            $name === 'creator', $name === 'updater' => $entry->state(fn (PastSale $record): HtmlString => UserPopup::html(
-                $record->getRelationValue($name) instanceof User ? $record->getRelationValue($name) : null,
-            ))->html(),
+            $name === 'creator', $name === 'updater' => $entry->state(UserPopup::of($name))->html(),
             $name === 'created_at', $name === 'updated_at' => $entry->dateTime('Y-m-d H:i'),
             default => $entry,
         };
@@ -109,14 +105,6 @@ final class PastSaleLayout
             array_slice($months, 6),
         ];
 
-        $components = [RecordSections::section($main, $make)];
-        if ($withFooter) {
-            $components[] = RecordSections::section(self::FOOTER, $make);
-        }
-        if (auth()->user() instanceof User && auth()->user()->isSuperAdmin()) {
-            $components[] = RecordSections::section(self::DEVELOPER, $make, '開発者用フィールド', collapsed: true);
-        }
-
-        return $components;
+        return RecordSections::cards($main, $make, $withFooter ? self::FOOTER : null, self::DEVELOPER);
     }
 }

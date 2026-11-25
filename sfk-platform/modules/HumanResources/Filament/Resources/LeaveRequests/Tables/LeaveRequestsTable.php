@@ -17,6 +17,7 @@ use Modules\Core\Domain\Filters\DateMode;
 use Modules\Core\Domain\Filters\FilterCondition;
 use Modules\Core\Domain\Filters\FilterOperator;
 use Modules\Core\Filament\AppPages\AppListRecords;
+use Modules\Core\Filament\Support\UserPopup;
 use Modules\Core\Filament\Tables\AppRecordActions;
 use Modules\Core\Filament\Tables\AppTextColumn;
 use Modules\Core\Filament\Tables\InlineField;
@@ -24,7 +25,6 @@ use Modules\HumanResources\Domain\HrChoices;
 use Modules\HumanResources\Domain\LeaveRequests\LeaveRequestStatus;
 use Modules\HumanResources\Filament\Resources\LeaveRequests\LeaveRequestLayout;
 use Modules\HumanResources\Filament\Resources\LeaveRequests\LeaveRequestResource;
-use Modules\HumanResources\Filament\Support\Employees;
 use Modules\HumanResources\Models\LeaveRequest;
 
 /**
@@ -141,7 +141,7 @@ final class LeaveRequestsTable
             $name === 'status' => $column->state(fn (LeaveRequest $record): string => $record->status->value),
             $name === 'total_time', $name === 'clock_time' => $column->formatStateUsing(fn (mixed $state): string => is_string($state) ? substr($state, 0, 5) : ''),
             // user names open the ユーザー情報 popup, so the cell is not a link to the record
-            isset(self::USERS[$name]) => $column->state(Employees::popup(self::USERS[$name]))->html()->disabledClick()->sortable(query: $user($name)),
+            isset(self::USERS[$name]) => $column->state(UserPopup::of(self::USERS[$name]))->html()->disabledClick()->sortable(query: $user($name)),
             $name === 'assignee' => $column
                 ->state(fn (LeaveRequest $record): HtmlString => LeaveRequestLayout::assignee($record))
                 ->html()

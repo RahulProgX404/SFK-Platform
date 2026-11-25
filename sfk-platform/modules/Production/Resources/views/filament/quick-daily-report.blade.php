@@ -29,8 +29,6 @@
     x-on:{{ AppResource::QUICK_CREATE_EVENT }}.window="if ($event.detail && $event.detail.app === @js($app)) { shown = true; $wire.start() }"
     x-on:keydown.escape.window="if (shown) { shown = false; $wire.close() }"
     x-effect="document.documentElement.style.overflow = shown ? 'hidden' : ''">
-    @include('core::filament.quick-entry-styles')
-
     <div class="sfk-qe" x-show="shown" x-cloak role="dialog" aria-modal="true" aria-labelledby="sfk-qe-title" x-transition.opacity.duration.150ms>
         <header class="sfk-qe-head">
             <span></span>

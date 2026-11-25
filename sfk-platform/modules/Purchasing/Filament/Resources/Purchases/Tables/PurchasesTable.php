@@ -102,7 +102,7 @@ final class PurchasesTable
             FilterField::choice('master_category', $label('master_category'), PurchaseLayout::categoryOptions())->relationship('supplier', 'purchase_category'),
             FilterField::choice('category', $label('category'), PurchaseLayout::categoryOptions()),
             FilterField::text('purchase_number', $label('purchase_number')),
-            FilterField::text('order_id', $label('order_id'))->query(self::filterOrderNumber(...)),
+            FilterField::text('order_id', $label('order_id'))->relatedText('order', 'order_number'),
             FilterField::text('product_name', $label('product_name')),
             FilterField::number('quantity', $label('quantity')),
             FilterField::number('unit_price', $label('unit_price')),
@@ -190,26 +190,6 @@ final class PurchasesTable
                     $direction,
                 )),
             default => $column,
-        };
-    }
-
-    /**
-     * 受注No is the job's 注番, compared like a text field.
-     *
-     * @param  Builder<*>  $query
-     */
-    private static function filterOrderNumber(Builder $query, FilterCondition $condition): void
-    {
-        $value = $condition->values[0] ?? '';
-        $has = fn (callable $where): Builder => $query->whereHas('order', $where);
-
-        match ($condition->operator) {
-            FilterOperator::Contains => $has(fn (Builder $q): Builder => $q->whereLike('order_number', '%'.$value.'%')),
-            FilterOperator::NotContains => $query->whereDoesntHave('order', fn (Builder $q): Builder => $q->whereLike('order_number', '%'.$value.'%')),
-            FilterOperator::Equals => $value === '' ? $query->whereDoesntHave('order') : $has(fn (Builder $q): Builder => $q->where('order_number', $value)),
-            FilterOperator::NotEquals => $value === '' ? $query->whereHas('order') : $query->whereDoesntHave('order', fn (Builder $q): Builder => $q->where('order_number', $value)),
-            FilterOperator::OneOf => $has(fn (Builder $q): Builder => $q->whereIn('order_number', $condition->values)),
-            default => $query->whereRaw('1 = 0'),
         };
     }
 

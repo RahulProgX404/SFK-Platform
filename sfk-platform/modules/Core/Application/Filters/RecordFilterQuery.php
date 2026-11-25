@@ -7,6 +7,7 @@ namespace Modules\Core\Application\Filters;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Domain\Filters\FilterCondition;
 use Modules\Core\Domain\Filters\FilterFieldType;
 use Modules\Core\Domain\Filters\FilterOperator;
@@ -181,6 +182,39 @@ final class RecordFilterQuery
         }
 
         $query->where(fn (Builder $q) => $q->whereNull($column)->orWhereNotIn($column, $chosen));
+    }
+
+    /**
+     * A text field showing the number of a related record (注番 of the job, 請求書番号 …; FilterField::relatedText()):
+     * compared like a text field on the related $column; blank = no related record.
+     *
+     * @param  Builder<*>  $query
+     */
+    public static function relatedText(Builder $query, string $relationship, string $column, FilterCondition $condition): void
+    {
+        $value = $condition->values[0] ?? '';
+        $like = fn (Builder $q): Builder => $q->whereLike($column, '%'.$value.'%');
+        $equal = fn (Builder $q): Builder => $q->where($column, $value);
+        // a belongs-to relation is blank when its key is (no subquery)
+        $relation = $query->getModel()->{$relationship}();
+        $key = $relation instanceof BelongsTo ? $relation->getQualifiedForeignKeyName() : null;
+
+        match ($condition->operator) {
+            FilterOperator::Contains => $query->whereHas($relationship, $like),
+            FilterOperator::NotContains => $query->whereDoesntHave($relationship, $like),
+            FilterOperator::Equals => match (true) {
+                $value !== '' => $query->whereHas($relationship, $equal),
+                $key !== null => $query->whereNull($key),
+                default => $query->whereDoesntHave($relationship),
+            },
+            FilterOperator::NotEquals => match (true) {
+                $value !== '' => $query->whereDoesntHave($relationship, $equal),
+                $key !== null => $query->whereNotNull($key),
+                default => $query->whereHas($relationship),
+            },
+            FilterOperator::OneOf => $query->whereHas($relationship, fn (Builder $q): Builder => $q->whereIn($column, $condition->values)),
+            default => $query->whereRaw('1 = 0'),
+        };
     }
 
     /**

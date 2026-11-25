@@ -16,7 +16,6 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\HtmlString;
 use Modules\Core\Filament\Records\RecordSections;
 use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Support\UserPopup;
@@ -183,9 +182,7 @@ final class BagScheduleLayout
             $name === 'product_name_p' => $entry->state(fn (BagSchedule $record): ?string => $record->productName()),
             $name === 'customer' => $entry->state(fn (BagSchedule $record): ?string => $record->order?->customer?->name),
             isset(self::ORDER_VALUES[$name]) => $entry->state(fn (BagSchedule $record): ?string => self::orderValue($record->order, $name)),
-            $name === 'creator', $name === 'updater' => $entry->state(fn (BagSchedule $record): HtmlString => UserPopup::html(
-                $record->getRelationValue($name) instanceof User ? $record->getRelationValue($name) : null,
-            ))->html(),
+            $name === 'creator', $name === 'updater' => $entry->state(UserPopup::of($name))->html(),
             $name === 'created_at', $name === 'updated_at' => $entry->dateTime('Y-m-d H:i'),
             default => $entry,
         };
@@ -197,14 +194,6 @@ final class BagScheduleLayout
      */
     private static function components(callable $make, bool $withFooter): array
     {
-        $components = [RecordSections::section(self::MAIN, $make)];
-        if ($withFooter) {
-            $components[] = RecordSections::section(self::FOOTER, $make);
-        }
-        if (auth()->user() instanceof User && auth()->user()->isSuperAdmin()) {
-            $components[] = RecordSections::section(self::DEVELOPER, $make, '開発者用フィールド', collapsed: true);
-        }
-
-        return $components;
+        return RecordSections::cards(self::MAIN, $make, $withFooter ? self::FOOTER : null, self::DEVELOPER);
     }
 }

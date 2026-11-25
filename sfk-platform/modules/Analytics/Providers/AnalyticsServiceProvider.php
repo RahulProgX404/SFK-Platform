@@ -16,6 +16,7 @@ use Modules\Analytics\Filament\Users\UserOverviewCard;
 use Modules\Core\Access\EmployeeDataAccess;
 use Modules\Core\Application\Legacy\LegacyImporter;
 use Modules\Core\Application\Realtime\DataPulse;
+use Modules\Core\Filament\Support\ThemeAssets;
 use Modules\Core\Filament\Users\UserDetailWidgets;
 
 final class AnalyticsServiceProvider extends ModuleServiceProvider
@@ -36,6 +37,10 @@ final class AnalyticsServiceProvider extends ModuleServiceProvider
         foreach (DashboardCard::CARDS as $card) {
             DataPulse::watch($card::liveTables());
         }
+
+        // their styles are part of the cached theme, not of the Livewire components a live redraw sends again
+        ThemeAssets::extend('analytics::filament.analysis-styles');
+        ThemeAssets::extend('analytics::widgets.partials.trend-style');
 
         // 個人の概要 on the page of a user (ユーザー管理, 02. 従業員マスタ): for the person and administrators (作業単価)
         Livewire::component('analytics.user-overview-card', UserOverviewCard::class);

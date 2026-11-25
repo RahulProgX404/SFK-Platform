@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Sales\Filament\Resources\DeliveryNotes;
 
-use App\Models\User;
 use Filament\Forms\Components\DatePicker;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Component;
@@ -76,14 +75,6 @@ final class DeliveryNoteLayout
      */
     private static function components(callable $make, bool $withFooter): array
     {
-        $components = [RecordSections::section(self::MAIN, $make)];
-        if ($withFooter) {
-            $components[] = RecordSections::section(self::FOOTER, $make);
-        }
-        if (auth()->user() instanceof User && auth()->user()->isSuperAdmin()) {
-            $components[] = RecordSections::section(self::DEVELOPER, $make, '開発者用フィールド', collapsed: true);
-        }
-
-        return $components;
+        return RecordSections::cards(self::MAIN, $make, $withFooter ? self::FOOTER : null, self::DEVELOPER);
     }
 }

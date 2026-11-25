@@ -4,18 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\HumanResources\Filament\Support;
 
-use App\Models\User;
-use Closure;
 use Filament\Forms\Components\Select;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\HtmlString;
 use Modules\Core\Domain\People\EmploymentStatus;
-use Modules\Core\Filament\Support\UserPopup;
 
 /**
  * The user / employee inputs of the HR apps: the legacy ユーザー選択 (any user) and the lookups of 02. 従業員マスタ
- * (employees 在籍中, newest first — the record's own choice stays offered), shown with the ユーザー情報 popup.
+ * (employees 在籍中, newest first — the record's own choice stays offered); shown with the ユーザー情報 popup
+ * (Core UserPopup::of()).
  */
 final class Employees
 {
@@ -38,11 +35,5 @@ final class Employees
             ->searchable()
             ->preload()
             ->placeholder('-----');
-    }
-
-    /** The ユーザー情報 popup of a related user of the record. */
-    public static function popup(string $relation): Closure
-    {
-        return fn (Model $record): HtmlString => UserPopup::html($record->getRelationValue($relation) instanceof User ? $record->getRelationValue($relation) : null);
     }
 }

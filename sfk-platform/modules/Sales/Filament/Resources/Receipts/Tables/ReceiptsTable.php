@@ -18,6 +18,7 @@ use Modules\Core\Domain\Billing\CollectionMonth;
 use Modules\Core\Domain\Filters\FilterCondition;
 use Modules\Core\Domain\Filters\FilterOperator;
 use Modules\Core\Filament\AppPages\AppListRecords;
+use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Support\UserPopup;
 use Modules\Core\Filament\Tables\AppRecordActions;
 use Modules\Core\Filament\Tables\AppTextColumn;
@@ -26,7 +27,6 @@ use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
 use Modules\Sales\Filament\Resources\Receipts\ReceiptLayout;
 use Modules\Sales\Filament\Resources\Receipts\ReceiptResource;
-use Modules\Sales\Filament\SalesFormat;
 use Modules\Sales\Models\Invoice;
 use Modules\Sales\Models\Receipt;
 
@@ -108,7 +108,7 @@ final class ReceiptsTable
         $months = array_map(fn (CollectionMonth $month): string => $month->value, CollectionMonth::cases());
 
         return [
-            FilterField::text('invoice_id', $label('invoice_id'))->query(self::filterInvoiceNumber(...)),
+            FilterField::text('invoice_id', $label('invoice_id'))->relatedText('invoice', 'number'),
             FilterField::choice('customer_id', $label('customer_id'), fn (): array => PartnerResource::visibleOr(Partner::query()->where('is_customer', true), ReceiptResource::getEloquentQuery()->select('receipts.customer_id'))->orderByDesc('id')
                 ->pluck('name', 'id')->mapWithKeys(fn (string $name, int|string $id): array => [(string) $id => $name])->all()),
             FilterField::user('assignees', $label('assignees'))->relationship('assignees', 'id'),
@@ -148,10 +148,10 @@ final class ReceiptsTable
             'notes' => $column->searchable(),
             'billed_on' => $column->date('Y-m-d'),
             'created_at' => $column->dateTime('Y-m-d H:i'),
-            'billed_amount', 'settled_amount' => $column->alignEnd()->formatStateUsing(fn (mixed $state): string => SalesFormat::yen($state)),
-            'shortfall' => $column->alignEnd()->state(fn (Receipt $record): ?string => $record->shortfall() === null ? null : SalesFormat::yen($record->shortfall()))
+            'billed_amount', 'settled_amount' => $column->alignEnd()->formatStateUsing(fn (mixed $state): string => AppFormat::yen($state)),
+            'shortfall' => $column->alignEnd()->state(fn (Receipt $record): ?string => $record->shortfall() === null ? null : AppFormat::yen($record->shortfall()))
                 ->sortable(query: $difference(self::SHORTFALL_SQL)),
-            'overpayment' => $column->alignEnd()->state(fn (Receipt $record): ?string => $record->overpayment() === null ? null : SalesFormat::yen($record->overpayment()))
+            'overpayment' => $column->alignEnd()->state(fn (Receipt $record): ?string => $record->overpayment() === null ? null : AppFormat::yen($record->overpayment()))
                 ->sortable(query: $difference(self::OVERPAYMENT_SQL)),
             'invoice_id' => $column
                 ->state(fn (Receipt $record): ?string => $record->invoice?->number)
@@ -166,7 +166,7 @@ final class ReceiptsTable
                 ->sortable(query: $partner('name')),
             'customer_code' => $column->state(fn (Receipt $record): ?string => $record->customer->code)->sortable(query: $partner('code')),
             'collection_month', 'collection_day', 'master_closing_day' => $column
-                ->state(fn (Receipt $record): ?string => SalesFormat::text($record->customer->getAttribute($name === 'master_closing_day' ? 'closing_day' : $name)))
+                ->state(fn (Receipt $record): ?string => AppFormat::text($record->customer->getAttribute($name === 'master_closing_day' ? 'closing_day' : $name)))
                 ->sortable(query: $partner($name === 'master_closing_day' ? 'closing_day' : $name)),
             // user names open the ユーザー情報 popup, so the cell is not a link to the record
             'assignees' => $column
@@ -179,24 +179,6 @@ final class ReceiptsTable
                     $direction,
                 )),
             default => $column,
-        };
-    }
-
-    /**
-     * 請求書番号 is the number of the linked invoice.
-     *
-     * @param  Builder<*>  $query
-     */
-    private static function filterInvoiceNumber(Builder $query, FilterCondition $condition): void
-    {
-        $value = (string) ($condition->values[0] ?? '');
-
-        match ($condition->operator) {
-            FilterOperator::Contains => $query->whereHas('invoice', fn (Builder $q): Builder => $q->whereLike('number', '%'.$value.'%')),
-            FilterOperator::NotContains => $query->whereDoesntHave('invoice', fn (Builder $q): Builder => $q->whereLike('number', '%'.$value.'%')),
-            FilterOperator::Equals => $value === '' ? $query->whereNull('receipts.invoice_id') : $query->whereHas('invoice', fn (Builder $q): Builder => $q->where('number', $value)),
-            FilterOperator::NotEquals => $value === '' ? $query->whereNotNull('receipts.invoice_id') : $query->whereDoesntHave('invoice', fn (Builder $q): Builder => $q->where('number', $value)),
-            default => $query->whereRaw('1 = 0'),
         };
     }
 

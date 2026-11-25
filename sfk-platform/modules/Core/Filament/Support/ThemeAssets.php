@@ -14,13 +14,20 @@ use Illuminate\Support\Facades\Cache;
  * core::filament.design, core::filament.app-filter-script, core::filament.user-popup-script,
  * core::filament.row-menu-script and core::filament.notification-pulse-script: their <style> and <script> contents are put together once
  * per change of those files (the version follows the content).
+ *
+ * The styles of screens drawn by a Livewire component (the dashboard, the quick entries, the スペース wizard) are here
+ * too (SCREEN_STYLES), never a <style> inside the component: each Livewire update (a filter, a step, a live redraw)
+ * would send them again.
  */
 final class ThemeAssets
 {
-    /** Views rendered into the assets, in order (core::filament.design, the current look, last of the styles). */
-    private const VIEWS = ['core::filament.theme', 'core::filament.design', 'core::filament.app-filter-script', 'core::filament.user-popup-script',
-        'core::filament.row-menu-script', 'core::filament.table-links-script', 'core::filament.realtime-script', 'core::filament.notification-pulse-script',
-        'core::filament.live-data-script'];
+    /** Styles of single screens, after the general look (as they were after it in the page); scoped to their own classes. */
+    private const SCREEN_STYLES = ['core::filament.portal-styles', 'core::filament.quick-entry-styles', 'core::filament.space-wizard-styles'];
+
+    /** Views rendered into the assets, in order (core::filament.design, the current look, before the screens' styles). */
+    private const VIEWS = ['core::filament.theme', 'core::filament.design', ...self::SCREEN_STYLES, 'core::filament.app-filter-script',
+        'core::filament.user-popup-script', 'core::filament.row-menu-script', 'core::filament.table-links-script', 'core::filament.realtime-script',
+        'core::filament.notification-pulse-script', 'core::filament.live-data-script'];
 
     /** Views whose changes make new assets (the ones above and what they include). */
     private const SOURCES = [...self::VIEWS, 'core::filament.ui', 'core::filament.documents.styles'];
@@ -32,8 +39,9 @@ final class ThemeAssets
     private static array $extra = [];
 
     /**
-     * Adds a module's view (its <style> / <script>) to every panel's theme. Keep it small: it is in every page — what
-     * only one screen needs is loaded by that screen.
+     * Adds a module's view (its <style> / <script>) to every panel's theme: small scripts every page needs (e.g. the
+     * messenger's badge), and the styles of a module's screens that Livewire redraws (e.g. 売上分析), which would
+     * otherwise travel with each update. The browser keeps the theme, so it is loaded once per version.
      */
     public static function extend(string $view): void
     {

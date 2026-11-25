@@ -8,7 +8,6 @@
 <div class="sfk-dash-cell sfk-dash-span-{{ $span }}">
     {{-- live: redrawn when what it reads changes (DashboardCard::liveTables(), DataPulse) --}}
     @include('core::filament.live-data', ['tables' => $this::liveTables()])
-    @include('analytics::widgets.partials.trend-style')
 
     <section class="sfk-dash-card" aria-labelledby="sfk-sales-trend-title">
         <header class="sfk-dash-card-head">

@@ -4,14 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Core\Filament\AppPages;
 
-use App\Models\User;
-use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
 use Filament\Infolists\Components\Entry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
@@ -23,31 +19,21 @@ use Filament\Schemas\Components\View as ViewComponent;
 use Filament\Schemas\Schema;
 use Filament\Support\Exceptions\Cancel;
 use Filament\Support\Icons\Heroicon;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
-use Illuminate\Support\Js;
-use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Modules\Core\Application\Comments\HasRecordComments;
-use Modules\Core\Application\Comments\RecordComments;
-use Modules\Core\Application\Documents\AppDocuments;
 use Modules\Core\Application\History\HasRecordHistory;
-use Modules\Core\Application\History\RecordHistory;
 use Modules\Core\Application\Records\RecordDeletion;
 use Modules\Core\Application\Records\RelationBatch;
-use Modules\Core\Application\Users\UserChoices;
-use Modules\Core\Domain\Documents\OutputDelivery;
-use Modules\Core\Domain\Documents\OutputPlacement;
 use Modules\Core\Filament\AppPages\Concerns\HasAppChrome;
+use Modules\Core\Filament\AppPages\Concerns\Records\CommentsPanel;
+use Modules\Core\Filament\AppPages\Concerns\Records\HistoryPanel;
+use Modules\Core\Filament\AppPages\Concerns\Records\RecordExports;
+use Modules\Core\Filament\AppPages\Concerns\Records\RecordNavigation;
 use Modules\Core\Filament\Support\DeleteImpact;
-use Modules\Core\Filament\Support\DocumentNameField;
 use Modules\Core\Filament\Support\GuardedDelete;
 use Modules\Core\Filament\Support\MenuButtons;
-use Modules\Core\Models\DocumentOutput;
-use Modules\Core\Models\RecordComment;
-use Modules\Core\Models\RecordVersion;
 
 /**
  * A record of an app, in the legacy layout: app frame; toolbar with the pencil (レコードを編集する), 再利用
@@ -58,51 +44,21 @@ use Modules\Core\Models\RecordVersion;
  * (records implementing HasRecordHistory, その他の設定): version cards newest first with 更新内容を表示 (changed fields
  * in green) / このバージョンに戻す, and 最新の内容を表示.
  * 印刷する opens the print view (?print=1): the record without header, menus, comments and history, with 印刷 / 閉じる.
+ * The parts live in Concerns\Records: CommentsPanel, HistoryPanel, RecordExports and RecordNavigation.
  *
  * @property-read Schema $commentForm
  */
 abstract class AppViewRecord extends ViewRecord
 {
+    use CommentsPanel;
     use HasAppChrome;
+    use HistoryPanel;
+    use RecordExports;
+    use RecordNavigation;
 
     /** Print view (印刷する) */
     #[Url(as: 'print')]
     public bool $printMode = false;
-
-    /** 変更履歴: the version shown instead of the latest content */
-    #[Url(as: 'version')]
-    public ?int $historyVersion = null;
-
-    /** @var array<string, mixed>|null コメント being written: body, mentions (宛先; 「全員」 = COMMENT_TO_EVERYONE) */
-    public ?array $commentData = [];
-
-    /**
-     * ‹ › of the header (recordNeighbours()), worked out when the page opens and kept with the page: the header is drawn
-     * again on every Livewire request of the page, which asked the database twice each time (performance pass
-     * 2026-11-20).
-     *
-     * @var array{previous: string|null, next: string|null}|null
-     */
-    #[Locked]
-    public ?array $neighbourUrls = null;
-
-    /** 返信する: the comment the one being written answers */
-    public ?int $commentReplyTo = null;
-
-    /** 編集する: the own comment being edited, and its text */
-    public ?int $editingComment = null;
-
-    public string $editingCommentBody = '';
-
-    /** 宛先 「全員」 */
-    public const COMMENT_TO_EVERYONE = 'all';
-
-    /** @var Collection<int, RecordComment>|null the comment threads, read once per request */
-    private ?Collection $commentThreads = null;
-
-    private ?Model $versionPreview = null;
-
-    private ?RecordVersion $shownVersion = null;
 
     public function mount(int|string $record): void
     {
@@ -202,16 +158,6 @@ abstract class AppViewRecord extends ViewRecord
         return $schema;
     }
 
-    public function showsHistory(): bool
-    {
-        return ! $this->printMode && $this->record instanceof HasRecordHistory && $this->appSetting('record_history_enabled');
-    }
-
-    public function showsComments(): bool
-    {
-        return ! $this->printMode && $this->record instanceof HasRecordComments && $this->appSetting('record_comments_enabled');
-    }
-
     /** Tab of the side panel shown first: 変更履歴 while a version is shown or without comments, else コメント. */
     public function sidebarTab(): string
     {
@@ -222,284 +168,6 @@ abstract class AppViewRecord extends ViewRecord
     public function sidebarStartsOpen(): bool
     {
         return $this->historyVersion !== null && $this->showsHistory();
-    }
-
-    /** 宛先 (「全員」 first, then the users who may sign in) + コメント → 書き込む */
-    public function commentForm(Schema $schema): Schema
-    {
-        return $schema
-            ->statePath('commentData')
-            ->components([
-                Select::make('mentions')
-                    ->label('宛先')
-                    ->multiple()
-                    ->searchable()
-                    // the option list closes once a 宛先 is chosen (user, 2026-11-16); a click opens it again for the next
-                    // one. Filament keeps a multiple select open, so its Alpine component (`select`, `state`) is told here —
-                    // two frames later, after Filament placed the list for the new chips: closed before that, the list kept a
-                    // position measured while hidden and the next opening scrolled the page to it
-                    ->extraAlpineAttributes(['x-init' => "\$watch('state', () => requestAnimationFrame(() => requestAnimationFrame(() => { if (select?.isOpen) { select.closeDropdown(); select.selectButton?.focus({ preventScroll: true }); } })))"])
-                    // `+` keeps the user ids as keys (a spread would number them anew)
-                    ->options(fn (): array => [self::COMMENT_TO_EVERYONE => '全員'] + UserChoices::active())
-                    // the choices go with the page: opening the list asks the server nothing (a closure would make Filament
-                    // fetch them again on every opening — a round trip each time the list is reopened for the next 宛先)
-                    ->dynamicOptions(false),
-                Textarea::make('body')
-                    ->label('コメント')
-                    ->hiddenLabel()
-                    ->required()
-                    ->maxLength(RecordComments::MAX_LENGTH)
-                    ->rows(3)
-                    ->autosize()
-                    ->extraInputAttributes(['data-sfk-comment-body' => true]),
-            ]);
-    }
-
-    /** @return Collection<int, RecordComment> the comment threads: newest first, each with its replies oldest first */
-    public function recordComments(): Collection
-    {
-        if (! $this->showsComments()) {
-            return new Collection;
-        }
-
-        return $this->commentThreads ??= app(RecordComments::class)->threads($this->record);
-    }
-
-    /** Comments and replies (the count on the collapsed panel). */
-    public function recordCommentCount(): int
-    {
-        return $this->recordComments()->sum(fn (RecordComment $comment): int => 1 + $comment->replies()->count());
-    }
-
-    /** A comment or reply of the record. */
-    public function recordComment(int $commentId): ?RecordComment
-    {
-        foreach ($this->recordComments() as $comment) {
-            if ($comment->id === $commentId) {
-                return $comment;
-            }
-            $reply = $comment->replies()->firstWhere('id', $commentId);
-            if ($reply !== null) {
-                return $reply;
-            }
-        }
-
-        return null;
-    }
-
-    /** The comment the one being written answers (返信する), while it is there. */
-    public function commentReplyTarget(): ?RecordComment
-    {
-        return $this->commentReplyTo !== null ? $this->recordComment($this->commentReplyTo) : null;
-    }
-
-    public function postComment(): void
-    {
-        $user = auth()->user();
-        if (! $user instanceof User || ! $this->showsComments() || ! $this->record instanceof HasRecordComments) {
-            return;
-        }
-
-        $data = $this->commentForm->getState();
-        $mentions = array_map('strval', (array) ($data['mentions'] ?? []));
-        app(RecordComments::class)->post(
-            $this->record,
-            $user,
-            trim((string) $data['body']),
-            array_map('intval', array_values(array_filter($mentions, fn (string $id): bool => ctype_digit($id)))),
-            $this->appResource()::displayName().': '.$this->getRecordTitle(),
-            static::getResource()::getUrl('view', ['record' => $this->record]),
-            toEveryone: in_array(self::COMMENT_TO_EVERYONE, $mentions, true),
-            replyTo: $this->commentReplyTarget()?->id,
-        );
-
-        $this->commentReplyTo = null;
-        $this->commentThreads = null;
-        $this->commentForm->fill();
-    }
-
-    /** 返信する: the comment being written answers the given one and is addressed to its writer. */
-    public function replyToComment(int $commentId): void
-    {
-        $comment = $this->recordComment($commentId);
-        if ($comment === null) {
-            return;
-        }
-
-        $mentions = array_map('strval', (array) ($this->commentData['mentions'] ?? []));
-        if ($comment->user_id !== null && $comment->user_id !== auth()->id()) {
-            $mentions = [(string) $comment->user_id];
-        }
-
-        $this->commentReplyTo = $comment->id;
-        $this->commentForm->fill(['body' => $this->commentData['body'] ?? '', 'mentions' => $mentions]);
-        $this->dispatch('sfk-comment-reply');
-    }
-
-    public function cancelCommentReply(): void
-    {
-        $this->commentReplyTo = null;
-    }
-
-    /** 編集する: one's own comment, edited in place. */
-    public function editComment(int $commentId): void
-    {
-        $comment = $this->recordComment($commentId);
-        if ($comment === null || $comment->user_id === null || $comment->user_id !== auth()->id()) {
-            return;
-        }
-
-        $this->editingComment = $comment->id;
-        $this->editingCommentBody = $comment->body;
-        $this->resetValidation('editingCommentBody');
-    }
-
-    public function cancelCommentEdit(): void
-    {
-        $this->editingComment = null;
-        $this->editingCommentBody = '';
-        $this->resetValidation('editingCommentBody');
-    }
-
-    public function saveCommentEdit(): void
-    {
-        $user = auth()->user();
-        if (! $user instanceof User || ! $this->showsComments() || $this->editingComment === null) {
-            return;
-        }
-
-        $this->validate(
-            ['editingCommentBody' => ['required', 'string', 'max:'.RecordComments::MAX_LENGTH]],
-            attributes: ['editingCommentBody' => 'コメント'],
-        );
-
-        app(RecordComments::class)->update($this->record, $this->editingComment, $user, trim($this->editingCommentBody));
-        $this->commentThreads = null;
-        $this->cancelCommentEdit();
-    }
-
-    public function deleteCommentAction(): Action
-    {
-        return Action::make('deleteComment')
-            ->label('削除')
-            ->icon(Heroicon::Trash)
-            ->extraAttributes(['class' => 'sfk-comment-action is-danger'])
-            ->link()
-            ->color('danger')
-            ->visible(fn (array $arguments): bool => $this->showsComments()
-                && ($writer = $this->recordComment((int) ($arguments['comment'] ?? 0))?->user_id) !== null
-                && $writer === auth()->id())
-            ->modalIcon(Heroicon::OutlinedTrash)
-            ->modalIconColor('danger')
-            ->modalWidth('md')
-            ->modalHeading('コメントを削除しますか？')
-            ->modalSubmitAction(fn (Action $action): Action => $action->label('削除する')->color('danger'))
-            ->modalCancelActionLabel('キャンセル')
-            ->action(function (array $arguments): void {
-                $user = auth()->user();
-                if ($user instanceof User) {
-                    $id = (int) ($arguments['comment'] ?? 0);
-                    app(RecordComments::class)->delete($this->record, $id, $user);
-                    $this->commentThreads = null;
-                    if ($this->commentReplyTo === $id) {
-                        $this->commentReplyTo = null;
-                    }
-                    if ($this->editingComment === $id) {
-                        $this->cancelCommentEdit();
-                    }
-                }
-            });
-    }
-
-    /** @return Collection<int, RecordVersion> */
-    public function historyVersions(): Collection
-    {
-        return $this->showsHistory() ? app(RecordHistory::class)->versions($this->record) : new Collection;
-    }
-
-    public function shownVersion(): ?RecordVersion
-    {
-        if ($this->historyVersion === null || ! $this->showsHistory()) {
-            return null;
-        }
-
-        return $this->shownVersion ??= app(RecordHistory::class)->find($this->record, $this->historyVersion);
-    }
-
-    /** @return list<string> fields marked in green: those changed in the shown version */
-    public function highlightedFields(): array
-    {
-        $changed = $this->shownVersion()->changed ?? [];
-
-        return [...$changed, ...$this->relatedHighlightFields($changed)];
-    }
-
-    /** Label of a field in the 変更履歴: historyLabels(), else the app's list column label, else the field name. */
-    public function historyFieldLabel(string $field): string
-    {
-        if (isset($this->historyLabels()[$field])) {
-            return $this->historyLabels()[$field];
-        }
-
-        $index = static::getResource()::getPages()['index']->getPage();
-        $columns = is_subclass_of($index, AppListRecords::class) ? (new $index)->listColumns() : [];
-
-        return $columns[$field] ?? $field;
-    }
-
-    /** @return array<string, string> field => label for the 変更履歴 (e.g. the app's legacy field names) */
-    protected function historyLabels(): array
-    {
-        return [];
-    }
-
-    public function showVersion(int $version): void
-    {
-        $this->historyVersion = $version;
-        $this->rebindShownRecord();
-    }
-
-    public function showLatest(): void
-    {
-        $this->historyVersion = null;
-        $this->rebindShownRecord();
-    }
-
-    /** The record schema is cached at the start of the request: point it at the newly shown content. */
-    private function rebindShownRecord(): void
-    {
-        $this->shownVersion = null;
-        $this->versionPreview = null;
-        $this->getSchema('infolist')?->record($this->getRecord());
-    }
-
-    public function restoreVersionAction(): Action
-    {
-        return Action::make('restoreVersion')
-            ->label(fn (array $arguments): string => (int) ($arguments['version'] ?? 0) === 1 ? '初版に戻す' : 'このバージョンに戻す')
-            ->icon(Heroicon::ArrowUturnLeft)
-            ->extraAttributes(['class' => 'sfk-comment-action'])
-            ->link()
-            ->color('gray')
-            ->visible(fn (): bool => $this->showsHistory() && static::getResource()::canEdit($this->record))
-            ->modalIcon(Heroicon::OutlinedArrowUturnLeft)
-            ->modalWidth('md')
-            ->modalHeading(fn (array $arguments): string => 'バージョン '.(int) ($arguments['version'] ?? 0).' に戻しますか？')
-            ->modalSubmitActionLabel('戻す')
-            ->modalCancelActionLabel('キャンセル')
-            ->action(function (array $arguments): void {
-                $version = app(RecordHistory::class)->find($this->record, (int) ($arguments['version'] ?? 0));
-                if ($version === null || ! $this->record instanceof HasRecordHistory) {
-                    return;
-                }
-
-                $user = auth()->user();
-                app(RecordHistory::class)->restore($this->record, $version, $user instanceof User ? $user->id : null);
-                $this->record->refresh();
-                $this->showLatest();
-
-                Notification::make()->title('バージョン '.$version->version.' に戻しました')->success()->send();
-            });
     }
 
     protected function getHeaderActions(): array
@@ -591,84 +259,6 @@ abstract class AppViewRecord extends ViewRecord
     }
 
     /**
-     * エクスポート (帳票出力, アプリの設定 → 帳票出力): an entry per 出力設定 of the record page, putting out this record
-     * (a new tab, or a download). 出力設定 with the same ボタン名 are one entry with a sub-menu of their サブボタン名 (e.g.
-     * the legacy 作業明細表 — 注文書 / 営業控 / 原稿添付用, SYSTEM_BRAIN 08_PRINTCREATOR). When the ファイル名 has
-     * 「{ユーザー選択}」 the user first chooses the field of the name.
-     *
-     * @return list<Action|ActionGroup>
-     */
-    private function exportActions(): array
-    {
-        if ($this->printMode || $this->historyVersion !== null) {
-            return [];
-        }
-
-        $outputs = collect([...$this->documentOutputsAt(OutputPlacement::RecordMenu), ...$this->documentOutputsAt(OutputPlacement::RecordSpace)])
-            ->unique('id')->values()->all();
-
-        return array_map(fn (array $group): Action|ActionGroup => MenuButtons::exportEntry(array_map(
-            fn (DocumentOutput $output): Action => $this->recordDocumentAction($output, count($group) > 1 ? $output->optionLabel() : $output->name),
-            $group,
-        ), $group[0]->name), AppDocuments::groups($outputs));
-    }
-
-    private function recordDocumentAction(DocumentOutput $output, string $label): Action
-    {
-        $action = Action::make('document'.$output->id)->label($label)->icon(Heroicon::OutlinedPrinter);
-
-        return $output->asksForNameField()
-            ? $this->askingNameField($action, fn (): DocumentOutput => $output)
-            : $action->url(fn (): string => $this->documentUrl($output))->openUrlInNewTab($output->delivery === OutputDelivery::Open);
-    }
-
-    /** @return list<DocumentOutput> the 出力設定 the user gets at the place */
-    private function documentOutputsAt(OutputPlacement $placement): array
-    {
-        $user = auth()->user();
-
-        return AppDocuments::at($this->appResource()::app(), $user instanceof User ? $user : null, $placement);
-    }
-
-    private function documentUrl(DocumentOutput $output, ?string $nameField = null): string
-    {
-        return route('core.documents.record', array_filter([
-            'output' => $output,
-            'record' => $this->record->getKey(),
-            'name_field' => $nameField,
-        ], fn (mixed $value): bool => $value !== null));
-    }
-
-    /**
-     * 出力 asking first which field goes into the ファイル名 (「{ユーザー選択}」), then opening this record's 帳票 in a
-     * new tab, or downloading it.
-     *
-     * @param  Closure(array<string, mixed>): ?DocumentOutput  $output
-     */
-    private function askingNameField(Action $action, Closure $output): Action
-    {
-        return $action
-            ->icon(Heroicon::OutlinedPrinter)
-            ->modalIcon(Heroicon::OutlinedPrinter)
-            ->modalWidth('md')
-            ->modalHeading(fn (array $arguments): string => $output($arguments)->name ?? '帳票出力')
-            ->modalSubmitActionLabel('出力する')
-            ->modalCancelActionLabel('キャンセル')
-            ->schema([DocumentNameField::make($this->appResource())])
-            ->action(function (array $data, array $arguments) use ($output): void {
-                $document = $output($arguments);
-                if ($document === null) {
-                    return;
-                }
-
-                $url = $this->documentUrl($document, is_string($data['name_field'] ?? null) ? $data['name_field'] : null);
-                $this->js($document->delivery === OutputDelivery::Open
-                    ? 'window.open('.Js::from($url).', "_blank")'
-                    : 'window.location.href = '.Js::from($url));
-            });
-    }
-
-    /**
      * The legacy text of the record menu (「メニュー位置に文字を表示する」 レコード詳細メニューの上側) as button label =>
      * explanation, shown in the collapsible 「ボタンの説明」 panel; empty for none.
      *
@@ -677,90 +267,5 @@ abstract class AppViewRecord extends ViewRecord
     public function menuHelp(): array
     {
         return [];
-    }
-
-    /**
-     * Entries to mark besides the changed fields themselves (e.g. an entry built from several fields).
-     *
-     * @param  list<string>  $changed
-     * @return list<string>
-     */
-    protected function relatedHighlightFields(array $changed): array
-    {
-        return [];
-    }
-
-    /** Column of the app's default list order, followed by ‹ › (the key breaks ties; a blank value navigates by key). */
-    protected function recordNavigationColumn(): string
-    {
-        return $this->record->getKeyName();
-    }
-
-    /** @return array{previous: string|null, next: string|null} */
-    public function recordNeighbours(): array
-    {
-        if ($this->neighbourUrls !== null) {
-            return $this->neighbourUrls;
-        }
-
-        $resource = static::getResource();
-        $urls = [];
-        $neighbours = $this->neighbours();
-
-        foreach (['previous', 'next'] as $direction) {
-            $neighbour = $neighbours[$direction];
-            $urls[$direction] = $neighbour !== null && $resource::canView($neighbour)
-                ? $resource::getUrl('view', ['record' => $neighbour])
-                : null;
-        }
-
-        return $this->neighbourUrls = $urls;
-    }
-
-    /**
-     * The records before and after this one in the app's default order — both in one query.
-     *
-     * @return array{previous: Model|null, next: Model|null}
-     */
-    private function neighbours(): array
-    {
-        $rows = $this->neighbourQuery(false)->unionAll($this->neighbourQuery(true)->toBase())->get();
-
-        $found = ['previous' => null, 'next' => null];
-        foreach ($rows as $row) {
-            $direction = $row->getAttribute('sfk_neighbour') === 'next' ? 'next' : 'previous';
-            $row->offsetUnset('sfk_neighbour');
-            $row->syncOriginal();
-            $found[$direction] = $row;
-        }
-
-        return $found;
-    }
-
-    /** @return Builder<Model> */
-    private function neighbourQuery(bool $forward): Builder
-    {
-        $record = $this->record;
-        $key = $record->getQualifiedKeyName();
-        $id = $record->getKey();
-        $value = $record->getAttribute($this->recordNavigationColumn());
-        $column = $value === null ? $key : $record->qualifyColumn($this->recordNavigationColumn());
-        $value ??= $id;
-        $operator = $forward ? '>' : '<';
-        $direction = $forward ? 'asc' : 'desc';
-
-        $query = static::getResource()::getEloquentQuery();
-        if ($query->getQuery()->columns === null) {
-            $query->select($record->getTable().'.*');
-        }
-
-        return $query
-            ->selectRaw('cast(? as varchar(8)) as sfk_neighbour', [$forward ? 'next' : 'previous'])
-            ->where(fn (Builder $query): Builder => $query
-                ->where($column, $operator, $value)
-                ->orWhere(fn (Builder $query): Builder => $query->where($column, $value)->where($key, $operator, $id)))
-            ->orderBy($column, $direction)
-            ->orderBy($key, $direction)
-            ->limit(1);
     }
 }

@@ -170,6 +170,34 @@ it('enters a purchase: 金額 from 数量 × 単価, numbered, totalled, its job
         ->assertCanNotSeeTableRecords([$other]);
 });
 
+it('filters 注番 through the job: its number compared like text, blank = no job (FilterField::relatedText)', function () {
+    $this->actingAs($this->admin);
+    $job = screenJob();
+    $otherJob = screenJob('角2封筒');
+    $purchase = fn (?Order $order, string $product): Purchase => Purchase::query()->create(['supplier_id' => $this->supplier->id, 'purchased_on' => '2026-11-02',
+        'order_id' => $order?->id, 'product_name' => $product, 'amount' => 100]);
+    $withJob = $purchase($job, '紙A');
+    $withOther = $purchase($otherJob, '紙B');
+    $without = $purchase(null, '運送代');
+    $number = (string) $job->fresh()?->order_number;
+    $filter = fn (string $operator, string $value): array => ['conditions' => [['field' => 'order_id', 'operator' => $operator, 'values' => [$value]]]];
+
+    Livewire::test(ListPurchases::class)
+        ->call('applyAppFilter', $filter('eq', $number))
+        ->assertCanSeeTableRecords([$withJob])->assertCanNotSeeTableRecords([$withOther, $without])
+        // ≠ keeps the blank ones (as the legacy filter)
+        ->call('applyAppFilter', $filter('ne', $number))
+        ->assertCanSeeTableRecords([$withOther, $without])->assertCanNotSeeTableRecords([$withJob])
+        ->call('applyAppFilter', $filter('eq', ''))
+        ->assertCanSeeTableRecords([$without])->assertCanNotSeeTableRecords([$withJob, $withOther])
+        ->call('applyAppFilter', $filter('ne', ''))
+        ->assertCanSeeTableRecords([$withJob, $withOther])->assertCanNotSeeTableRecords([$without])
+        ->call('applyAppFilter', $filter('like', $number))
+        ->assertCanSeeTableRecords([$withJob])->assertCanNotSeeTableRecords([$withOther, $without])
+        ->call('applyAppFilter', $filter('not_like', $number))
+        ->assertCanSeeTableRecords([$withOther, $without])->assertCanNotSeeTableRecords([$withJob]);
+});
+
 it('imports purchases from a CSV file only when every line is valid', function () {
     // uploads are kept by Livewire for a day of real time: no time travel while files are uploaded
     $this->travelBack();

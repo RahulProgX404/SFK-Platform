@@ -16,6 +16,7 @@ use Modules\Core\Application\Views\ListView;
 use Modules\Core\Domain\Billing\ClosingDay;
 use Modules\Core\Domain\Filters\FilterOperator;
 use Modules\Core\Filament\AppPages\AppListRecords;
+use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Support\UserPopup;
 use Modules\Core\Filament\Tables\AppRecordActions;
 use Modules\Core\Filament\Tables\AppTextColumn;
@@ -25,7 +26,6 @@ use Modules\MasterData\Models\Partner;
 use Modules\Sales\Domain\Sales\SaleChoices;
 use Modules\Sales\Filament\Resources\Invoices\InvoiceLayout;
 use Modules\Sales\Filament\Resources\Invoices\InvoiceResource;
-use Modules\Sales\Filament\SalesFormat;
 use Modules\Sales\Models\Invoice;
 
 /**
@@ -154,15 +154,15 @@ final class InvoicesTable
             Partner::query()->select("partners.{$attribute}")->whereColumn('partners.id', 'invoices.customer_id'),
             $direction,
         );
-        $yen = fn (mixed $state): string => SalesFormat::yen($state);
+        $yen = fn (mixed $state): string => AppFormat::yen($state);
 
         return match ($name) {
             'number', 'address', 'notes' => $column->searchable(),
             'invoiced_on' => $column->date('Y-m-d'),
             'previous_amount', 'received_amount', 'carried_amount', 'subtotal', 'tax_total', 'billed_total' => $column->alignEnd()->formatStateUsing($yen),
-            'tax_sum' => $column->alignEnd()->state(fn (Invoice $record): string => SalesFormat::yen($record->tax_total))
+            'tax_sum' => $column->alignEnd()->state(fn (Invoice $record): string => AppFormat::yen($record->tax_total))
                 ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy('invoices.tax_total', $direction)),
-            'purchase_total' => $column->alignEnd()->state(fn (Invoice $record): string => SalesFormat::yen($record->purchaseTotal()))
+            'purchase_total' => $column->alignEnd()->state(fn (Invoice $record): string => AppFormat::yen($record->purchaseTotal()))
                 ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderByRaw('(invoices.subtotal + invoices.tax_total) '.($direction === 'desc' ? 'desc' : 'asc'))),
             'customer_id' => $column
                 ->state(fn (Invoice $record): ?string => $record->customer?->name)
@@ -171,10 +171,10 @@ final class InvoicesTable
             'customer_code' => $column->state(fn (Invoice $record): ?string => $record->customer?->code)->sortable(query: $partner('code')),
             'customer_rounding' => $column->state(fn (Invoice $record): string => $record->roundingMode()->value),
             'master_closing_day', 'collection', 'collection_day', 'invoice_issuance', 'delivery_note_issuance' => $column
-                ->state(fn (Invoice $record): ?string => SalesFormat::text($record->customer?->getAttribute(self::partnerColumn($name))))
+                ->state(fn (Invoice $record): ?string => AppFormat::text($record->customer?->getAttribute(self::partnerColumn($name))))
                 ->sortable(query: $partner(self::partnerColumn($name))),
             'billing_month' => $column->state(fn (Invoice $record): ?string => filled($record->billing_month)
-                ? $record->customer_id.'_'.SalesFormat::month($record->billing_month) : null),
+                ? $record->customer_id.'_'.AppFormat::month($record->billing_month) : null),
             'pdf_files' => $column->state(fn (Invoice $record): ?string => implode('、', array_map('basename', (array) $record->pdf_files)) ?: null),
             // user names open the ユーザー情報 popup, so the cell is not a link to the record
             'assignees' => $column

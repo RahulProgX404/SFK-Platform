@@ -14,6 +14,7 @@ use Modules\Core\Domain\Apps\AppAbility;
 use Modules\Core\Domain\Apps\AppStatus;
 use Modules\Core\Domain\Apps\PermissionSubject;
 use Modules\Core\Filament\Portal\PortalPage;
+use Modules\Core\Filament\Support\ThemeAssets;
 use Modules\Core\Models\BusinessApp;
 use Modules\Core\Models\DashboardPortal;
 use Modules\Core\Models\Space;
@@ -327,9 +328,22 @@ it('lets users order the apps for themselves only, and administrators change the
 });
 
 it('frames each よく使うアプリ on its own, with space between them', function () {
-    $this->actingAs($this->admin)->get('/erp')
-        ->assertOk()
-        ->assertSee(['.sfk-shortcuts {', '.sfk-shortcut {', 'box-shadow: var(--sfk-ring);'], false);
+    $this->actingAs($this->admin)->get('/erp')->assertOk();
+
+    expect(ThemeAssets::bundle()['css'])->toContain('.sfk-shortcuts {', '.sfk-shortcut {', 'box-shadow: var(--sfk-ring);');
+});
+
+it('keeps the dashboard\'s styles in the cached theme, out of the page and its Livewire updates', function () {
+    ThemeAssets::forget();
+    $css = ThemeAssets::bundle()['css'];
+
+    // the dashboard, the quick entries and the スペース wizard (Core), 売上分析 / 日報分析 and the 12-month charts (Analytics)
+    expect($css)->toContain('.sfk-dashboard-page {', '.sfk-apps .sfk-empty {', '.sfk-qe {', '.sfk-sw {', '.sfk-an {', '.sfk-growth-tools {')
+        // the dashboard's rule for its empty スペース list stays inside the アプリ panel (設定 → アプリ has its own)
+        ->not->toMatch('/(^|\})\s*\.sfk-empty \{/');
+
+    $this->actingAs($this->admin)->get('/erp')->assertOk()->assertDontSee('.sfk-dashboard-page {', false);
+    Livewire::test(PortalPage::class)->call('$refresh')->assertDontSee('.sfk-dash {', false);
 });
 
 it('lists 共通管理 first in ダッシュボード切替, each dashboard with its own icon, without a ダッシュボード entry', function () {

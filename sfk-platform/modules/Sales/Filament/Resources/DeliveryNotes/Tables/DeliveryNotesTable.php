@@ -15,6 +15,7 @@ use Modules\Core\Application\Views\ListView;
 use Modules\Core\Domain\Billing\ClosingDay;
 use Modules\Core\Domain\Filters\FilterOperator;
 use Modules\Core\Filament\AppPages\AppListRecords;
+use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Support\UserPopup;
 use Modules\Core\Filament\Tables\AppRecordActions;
 use Modules\Core\Filament\Tables\AppTextColumn;
@@ -24,7 +25,6 @@ use Modules\MasterData\Models\Partner;
 use Modules\Sales\Domain\Sales\SaleChoices;
 use Modules\Sales\Filament\Resources\DeliveryNotes\DeliveryNoteLayout;
 use Modules\Sales\Filament\Resources\DeliveryNotes\DeliveryNoteResource;
-use Modules\Sales\Filament\SalesFormat;
 use Modules\Sales\Models\DeliveryNote;
 
 /**
@@ -146,14 +146,14 @@ final class DeliveryNotesTable
             'number', 'address', 'notes' => $column->searchable(),
             'sold_on', 'billing_due_on' => $column->date('Y-m-d'),
             'created_at' => $column->dateTime('Y-m-d H:i'),
-            'subtotal', 'tax_total' => $column->alignEnd()->formatStateUsing(fn (mixed $state): string => SalesFormat::yen($state)),
+            'subtotal', 'tax_total' => $column->alignEnd()->formatStateUsing(fn (mixed $state): string => AppFormat::yen($state)),
             'customer_id' => $column
                 ->state(fn (DeliveryNote $record): ?string => $record->customer?->name)
                 ->searchable(query: SearchQuery::through('customer', 'name'))
                 ->sortable(query: $partner('name')),
             'customer_code' => $column->state(fn (DeliveryNote $record): ?string => $record->customer?->code)->sortable(query: $partner('code')),
             'delivery_note_issuance', 'invoice_issuance' => $column
-                ->state(fn (DeliveryNote $record): ?string => SalesFormat::text($record->customer?->getAttribute($name)))
+                ->state(fn (DeliveryNote $record): ?string => AppFormat::text($record->customer?->getAttribute($name)))
                 ->sortable(query: $partner($name)),
             'pdf_files' => $column->state(fn (DeliveryNote $record): ?string => implode('、', array_map('basename', (array) $record->pdf_files)) ?: null),
             // user names open the ユーザー情報 popup, so the cell is not a link to the record

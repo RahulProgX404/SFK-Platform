@@ -104,12 +104,12 @@ final class LeaveRequestLayout
             'status' => $entry->state(fn (LeaveRequest $record): string => $record->status->value),
             'assignee' => $entry->state(fn (LeaveRequest $record): HtmlString => self::assignee($record))->html(),
             // user names open the ユーザー情報 popup
-            'applicant_id' => $entry->state(Employees::popup('applicant'))->html(),
-            'worker_id' => $entry->state(Employees::popup('worker'))->html(),
-            'approver_id' => $entry->state(Employees::popup('approver'))->html(),
+            'applicant_id' => $entry->state(UserPopup::of('applicant'))->html(),
+            'worker_id' => $entry->state(UserPopup::of('worker'))->html(),
+            'approver_id' => $entry->state(UserPopup::of('approver'))->html(),
             'target_on' => $entry->date('Y-m-d'),
             'total_time', 'clock_time' => $entry->formatStateUsing($time),
-            'creator', 'updater' => $entry->state(Employees::popup($name))->html(),
+            'creator', 'updater' => $entry->state(UserPopup::of($name))->html(),
             'created_at', 'updated_at' => $entry->dateTime('Y-m-d H:i'),
             default => $entry,
         };
@@ -121,18 +121,8 @@ final class LeaveRequestLayout
      */
     private static function components(callable $make, bool $withRecordRows): array
     {
-        $components = [];
-        if ($withRecordRows) {
-            $components[] = RecordSections::section(self::STATUS, $make);
-        }
-        $components[] = RecordSections::section(self::MAIN, $make);
-        if ($withRecordRows) {
-            $components[] = RecordSections::section(self::FOOTER, $make);
-        }
-        if (auth()->user() instanceof User && auth()->user()->isSuperAdmin()) {
-            $components[] = RecordSections::section(self::DEVELOPER, $make, '開発者用フィールド', collapsed: true);
-        }
+        $status = $withRecordRows ? [RecordSections::section(self::STATUS, $make)] : [];
 
-        return $components;
+        return [...$status, ...RecordSections::cards(self::MAIN, $make, $withRecordRows ? self::FOOTER : null, self::DEVELOPER)];
     }
 }

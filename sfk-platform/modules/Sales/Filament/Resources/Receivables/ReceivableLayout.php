@@ -4,23 +4,21 @@ declare(strict_types=1);
 
 namespace Modules\Sales\Filament\Resources\Receivables;
 
-use App\Models\User;
 use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
-use Illuminate\Support\HtmlString;
 use Modules\Core\Domain\Billing\BillingCycle;
 use Modules\Core\Domain\Billing\ClosingDay;
 use Modules\Core\Domain\Calendar\YearMonth;
 use Modules\Core\Filament\Records\RecordSections;
+use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Support\UserPopup;
 use Modules\Sales\Domain\Documents\DocumentFields;
 use Modules\Sales\Domain\Receivables\ReceivableBasis;
 use Modules\Sales\Filament\Resources\Receipts\ReceiptResource;
 use Modules\Sales\Filament\Resources\Sales\SaleResource;
-use Modules\Sales\Filament\SalesFormat;
 use Modules\Sales\Models\Receipt;
 use Modules\Sales\Models\ReceiptLine;
 use Modules\Sales\Models\ReceivableMonth;
@@ -88,22 +86,20 @@ final class ReceivableLayout
         $entry = TextEntry::make($name)->label(self::label($name, $basis))->placeholder('—');
 
         return match (true) {
-            in_array($name, self::AMOUNTS, true) => $entry->formatStateUsing(fn (mixed $state): string => SalesFormat::yen($state)),
-            $name === 'tax_exempt', $name === 'tax_out_of_scope' => $entry->state(SalesFormat::yen(0)),
+            in_array($name, self::AMOUNTS, true) => $entry->formatStateUsing(fn (mixed $state): string => AppFormat::yen($state)),
+            $name === 'tax_exempt', $name === 'tax_out_of_scope' => $entry->state(AppFormat::yen(0)),
             $name === 'year_month' => $entry->state(fn (ReceivableMonth $record): string => $record->monthLabel()),
             $name === 'customer_code' => $entry->state(fn (ReceivableMonth $record): ?string => $record->customer->code),
             $name === 'customer_id' => $entry->state(fn (ReceivableMonth $record): string => $record->customer->name),
-            $name === 'billing_closing_day' => $entry->state(fn (ReceivableMonth $record): ?string => SalesFormat::text($record->customer->closing_day)),
+            $name === 'billing_closing_day' => $entry->state(fn (ReceivableMonth $record): ?string => AppFormat::text($record->customer->closing_day)),
             in_array($name, ['invoice_issuance', 'delivery_note_issuance', 'collection_month', 'collection_day'], true) => $entry
-                ->state(fn (ReceivableMonth $record): ?string => SalesFormat::text($record->customer->getAttribute($name))),
+                ->state(fn (ReceivableMonth $record): ?string => AppFormat::text($record->customer->getAttribute($name))),
             $name === 'other_months' => View::make('core::filament.related-table')->viewData(fn (ReceivableMonth $record): array => self::otherMonths($record, $basis)),
             $name === 'month_sales' => View::make('core::filament.related-table')->viewData(fn (ReceivableMonth $record): array => self::monthSales($record)),
             $name === 'month_receipts' => View::make('core::filament.related-table')->viewData(fn (ReceivableMonth $record): array => self::monthReceipts($record)),
             $name === 'carries_forward' => $entry->state(fn (ReceivableMonth $record): string => $record->carriesForward()),
             $name === 'month_start' => $entry->date('Y-m-d'),
-            $name === 'creator', $name === 'updater' => $entry->state(fn (ReceivableMonth $record): HtmlString => UserPopup::html(
-                $record->getRelationValue($name) instanceof User ? $record->getRelationValue($name) : null,
-            ))->html(),
+            $name === 'creator', $name === 'updater' => $entry->state(UserPopup::of($name))->html(),
             $name === 'created_at', $name === 'updated_at' => $entry->dateTime('Y-m-d H:i'),
             default => $entry,
         };
@@ -120,15 +116,7 @@ final class ReceivableLayout
             ? [[...self::HEAD, ['closing_day', 193]], self::BALANCE, self::TERMS, self::SALES, ...self::PER_RATE, ...self::RELATED]
             : [self::HEAD, self::BALANCE, self::SALES, self::TERMS, ...self::PER_RATE, ...self::RELATED];
 
-        $components = [RecordSections::section($rows, $make)];
-        if ($withFooter) {
-            $components[] = RecordSections::section(self::FOOTER, $make);
-        }
-        if (auth()->user() instanceof User && auth()->user()->isSuperAdmin()) {
-            $components[] = RecordSections::section(self::DEVELOPER, $make, '開発者用フィールド', collapsed: true);
-        }
-
-        return $components;
+        return RecordSections::cards($rows, $make, $withFooter ? self::FOOTER : null, self::DEVELOPER);
     }
 
     /**
@@ -148,7 +136,7 @@ final class ReceivableLayout
             'numeric' => $figures,
             'rows' => $months->map(fn (ReceivableMonth $row): array => [
                 'year_month' => $row->monthLabel(),
-                ...array_combine($figures, array_map(fn (string $name): string => SalesFormat::yen($row->getAttribute($name)), $figures)),
+                ...array_combine($figures, array_map(fn (string $name): string => AppFormat::yen($row->getAttribute($name)), $figures)),
             ])->values()->all(),
             'urls' => $months->map(fn (ReceivableMonth $row): ?string => $resource::canView($row) ? $resource::getUrl('view', ['record' => $row]) : null)->values()->all(),
         ];
@@ -176,16 +164,16 @@ final class ReceivableLayout
                 'quantity' => '売上数量', 'unit_price' => '売上単価', 'tax_rate' => '税率', 'tax' => '消費税', 'amount' => '売上金額', 'fsc' => 'FSC'],
             'numeric' => ['quantity', 'unit_price', 'tax', 'amount'],
             'rows' => $sales->map(fn (Sale $sale): array => [
-                'sold_on' => SalesFormat::date($sale->sold_on),
+                'sold_on' => AppFormat::date($sale->sold_on),
                 'sales_number' => (string) $sale->sales_number,
-                'delivery_due_on' => SalesFormat::date($sale->delivery_due_on),
+                'delivery_due_on' => AppFormat::date($sale->delivery_due_on),
                 'order_number' => (string) $sale->order?->order_number,
                 'product_name' => (string) $sale->product_name,
-                'quantity' => SalesFormat::number($sale->quantity),
-                'unit_price' => SalesFormat::price($sale->unit_price),
+                'quantity' => AppFormat::number($sale->quantity),
+                'unit_price' => AppFormat::price($sale->unit_price),
                 'tax_rate' => $sale->tax_rate,
-                'tax' => SalesFormat::yen($sale->tax),
-                'amount' => SalesFormat::yen($sale->amount),
+                'tax' => AppFormat::yen($sale->tax),
+                'amount' => AppFormat::yen($sale->amount),
                 'fsc' => $sale->order?->is_fsc ? 'FSC' : '',
             ])->values()->all(),
             'urls' => $sales->map(fn (Sale $sale): ?string => SaleResource::canView($sale) ? SaleResource::getUrl('view', ['record' => $sale]) : null)->values()->all(),
@@ -218,13 +206,13 @@ final class ReceivableLayout
                 'settled' => '入金額小計'],
             'numeric' => ['amount', 'fee', 'discount', 'settled'],
             'rows' => $lines->map(fn (ReceiptLine $line): array => [
-                'received_on' => SalesFormat::date($line->received_on),
+                'received_on' => AppFormat::date($line->received_on),
                 'invoice' => (string) $line->receipt->invoice?->number,
-                'amount' => SalesFormat::yen($line->amount),
-                'fee' => SalesFormat::yen($line->fee),
-                'discount' => SalesFormat::yen($line->discount),
+                'amount' => AppFormat::yen($line->amount),
+                'fee' => AppFormat::yen($line->fee),
+                'discount' => AppFormat::yen($line->discount),
                 'method' => (string) $line->method,
-                'settled' => SalesFormat::yen($line->settled()),
+                'settled' => AppFormat::yen($line->settled()),
             ])->all(),
             'urls' => $lines->map(fn (ReceiptLine $line): ?string => ReceiptResource::canView($line->receipt) ? ReceiptResource::getUrl('view', ['record' => $line->receipt]) : null)->all(),
         ];

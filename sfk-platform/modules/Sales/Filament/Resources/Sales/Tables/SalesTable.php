@@ -19,6 +19,7 @@ use Modules\Core\Domain\Filters\FilterCondition;
 use Modules\Core\Domain\Filters\FilterOperator;
 use Modules\Core\Domain\Tax\TaxRate;
 use Modules\Core\Filament\AppPages\AppListRecords;
+use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Support\UserPopup;
 use Modules\Core\Filament\Tables\AppRecordActions;
 use Modules\Core\Filament\Tables\AppTextColumn;
@@ -30,7 +31,6 @@ use Modules\Sales\Domain\Sales\SaleChoices;
 use Modules\Sales\Filament\Resources\Sales\SaleLayout;
 use Modules\Sales\Filament\Resources\Sales\SaleResource;
 use Modules\Sales\Filament\Resources\Sales\Schemas\SaleForm;
-use Modules\Sales\Filament\SalesFormat;
 use Modules\Sales\Models\DeliveryNote;
 use Modules\Sales\Models\Invoice;
 use Modules\Sales\Models\Sale;
@@ -156,15 +156,15 @@ final class SalesTable
             FilterField::choice('tax_rate', $label('tax_rate'), array_combine($rates, $rates)),
             FilterField::number('tax', $label('tax')),
             FilterField::text('summary', $label('summary')),
-            FilterField::text('order_id', $label('order_id'))->query(self::filterOrderNumber(...)),
+            FilterField::text('order_id', $label('order_id'))->relatedText('order', 'order_number'),
             FilterField::text('product_name', $label('product_name')),
             FilterField::user('assignees', $label('assignees'))->relationship('assignees', 'id'),
             FilterField::choice('needs', $label('needs'), SaleChoices::options(SaleChoices::NEEDS))->query(fn (Builder $query, FilterCondition $condition) => self::filterJson($query, 'needs', $condition)),
             FilterField::choice('handover', $label('handover'), SaleChoices::options(SaleChoices::HANDOVERS))->query(fn (Builder $query, FilterCondition $condition) => self::filterJson($query, 'handover', $condition)),
             FilterField::choice('delivered', $label('delivered'), ['済' => '済'])->query(fn (Builder $query, FilterCondition $condition) => self::filterLinked($query, 'delivery_note_id', $condition)),
-            FilterField::text('delivery_note_id', $label('delivery_note_id'))->query(fn (Builder $query, FilterCondition $condition) => self::filterNumber($query, 'deliveryNote', $condition)),
+            FilterField::text('delivery_note_id', $label('delivery_note_id'))->relatedText('deliveryNote', 'number'),
             FilterField::choice('invoiced', $label('invoiced'), ['済' => '済'])->query(fn (Builder $query, FilterCondition $condition) => self::filterLinked($query, 'invoice_id', $condition)),
-            FilterField::text('invoice_id', $label('invoice_id'))->query(fn (Builder $query, FilterCondition $condition) => self::filterNumber($query, 'invoice', $condition)),
+            FilterField::text('invoice_id', $label('invoice_id'))->relatedText('invoice', 'number'),
             FilterField::choice('locked', $label('locked'), ['可' => '可', '不可' => '不可'])->query(self::filterLocked(...)),
             FilterField::number('id', $label('id')),
             FilterField::user('created_by', $label('creator')),
@@ -215,11 +215,11 @@ final class SalesTable
         return match ($name) {
             'sales_number', 'product_name', 'summary' => $column->searchable(),
             'sold_on', 'delivery_due_on', 'billing_date' => $column->date('Y-m-d'),
-            'quantity' => $column->alignEnd()->formatStateUsing(fn (mixed $state): string => SalesFormat::number($state)),
-            'unit_price' => $column->alignEnd()->formatStateUsing(fn (mixed $state): string => SalesFormat::price($state)),
-            'amount', 'estimated_cost', 'estimated_expense', 'tax' => $column->alignEnd()->formatStateUsing(fn (mixed $state): string => SalesFormat::yen($state)),
+            'quantity' => $column->alignEnd()->formatStateUsing(fn (mixed $state): string => AppFormat::number($state)),
+            'unit_price' => $column->alignEnd()->formatStateUsing(fn (mixed $state): string => AppFormat::price($state)),
+            'amount', 'estimated_cost', 'estimated_expense', 'tax' => $column->alignEnd()->formatStateUsing(fn (mixed $state): string => AppFormat::yen($state)),
             'amount_with_tax' => $column->alignEnd()
-                ->state(fn (Sale $record): string => SalesFormat::yen($record->amountWithTax()))
+                ->state(fn (Sale $record): string => AppFormat::yen($record->amountWithTax()))
                 ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderByRaw('(sales.amount + sales.tax) '.($direction === 'asc' ? 'asc' : 'desc'))),
             'customer_id' => $column
                 ->state(fn (Sale $record): string => $record->customer->name)
@@ -252,7 +252,7 @@ final class SalesTable
             'needs', 'handover' => $column->state(fn (Sale $record): ?string => implode('、', (array) $record->getAttribute($name)) ?: null),
             'other_address' => $column->state(fn (Sale $record): ?string => $record->other_address ? 'する' : null),
             'locked' => $column->state(fn (Sale $record): string => $record->locked ? '不可' : '可'),
-            'billing_month' => $column->formatStateUsing(fn (mixed $state): string => SalesFormat::month(is_string($state) ? $state : null)),
+            'billing_month' => $column->formatStateUsing(fn (mixed $state): string => AppFormat::month(is_string($state) ? $state : null)),
             'delivery_note_recipient', 'invoice_recipient' => $column,
             // user names open the ユーザー情報 popup, so the cell is not a link to the record
             'assignees' => $column
@@ -265,36 +265,6 @@ final class SalesTable
                     $direction,
                 )),
             default => $column,
-        };
-    }
-
-    /**
-     * 注番 is the job's number.
-     *
-     * @param  Builder<*>  $query
-     */
-    private static function filterOrderNumber(Builder $query, FilterCondition $condition): void
-    {
-        self::filterNumber($query, 'order', $condition, 'order_number');
-    }
-
-    /**
-     * A document / job number of a related record, compared like a text field.
-     *
-     * @param  Builder<*>  $query
-     */
-    private static function filterNumber(Builder $query, string $relation, FilterCondition $condition, string $column = 'number'): void
-    {
-        $value = $condition->values[0] ?? '';
-        $has = fn (callable $where): Builder => $query->whereHas($relation, $where);
-
-        match ($condition->operator) {
-            FilterOperator::Contains => $has(fn (Builder $q): Builder => $q->whereLike($column, '%'.$value.'%')),
-            FilterOperator::NotContains => $query->whereDoesntHave($relation, fn (Builder $q): Builder => $q->whereLike($column, '%'.$value.'%')),
-            FilterOperator::Equals => $value === '' ? $query->whereDoesntHave($relation) : $has(fn (Builder $q): Builder => $q->where($column, $value)),
-            FilterOperator::NotEquals => $value === '' ? $query->whereHas($relation) : $query->whereDoesntHave($relation, fn (Builder $q): Builder => $q->where($column, $value)),
-            FilterOperator::OneOf => $has(fn (Builder $q): Builder => $q->whereIn($column, $condition->values)),
-            default => $query->whereRaw('1 = 0'),
         };
     }
 

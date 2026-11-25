@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Filament\Records;
 
+use App\Models\User;
 use Filament\Forms\Components\Field;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Section;
@@ -20,6 +21,43 @@ use Modules\Core\Domain\Apps\FieldAccessLevel;
  */
 final class RecordSections
 {
+    /**
+     * The cards of an app's record: its rows, the footer (レコード番号, 作成者, 作成日時 …) when given — record pages — and
+     * 開発者用フィールド for super admins.
+     *
+     * @param  list<list<array{0: string|null, 1: int}>|string>  $main
+     * @param  callable(string): ?Component  $make
+     * @param  list<list<array{0: string|null, 1: int}>|string>|null  $footer
+     * @param  list<list<array{0: string|null, 1: int}>|string>  $developer
+     * @return list<Section>
+     */
+    public static function cards(array $main, callable $make, ?array $footer = null, array $developer = []): array
+    {
+        $cards = [self::section($main, $make)];
+        if ($footer !== null) {
+            $cards[] = self::section($footer, $make);
+        }
+        $developerCard = self::developer($developer, $make);
+        if ($developerCard !== null) {
+            $cards[] = $developerCard;
+        }
+
+        return $cards;
+    }
+
+    /**
+     * 開発者用フィールド (legacy ids and the like): a collapsed card for super admins only.
+     *
+     * @param  list<list<array{0: string|null, 1: int}>|string>  $rows
+     * @param  callable(string): ?Component  $make
+     */
+    public static function developer(array $rows, callable $make): ?Section
+    {
+        $user = auth()->user();
+
+        return $rows !== [] && $user instanceof User && $user->isSuperAdmin() ? self::section($rows, $make, '開発者用フィールド', collapsed: true) : null;
+    }
+
     /**
      * @param  list<list<array{0: string|null, 1: int}>|string>  $rows
      * @param  callable(string): ?Component  $make

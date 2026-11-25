@@ -13,8 +13,6 @@ use Illuminate\Support\HtmlString;
 use Modules\Core\Application\Filters\FilterField;
 use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
-use Modules\Core\Domain\Filters\FilterCondition;
-use Modules\Core\Domain\Filters\FilterOperator;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Support\UserPopup;
@@ -91,7 +89,7 @@ final class AccidentReportsTable
         return [
             FilterField::date('occurred_on', $label('occurred_on')),
             FilterField::user('reporter_id', $label('reporter_id')),
-            FilterField::text('order_id', $label('order_id'))->query(self::filterOrderNumber(...)),
+            FilterField::text('order_id', $label('order_id'))->relatedText('order', 'order_number'),
             FilterField::number('quantity', $label('quantity')),
             FilterField::choice('machine_id', $label('machine_id'), AccidentReportLayout::machineOptions(...)),
             FilterField::user('maker1_id', $label('maker1_id')),
@@ -121,9 +119,6 @@ final class AccidentReportsTable
     {
         $column = AppTextColumn::make($name)->label(AccidentReportLayout::label($name))->placeholder('');
         $order = fn (Closure $select): Closure => fn (Builder $query, string $direction): Builder => $query->orderBy($select(), $direction);
-        $user = fn (string $relation): Closure => fn (AccidentReport $record): HtmlString => UserPopup::html(
-            $record->getRelationValue($relation) instanceof User ? $record->getRelationValue($relation) : null,
-        );
 
         return match (true) {
             in_array($name, ['description', 'cause', 'response', 'prevention', 'notes'], true) => $column->searchable()->limit(60),
@@ -132,7 +127,7 @@ final class AccidentReportsTable
             $name === 'quantity' => $column->alignEnd()->formatStateUsing(fn (mixed $state): string => AppFormat::number($state)),
             $name === 'total_damage' => $column->alignEnd()->formatStateUsing(fn (mixed $state): string => AppFormat::yen($state)),
             // user names open the ユーザー情報 popup, so the cell is not a link to the record
-            isset(self::USERS[$name]) => $column->state($user(self::USERS[$name]))->html()->disabledClick()
+            isset(self::USERS[$name]) => $column->state(UserPopup::of(self::USERS[$name]))->html()->disabledClick()
                 ->sortable(query: $order(fn (): Builder => User::query()->select('users.name')->whereColumn('users.id', "accident_reports.{$name}"))),
             $name === 'sales_users' => $column
                 ->state(fn (AccidentReport $record): HtmlString => UserPopup::list($record->salesUsers))
@@ -163,26 +158,6 @@ final class AccidentReportsTable
                 ->sortable(query: $order(fn (): Builder => Partner::query()->select('partners.code')->join('orders', 'orders.customer_id', '=', 'partners.id')
                     ->whereColumn('orders.id', 'accident_reports.order_id'))),
             default => $column,
-        };
-    }
-
-    /**
-     * 注番 is the job's number, compared like a text field.
-     *
-     * @param  Builder<*>  $query
-     */
-    private static function filterOrderNumber(Builder $query, FilterCondition $condition): void
-    {
-        $value = $condition->values[0] ?? '';
-        $has = fn (callable $where): Builder => $query->whereHas('order', $where);
-
-        match ($condition->operator) {
-            FilterOperator::Contains => $has(fn (Builder $q): Builder => $q->whereLike('order_number', '%'.$value.'%')),
-            FilterOperator::NotContains => $query->whereDoesntHave('order', fn (Builder $q): Builder => $q->whereLike('order_number', '%'.$value.'%')),
-            FilterOperator::Equals => $value === '' ? $query->whereDoesntHave('order') : $has(fn (Builder $q): Builder => $q->where('order_number', $value)),
-            FilterOperator::NotEquals => $value === '' ? $query->whereHas('order') : $query->whereDoesntHave('order', fn (Builder $q): Builder => $q->where('order_number', $value)),
-            FilterOperator::OneOf => $has(fn (Builder $q): Builder => $q->whereIn('order_number', $condition->values)),
-            default => $query->whereRaw('1 = 0'),
         };
     }
 }

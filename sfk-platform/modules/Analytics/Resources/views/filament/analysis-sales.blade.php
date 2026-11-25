@@ -11,8 +11,6 @@
 @endphp
 
 <x-filament-panels::page>
-    @include('analytics::filament.analysis-styles')
-
     <div class="sfk-an">
         @include('core::filament.app-summary', ['cards' => $sales['cards']])
 

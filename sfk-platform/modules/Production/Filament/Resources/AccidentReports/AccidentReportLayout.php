@@ -134,16 +134,13 @@ final class AccidentReportLayout
     private static function entry(string $name): Component
     {
         $entry = TextEntry::make($name)->label(self::label($name))->placeholder('—');
-        $user = fn (string $relation): \Closure => fn (AccidentReport $record): HtmlString => UserPopup::html(
-            $record->getRelationValue($relation) instanceof User ? $record->getRelationValue($relation) : null,
-        );
 
         return match (true) {
             $name === 'occurred_on' => $entry->date('Y-m-d'),
             // user names open the ユーザー情報 popup
-            $name === 'reporter_id' => $entry->state($user('reporter'))->html(),
-            $name === 'maker1_id' => $entry->state($user('maker1'))->html(),
-            $name === 'maker2_id' => $entry->state($user('maker2'))->html(),
+            $name === 'reporter_id' => $entry->state(UserPopup::of('reporter'))->html(),
+            $name === 'maker1_id' => $entry->state(UserPopup::of('maker1'))->html(),
+            $name === 'maker2_id' => $entry->state(UserPopup::of('maker2'))->html(),
             $name === 'sales_users' => $entry->state(fn (AccidentReport $record): HtmlString => UserPopup::list($record->salesUsers))->html(),
             $name === 'order_id' => $entry
                 ->state(fn (AccidentReport $record): ?string => $record->order?->order_number)
@@ -158,7 +155,7 @@ final class AccidentReportLayout
             $name === 'machine_record' => $entry->state(fn (AccidentReport $record): ?string => $record->machine_id === null ? null : (string) $record->machine_id),
             $name === 'reporter_code' => $entry->state(fn (AccidentReport $record): ?string => $record->reporter->getAttribute('employee_code')),
             $name === 'customer_code' => $entry->state(fn (AccidentReport $record): ?string => $record->order?->customer?->code),
-            $name === 'creator', $name === 'updater' => $entry->state($user($name))->html(),
+            $name === 'creator', $name === 'updater' => $entry->state(UserPopup::of($name))->html(),
             $name === 'created_at', $name === 'updated_at' => $entry->dateTime('Y-m-d H:i'),
             default => $entry,
         };
@@ -170,15 +167,7 @@ final class AccidentReportLayout
      */
     private static function components(callable $make, bool $withFooter): array
     {
-        $components = [RecordSections::section(self::MAIN, $make)];
-        if ($withFooter) {
-            $components[] = RecordSections::section(self::FOOTER, $make);
-        }
-        if (auth()->user() instanceof User && auth()->user()->isSuperAdmin()) {
-            $components[] = RecordSections::section(self::DEVELOPER, $make, '開発者用フィールド', collapsed: true);
-        }
-
-        return $components;
+        return RecordSections::cards(self::MAIN, $make, $withFooter ? self::FOOTER : null, self::DEVELOPER);
     }
 
     private static function damagesForm(): Repeater

@@ -15,8 +15,6 @@ use Illuminate\Database\Eloquent\Collection;
 use Modules\Core\Application\Filters\FilterField;
 use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
-use Modules\Core\Domain\Filters\FilterCondition;
-use Modules\Core\Domain\Filters\FilterOperator;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Tables\AppRecordActions;
@@ -97,10 +95,10 @@ final class FreightChargesTable
 
         return [
             FilterField::date('charged_on', $label('charged_on')),
-            FilterField::text('order_id', $label('order_id'))->query(fn (Builder $query, FilterCondition $condition) => self::filterNumber($query, 'order', 'order_number', $condition)),
+            FilterField::text('order_id', $label('order_id'))->relatedText('order', 'order_number'),
             FilterField::number('amount', $label('amount')),
             FilterField::text('carrier_number', $label('carrier_number')),
-            FilterField::text('purchase_id', $label('purchase_id'))->query(fn (Builder $query, FilterCondition $condition) => self::filterNumber($query, 'purchase', 'purchase_number', $condition)),
+            FilterField::text('purchase_id', $label('purchase_id'))->relatedText('purchase', 'purchase_number'),
             FilterField::number('unit_price', $label('unit_price')),
             FilterField::number('quantity', $label('quantity')),
             ...array_map(fn (string $name): FilterField => FilterField::number($name, $label($name)), array_slice(FreightChargeLayout::AMOUNTS, 1)),
@@ -191,26 +189,6 @@ final class FreightChargesTable
                     $direction,
                 )),
             default => $column,
-        };
-    }
-
-    /**
-     * 注番 / 納品(仕入)入力No are numbers of related records, compared like a text field.
-     *
-     * @param  Builder<*>  $query
-     */
-    private static function filterNumber(Builder $query, string $relation, string $column, FilterCondition $condition): void
-    {
-        $value = $condition->values[0] ?? '';
-        $has = fn (callable $where): Builder => $query->whereHas($relation, $where);
-
-        match ($condition->operator) {
-            FilterOperator::Contains => $has(fn (Builder $q): Builder => $q->whereLike($column, '%'.$value.'%')),
-            FilterOperator::NotContains => $query->whereDoesntHave($relation, fn (Builder $q): Builder => $q->whereLike($column, '%'.$value.'%')),
-            FilterOperator::Equals => $value === '' ? $query->whereDoesntHave($relation) : $has(fn (Builder $q): Builder => $q->where($column, $value)),
-            FilterOperator::NotEquals => $value === '' ? $query->whereHas($relation) : $query->whereDoesntHave($relation, fn (Builder $q): Builder => $q->where($column, $value)),
-            FilterOperator::OneOf => $has(fn (Builder $q): Builder => $q->whereIn($column, $condition->values)),
-            default => $query->whereRaw('1 = 0'),
         };
     }
 }

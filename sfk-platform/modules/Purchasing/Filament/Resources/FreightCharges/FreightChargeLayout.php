@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Purchasing\Filament\Resources\FreightCharges;
 
-use App\Models\User;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -12,7 +11,6 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\HtmlString;
 use Modules\Core\Filament\Records\RecordSections;
 use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Support\UserPopup;
@@ -101,9 +99,7 @@ final class FreightChargeLayout
             in_array($name, self::AMOUNTS, true) => $entry->formatStateUsing(fn (mixed $state): string => AppFormat::yen($state)),
             $name === 'unit_price' => $entry->formatStateUsing(fn (mixed $state): string => AppFormat::price($state)),
             $name === 'quantity' => $entry->formatStateUsing(fn (mixed $state): string => AppFormat::number($state)),
-            $name === 'creator', $name === 'updater' => $entry->state(fn (FreightCharge $record): HtmlString => UserPopup::html(
-                $record->getRelationValue($name) instanceof User ? $record->getRelationValue($name) : null,
-            ))->html(),
+            $name === 'creator', $name === 'updater' => $entry->state(UserPopup::of($name))->html(),
             $name === 'created_at', $name === 'updated_at' => $entry->dateTime('Y-m-d H:i'),
             default => $entry,
         };
@@ -115,14 +111,6 @@ final class FreightChargeLayout
      */
     private static function components(callable $make, bool $withFooter): array
     {
-        $components = [RecordSections::section(self::MAIN, $make)];
-        if ($withFooter) {
-            $components[] = RecordSections::section(self::FOOTER, $make);
-        }
-        if (auth()->user() instanceof User && auth()->user()->isSuperAdmin()) {
-            $components[] = RecordSections::section(self::DEVELOPER, $make, '開発者用フィールド', collapsed: true);
-        }
-
-        return $components;
+        return RecordSections::cards(self::MAIN, $make, $withFooter ? self::FOOTER : null, self::DEVELOPER);
     }
 }

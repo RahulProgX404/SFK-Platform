@@ -128,9 +128,7 @@ final class ConsumableOrderLayout
             $name === 'orderers' => $entry->state(fn (ConsumableOrder $record): HtmlString => UserPopup::list($record->orderers))->html(),
             $name === 'lines' => self::linesEntry(),
             isset(self::SUPPLIER_VALUES[$name]) => $entry->state(fn (ConsumableOrder $record): ?string => AppFormat::text($record->supplier?->getAttribute(self::SUPPLIER_VALUES[$name]))),
-            $name === 'creator', $name === 'updater' => $entry->state(fn (ConsumableOrder $record): HtmlString => UserPopup::html(
-                $record->getRelationValue($name) instanceof User ? $record->getRelationValue($name) : null,
-            ))->html(),
+            $name === 'creator', $name === 'updater' => $entry->state(UserPopup::of($name))->html(),
             $name === 'created_at', $name === 'updated_at' => $entry->dateTime('Y-m-d H:i'),
             default => $entry,
         };
@@ -142,19 +140,9 @@ final class ConsumableOrderLayout
      */
     private static function components(callable $make, bool $withRecordRows): array
     {
-        $components = [];
-        if ($withRecordRows) {
-            $components[] = RecordSections::section(self::STATUS, $make);
-        }
-        $components[] = RecordSections::section(self::MAIN, $make);
-        if ($withRecordRows) {
-            $components[] = RecordSections::section(self::FOOTER, $make);
-        }
-        if (auth()->user() instanceof User && auth()->user()->isSuperAdmin()) {
-            $components[] = RecordSections::section(self::DEVELOPER, $make, '開発者用フィールド', collapsed: true);
-        }
+        $status = $withRecordRows ? [RecordSections::section(self::STATUS, $make)] : [];
 
-        return $components;
+        return [...$status, ...RecordSections::cards(self::MAIN, $make, $withRecordRows ? self::FOOTER : null, self::DEVELOPER)];
     }
 
     private static function linesForm(): Repeater

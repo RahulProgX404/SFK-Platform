@@ -126,9 +126,7 @@ final class QuotationLayout
             'pdf_files' => $entry->state(fn (Quotation $record): array => array_map('basename', (array) $record->pdf_files))->listWithLineBreaks(),
             'customer_code' => $entry->state(fn (Quotation $record): ?string => $record->customer?->code),
             'file_name' => $entry->state(fn (Quotation $record): string => $record->fileName()),
-            'creator', 'updater' => $entry->state(fn (Quotation $record): HtmlString => UserPopup::html(
-                $record->getRelationValue($name) instanceof User ? $record->getRelationValue($name) : null,
-            ))->html(),
+            'creator', 'updater' => $entry->state(UserPopup::of($name))->html(),
             'created_at', 'updated_at' => $entry->dateTime('Y-m-d H:i'),
             default => $entry,
         };
@@ -140,15 +138,7 @@ final class QuotationLayout
      */
     private static function components(callable $make, bool $withFooter): array
     {
-        $components = [RecordSections::section(self::MAIN, $make)];
-        if ($withFooter) {
-            $components[] = RecordSections::section(self::FOOTER, $make);
-        }
-        if (auth()->user() instanceof User && auth()->user()->isSuperAdmin()) {
-            $components[] = RecordSections::section(self::DEVELOPER, $make, '開発者用フィールド', collapsed: true);
-        }
-
-        return $components;
+        return RecordSections::cards(self::MAIN, $make, $withFooter ? self::FOOTER : null, self::DEVELOPER);
     }
 
     private static function linesForm(): Repeater

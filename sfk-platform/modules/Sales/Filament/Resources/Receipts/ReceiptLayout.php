@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Sales\Filament\Resources\Receipts;
 
-use App\Models\User;
 use DateTimeInterface;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Repeater;
@@ -26,11 +25,11 @@ use Modules\Core\Domain\Billing\ClosingDay;
 use Modules\Core\Domain\Calendar\YearMonth;
 use Modules\Core\Filament\Records\RecordSections;
 use Modules\Core\Filament\Records\RecordTable;
+use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Support\UserPopup;
 use Modules\Sales\Domain\Documents\DocumentFields;
 use Modules\Sales\Domain\Sales\SaleChoices;
 use Modules\Sales\Filament\Resources\Invoices\InvoiceResource;
-use Modules\Sales\Filament\SalesFormat;
 use Modules\Sales\Models\Invoice;
 use Modules\Sales\Models\InvoiceLine;
 use Modules\Sales\Models\Receipt;
@@ -103,13 +102,13 @@ final class ReceiptLayout
                     ->map(fn (mixed $id): string => (string) $id)->all() ?? [])),
             'customer_id' => $text(fn (Get $get): ?string => self::invoice($get('invoice_id'))?->customer?->name),
             'assignees' => Select::make($name)->label($label)->placeholder('-----')->relationship('assignees', 'name')->multiple()->searchable()->preload(),
-            'collection_month', 'collection_day', 'master_closing_day' => $text(fn (Get $get): ?string => SalesFormat::text(self::invoice($get('invoice_id'))?->customer?->getAttribute(self::partnerColumn($name)))),
+            'collection_month', 'collection_day', 'master_closing_day' => $text(fn (Get $get): ?string => AppFormat::text(self::invoice($get('invoice_id'))?->customer?->getAttribute(self::partnerColumn($name)))),
             'closing_day' => $text(fn (Get $get): ?string => self::invoice($get('invoice_id'))?->closing_day),
-            'billed_on' => $text(fn (Get $get): string => SalesFormat::date(self::invoice($get('invoice_id'))?->invoiced_on)),
-            'billed_amount' => $text(fn (Get $get): string => SalesFormat::yen(self::invoice($get('invoice_id'))?->purchaseTotal())),
-            'settled_amount' => $text(fn (Get $get): string => SalesFormat::yen(self::liveSettled($get))),
-            'shortfall' => $text(fn (Get $get): string => SalesFormat::yen(self::difference($get, shortfall: true))),
-            'overpayment' => $text(fn (Get $get): string => SalesFormat::yen(self::difference($get, shortfall: false))),
+            'billed_on' => $text(fn (Get $get): string => AppFormat::date(self::invoice($get('invoice_id'))?->invoiced_on)),
+            'billed_amount' => $text(fn (Get $get): string => AppFormat::yen(self::invoice($get('invoice_id'))?->purchaseTotal())),
+            'settled_amount' => $text(fn (Get $get): string => AppFormat::yen(self::liveSettled($get))),
+            'shortfall' => $text(fn (Get $get): string => AppFormat::yen(self::difference($get, shortfall: true))),
+            'overpayment' => $text(fn (Get $get): string => AppFormat::yen(self::difference($get, shortfall: false))),
             'lines' => self::linesForm(),
             'notes' => Textarea::make($name)->label($label)->rows(3)->maxLength(4000),
             'invoice_lines' => null,
@@ -122,7 +121,7 @@ final class ReceiptLayout
     private static function entry(string $name): Component
     {
         $entry = TextEntry::make($name)->label(self::label($name))->placeholder('—');
-        $yen = fn (mixed $state): string => SalesFormat::yen($state);
+        $yen = fn (mixed $state): string => AppFormat::yen($state);
 
         return match ($name) {
             'invoice_id' => $entry->state(fn (Receipt $record): ?string => $record->invoice?->number)
@@ -130,16 +129,16 @@ final class ReceiptLayout
                     ? InvoiceResource::getUrl('view', ['record' => $record->invoice]) : null),
             'customer_id' => $entry->state(fn (Receipt $record): string => $record->customer->name),
             'assignees' => $entry->state(fn (Receipt $record): HtmlString => UserPopup::list($record->assignees))->html(),
-            'collection_month', 'collection_day', 'master_closing_day' => $entry->state(fn (Receipt $record): ?string => SalesFormat::text($record->customer->getAttribute(self::partnerColumn($name)))),
+            'collection_month', 'collection_day', 'master_closing_day' => $entry->state(fn (Receipt $record): ?string => AppFormat::text($record->customer->getAttribute(self::partnerColumn($name)))),
             'billed_on' => $entry->date('Y-m-d'),
             'billed_amount', 'settled_amount' => $entry->formatStateUsing($yen),
-            'shortfall' => $entry->state(fn (Receipt $record): ?string => $record->shortfall() === null ? null : SalesFormat::yen($record->shortfall())),
-            'overpayment' => $entry->state(fn (Receipt $record): ?string => $record->overpayment() === null ? null : SalesFormat::yen($record->overpayment())),
+            'shortfall' => $entry->state(fn (Receipt $record): ?string => $record->shortfall() === null ? null : AppFormat::yen($record->shortfall())),
+            'overpayment' => $entry->state(fn (Receipt $record): ?string => $record->overpayment() === null ? null : AppFormat::yen($record->overpayment())),
             'lines' => self::linesEntry(),
             'invoice_lines' => View::make('core::filament.related-table')
                 ->viewData(fn (Receipt $record): array => self::invoiceLines($record)),
             'customer_code' => $entry->state(fn (Receipt $record): ?string => $record->customer->code),
-            'creator', 'updater' => $entry->state(fn (Receipt $record): HtmlString => UserPopup::html($record->getRelationValue($name) instanceof User ? $record->getRelationValue($name) : null))->html(),
+            'creator', 'updater' => $entry->state(UserPopup::of($name))->html(),
             'created_at', 'updated_at' => $entry->dateTime('Y-m-d H:i'),
             default => $entry,
         };
@@ -151,15 +150,7 @@ final class ReceiptLayout
      */
     private static function components(callable $make, bool $withFooter): array
     {
-        $components = [RecordSections::section(self::MAIN, $make)];
-        if ($withFooter) {
-            $components[] = RecordSections::section(self::FOOTER, $make);
-        }
-        if (auth()->user() instanceof User && auth()->user()->isSuperAdmin()) {
-            $components[] = RecordSections::section(self::DEVELOPER, $make, '開発者用フィールド', collapsed: true);
-        }
-
-        return $components;
+        return RecordSections::cards(self::MAIN, $make, $withFooter ? self::FOOTER : null, self::DEVELOPER);
     }
 
     private static function linesForm(): Repeater
@@ -178,7 +169,7 @@ final class ReceiptLayout
             TextEntry::make('cycle_month')->hiddenLabel()->placeholder('')
                 ->state(fn (Get $get): string => self::month($get('received_on'), self::invoice($get('../../invoice_id'))?->closing_day, cycle: true)),
             TextEntry::make('line_settled')->hiddenLabel()->placeholder('')
-                ->state(fn (Get $get): string => SalesFormat::yen((int) $get('amount') + (int) $get('fee') + (int) $get('discount'))),
+                ->state(fn (Get $get): string => AppFormat::yen((int) $get('amount') + (int) $get('fee') + (int) $get('discount'))),
         ];
 
         return RecordTable::form(
@@ -189,7 +180,7 @@ final class ReceiptLayout
 
     private static function linesEntry(): RepeatableEntry
     {
-        $yen = fn (mixed $state): string => SalesFormat::yen($state);
+        $yen = fn (mixed $state): string => AppFormat::yen($state);
         $entries = [
             TextEntry::make('received_on')->date('Y-m-d'),
             TextEntry::make('amount')->alignEnd()->formatStateUsing($yen),
@@ -199,7 +190,7 @@ final class ReceiptLayout
             TextEntry::make('bank'),
             TextEntry::make('received_month')->state(fn (ReceiptLine $record): string => self::month($record->received_on, null, cycle: false)),
             TextEntry::make('cycle_month')->state(fn (ReceiptLine $record): string => self::month($record->received_on, $record->receipt->closing_day, cycle: true)),
-            TextEntry::make('line_settled')->alignEnd()->state(fn (ReceiptLine $record): string => SalesFormat::yen($record->settled())),
+            TextEntry::make('line_settled')->alignEnd()->state(fn (ReceiptLine $record): string => AppFormat::yen($record->settled())),
         ];
 
         return RecordTable::entry(
@@ -263,14 +254,14 @@ final class ReceiptLayout
                 'unit_price' => '単価', 'tax_rate' => '税率', 'amount' => '小計', 'sales_number' => '売上No', 'order_number' => '注番'],
             'numeric' => ['quantity', 'unit_price', 'amount'],
             'rows' => $lines->map(fn (InvoiceLine $line): array => [
-                'line_date' => SalesFormat::date($line->line_date),
+                'line_date' => AppFormat::date($line->line_date),
                 'slip_number' => (string) $line->slip_number,
                 'product_name' => (string) $line->product_name,
-                'quantity' => SalesFormat::number($line->quantity),
+                'quantity' => AppFormat::number($line->quantity),
                 'unit' => (string) $line->unit,
-                'unit_price' => SalesFormat::price($line->unit_price),
+                'unit_price' => AppFormat::price($line->unit_price),
                 'tax_rate' => $line->tax_rate,
-                'amount' => SalesFormat::yen($line->amount),
+                'amount' => AppFormat::yen($line->amount),
                 'sales_number' => (string) $line->sales_number,
                 'order_number' => (string) $line->order_number,
             ])->values()->all(),

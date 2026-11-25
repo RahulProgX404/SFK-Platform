@@ -17,6 +17,7 @@ use Modules\Core\Domain\Filters\FilterCondition;
 use Modules\Core\Domain\Filters\FilterOperator;
 use Modules\Core\Domain\Filters\RecordFilter;
 use Modules\Core\Filament\AppPages\AppListRecords;
+use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Tables\AppRecordActions;
 use Modules\Core\Filament\Tables\AppTextColumn;
 use Modules\Core\Filament\Tables\InlineField;
@@ -26,7 +27,6 @@ use Modules\Sales\Domain\Receivables\ReceivableBasis;
 use Modules\Sales\Filament\Resources\Receivables\CycleReceivableResource;
 use Modules\Sales\Filament\Resources\Receivables\ReceivableLayout;
 use Modules\Sales\Filament\Resources\Receivables\ReceivableResource;
-use Modules\Sales\Filament\SalesFormat;
 use Modules\Sales\Models\ReceivableMonth;
 
 /**
@@ -165,7 +165,7 @@ final class ReceivablesTable
         );
 
         return match (true) {
-            in_array($name, self::AMOUNTS, true) => $column->alignEnd()->formatStateUsing(fn (mixed $state): string => SalesFormat::yen($state)),
+            in_array($name, self::AMOUNTS, true) => $column->alignEnd()->formatStateUsing(fn (mixed $state): string => AppFormat::yen($state)),
             $name === 'year_month' => $column->state(fn (ReceivableMonth $record): string => $record->monthLabel()),
             $name === 'month_start' => $column->date('Y-m-d'),
             $name === 'created_at' => $column->dateTime('Y-m-d H:i'),
@@ -175,7 +175,7 @@ final class ReceivablesTable
                 ->sortable(query: $partner('name')),
             $name === 'customer_code' => $column->state(fn (ReceivableMonth $record): ?string => $record->customer->code)->sortable(query: $partner('code')),
             isset(self::MASTER[$name]) => $column
-                ->state(fn (ReceivableMonth $record): ?string => SalesFormat::text($record->customer->getAttribute(self::MASTER[$name])))
+                ->state(fn (ReceivableMonth $record): ?string => AppFormat::text($record->customer->getAttribute(self::MASTER[$name])))
                 ->sortable(query: $partner(self::MASTER[$name])),
             $name === 'carries_forward' => $column->state(fn (ReceivableMonth $record): string => $record->carriesForward())
                 ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderByRaw('(receivable_months.closing_balance <> 0) '.($direction === 'desc' ? 'desc' : 'asc'))),

@@ -9,6 +9,7 @@ use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
 use Modules\Core\Filament\AppPages\AppViewRecord;
+use Modules\Core\Filament\Support\AppFormat;
 use Modules\Sales\Application\Receivables\InvoiceBalances;
 use Modules\Sales\Application\Receivables\ReceivableLedger;
 use Modules\Sales\Application\SalesActionNotAllowed;
@@ -16,7 +17,6 @@ use Modules\Sales\Domain\Documents\DocumentFields;
 use Modules\Sales\Domain\Receivables\ReceivableBasis;
 use Modules\Sales\Filament\Resources\Invoices\InvoiceResource;
 use Modules\Sales\Filament\Resources\Receivables\ReceivableMonthResource;
-use Modules\Sales\Filament\SalesFormat;
 use Modules\Sales\Models\Invoice;
 use Modules\Sales\Models\ReceivableMonth;
 
@@ -77,7 +77,7 @@ abstract class ViewReceivableMonth extends AppViewRecord
                     ->native()
                     ->placeholder('-----')
                     ->options(fn (): array => app(InvoiceBalances::class)->invoicesFor($this->record)
-                        ->mapWithKeys(fn (Invoice $invoice): array => [(string) $invoice->id => $invoice->number.'（'.SalesFormat::date($invoice->invoiced_on).'）'])
+                        ->mapWithKeys(fn (Invoice $invoice): array => [(string) $invoice->id => $invoice->number.'（'.AppFormat::date($invoice->invoiced_on).'）'])
                         ->all())
                     ->default(fn (): ?string => ($id = app(InvoiceBalances::class)->invoicesFor($this->record)->first()?->id) === null ? null : (string) $id)
                     ->required(),

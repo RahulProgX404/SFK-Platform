@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Application\Filters\FilterField;
 use Modules\Core\Application\Search\SearchQuery;
 use Modules\Core\Application\Views\ListView;
-use Modules\Core\Domain\Filters\FilterCondition;
 use Modules\Core\Domain\Filters\FilterOperator;
 use Modules\Core\Filament\AppPages\AppListRecords;
 use Modules\Core\Filament\Support\AppFormat;
@@ -101,7 +100,7 @@ final class BagSchedulesTable
             FilterField::choice('machine_id', $label('machine_id'), fn (): array => Machine::query()->orderByDesc('id')->pluck('name', 'id')
                 ->mapWithKeys(fn (string $name, int|string $id): array => [(string) $id => $name])->all()),
             FilterField::text('person_initial', $label('person_initial')),
-            FilterField::text('order_id', $label('order_id'))->query(self::filterOrderNumber(...)),
+            FilterField::text('order_id', $label('order_id'))->relatedText('order', 'order_number'),
             FilterField::text('product_name', $label('product_name')),
             FilterField::number('copies', $label('copies')),
             FilterField::text('notes', $label('notes')),
@@ -177,25 +176,5 @@ final class BagSchedulesTable
     private static function machineColumn(string $attribute): Builder
     {
         return Machine::query()->select("machines.{$attribute}")->whereColumn('machines.id', 'bag_schedules.machine_id');
-    }
-
-    /**
-     * 注番 is the job's number, compared like a text field.
-     *
-     * @param  Builder<*>  $query
-     */
-    private static function filterOrderNumber(Builder $query, FilterCondition $condition): void
-    {
-        $value = $condition->values[0] ?? '';
-        $has = fn (callable $where): Builder => $query->whereHas('order', $where);
-
-        match ($condition->operator) {
-            FilterOperator::Contains => $has(fn (Builder $q): Builder => $q->whereLike('order_number', '%'.$value.'%')),
-            FilterOperator::NotContains => $query->whereDoesntHave('order', fn (Builder $q): Builder => $q->whereLike('order_number', '%'.$value.'%')),
-            FilterOperator::Equals => $value === '' ? $query->whereDoesntHave('order') : $has(fn (Builder $q): Builder => $q->where('order_number', $value)),
-            FilterOperator::NotEquals => $value === '' ? $query->whereHas('order') : $query->whereDoesntHave('order', fn (Builder $q): Builder => $q->where('order_number', $value)),
-            FilterOperator::OneOf => $has(fn (Builder $q): Builder => $q->whereIn('order_number', $condition->values)),
-            default => $query->whereRaw('1 = 0'),
-        };
     }
 }

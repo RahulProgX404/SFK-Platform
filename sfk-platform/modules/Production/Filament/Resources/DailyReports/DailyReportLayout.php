@@ -275,9 +275,7 @@ final class DailyReportLayout
             'glue_cost', 'work_rate', 'overtime_rate', 'cardboard_cost', 'partition_cost', 'processing_rate', 'changeover_rate', 'handwork_rate', 'machine_rate',
             'printing_rate', 'plate_change_rate', 'ink_mixing_rate' => $price(fn (DailyReport $record): ?string => $rate($record, $name)),
             'worker_code', 'employee_code', 'sales_staff_code', 'department_code' => $state(fn (DailyReport $record): ?string => self::text($record->worker->getAttribute($name))),
-            'creator', 'updater' => $entry->state(fn (DailyReport $record): HtmlString => UserPopup::html(
-                $record->getRelationValue($name) instanceof User ? $record->getRelationValue($name) : null,
-            ))->html(),
+            'creator', 'updater' => $entry->state(UserPopup::of($name))->html(),
             'created_at', 'updated_at' => $entry->dateTime('Y-m-d H:i'),
             default => $entry,
         };

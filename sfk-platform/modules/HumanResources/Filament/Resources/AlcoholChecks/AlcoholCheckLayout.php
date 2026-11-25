@@ -14,6 +14,7 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Schema;
 use Modules\Core\Filament\Records\RecordSections;
+use Modules\Core\Filament\Support\UserPopup;
 use Modules\HumanResources\Domain\HrChoices;
 use Modules\HumanResources\Domain\HrFields;
 use Modules\HumanResources\Filament\Support\Employees;
@@ -93,8 +94,8 @@ final class AlcoholCheckLayout
             $name === 'checked_on' => $entry->date('Y-m-d'),
             str_ends_with($name, '_time') => $entry->formatStateUsing(fn (mixed $state): string => is_string($state) ? substr($state, 0, 5) : ''),
             // user names open the ユーザー情報 popup
-            isset(self::USERS[$name]) => $entry->state(Employees::popup(self::USERS[$name]))->html(),
-            $name === 'creator', $name === 'updater' => $entry->state(Employees::popup($name))->html(),
+            isset(self::USERS[$name]) => $entry->state(UserPopup::of(self::USERS[$name]))->html(),
+            $name === 'creator', $name === 'updater' => $entry->state(UserPopup::of($name))->html(),
             $name === 'created_at', $name === 'updated_at' => $entry->dateTime('Y-m-d H:i'),
             default => $entry,
         };
@@ -106,14 +107,6 @@ final class AlcoholCheckLayout
      */
     private static function components(callable $make, bool $withFooter): array
     {
-        $components = [RecordSections::section(self::MAIN, $make)];
-        if ($withFooter) {
-            $components[] = RecordSections::section(self::FOOTER, $make);
-        }
-        if (auth()->user() instanceof User && auth()->user()->isSuperAdmin()) {
-            $components[] = RecordSections::section(self::DEVELOPER, $make, '開発者用フィールド', collapsed: true);
-        }
-
-        return $components;
+        return RecordSections::cards(self::MAIN, $make, $withFooter ? self::FOOTER : null, self::DEVELOPER);
     }
 }

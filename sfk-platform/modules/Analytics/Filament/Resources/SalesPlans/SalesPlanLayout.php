@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Analytics\Filament\Resources\SalesPlans;
 
-use App\Models\User;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -14,7 +13,6 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\HtmlString;
 use Modules\Analytics\Domain\AnalyticsFields;
 use Modules\Analytics\Domain\FiscalYear;
 use Modules\Analytics\Models\PastSale;
@@ -107,9 +105,7 @@ final class SalesPlanLayout
             $name === 'planned_on' => $entry->date('Y-m-d'),
             $name === 'year' => $entry->state(fn (SalesPlan $record): ?string => $record->yearLabel()),
             $name === 'progress' => $entry->state(fn (SalesPlan $record): ?string => self::percent($record->progress())),
-            $name === 'creator', $name === 'updater' => $entry->state(fn (SalesPlan $record): HtmlString => UserPopup::html(
-                $record->getRelationValue($name) instanceof User ? $record->getRelationValue($name) : null,
-            ))->html(),
+            $name === 'creator', $name === 'updater' => $entry->state(UserPopup::of($name))->html(),
             $name === 'created_at', $name === 'updated_at' => $entry->dateTime('Y-m-d H:i'),
             default => $entry,
         };
@@ -143,14 +139,6 @@ final class SalesPlanLayout
             [['notes', 1500]],
         ];
 
-        $components = [RecordSections::section($main, $make)];
-        if ($withFooter) {
-            $components[] = RecordSections::section(self::FOOTER, $make);
-        }
-        if (auth()->user() instanceof User && auth()->user()->isSuperAdmin()) {
-            $components[] = RecordSections::section(self::DEVELOPER, $make, '開発者用フィールド', collapsed: true);
-        }
-
-        return $components;
+        return RecordSections::cards($main, $make, $withFooter ? self::FOOTER : null, self::DEVELOPER);
     }
 }

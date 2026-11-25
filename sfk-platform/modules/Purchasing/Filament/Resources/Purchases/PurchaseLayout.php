@@ -182,9 +182,7 @@ final class PurchaseLayout
             'supplier_rounding' => $entry->state(fn (Purchase $record): string => $record->roundingMode()->value),
             'purchase_month' => $entry->state(fn (Purchase $record): string => $record->month()->label()),
             'effective_category' => $entry->state(fn (Purchase $record): ?string => AppFormat::text($record->effectiveCategory())),
-            'creator', 'updater' => $entry->state(fn (Purchase $record): HtmlString => UserPopup::html(
-                $record->getRelationValue($name) instanceof User ? $record->getRelationValue($name) : null,
-            ))->html(),
+            'creator', 'updater' => $entry->state(UserPopup::of($name))->html(),
             'created_at', 'updated_at' => $entry->dateTime('Y-m-d H:i'),
             default => $entry,
         };
@@ -196,15 +194,7 @@ final class PurchaseLayout
      */
     private static function components(callable $make, bool $withFooter): array
     {
-        $components = [RecordSections::section(self::MAIN, $make)];
-        if ($withFooter) {
-            $components[] = RecordSections::section(self::FOOTER, $make);
-        }
-        if (auth()->user() instanceof User && auth()->user()->isSuperAdmin()) {
-            $components[] = RecordSections::section(self::DEVELOPER, $make, '開発者用フィールド', collapsed: true);
-        }
-
-        return $components;
+        return RecordSections::cards(self::MAIN, $make, $withFooter ? self::FOOTER : null, self::DEVELOPER);
     }
 
     /** A legacy single check box (FSC 「115」, 帳端処理 「〇」), stored as a boolean. */

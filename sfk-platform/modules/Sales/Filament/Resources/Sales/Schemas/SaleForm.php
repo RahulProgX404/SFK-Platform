@@ -24,6 +24,7 @@ use Modules\Core\Domain\Money\RoundingMode;
 use Modules\Core\Domain\Money\Yen;
 use Modules\Core\Domain\Tax\TaxRate;
 use Modules\Core\Filament\Records\RecordTable;
+use Modules\Core\Filament\Support\AppFormat;
 use Modules\Core\Filament\Support\FieldTip;
 use Modules\MasterData\Filament\Resources\Partners\PartnerResource;
 use Modules\MasterData\Models\Partner;
@@ -33,7 +34,6 @@ use Modules\Sales\Application\Sales\SaleOrderTotals;
 use Modules\Sales\Domain\Sales\SaleChoices;
 use Modules\Sales\Filament\Resources\Sales\SaleLayout;
 use Modules\Sales\Filament\Resources\Sales\SaleResource;
-use Modules\Sales\Filament\SalesFormat;
 use Modules\Sales\Models\Sale;
 use Modules\Sales\Models\SaleAllocation;
 
@@ -128,8 +128,8 @@ final class SaleForm
                 array_map(fn (TaxRate $rate): string => $rate->value, TaxRate::cases()),
             ))->default(TaxRate::Standard->value)->required()->native(false)->live(),
                 '初期値は10%です。切手やはがき等の非課税対象品は「非課税」を選択してください。'),
-            'tax' => $entry(fn (Get $get, ?Sale $record): string => SalesFormat::yen(self::tax($get, $record))),
-            'amount_with_tax' => $entry(fn (Get $get, ?Sale $record): string => SalesFormat::yen((int) $get('amount') + self::tax($get, $record))),
+            'tax' => $entry(fn (Get $get, ?Sale $record): string => AppFormat::yen(self::tax($get, $record))),
+            'amount_with_tax' => $entry(fn (Get $get, ?Sale $record): string => AppFormat::yen((int) $get('amount') + self::tax($get, $record))),
             'estimated_cost', 'estimated_expense' => TextInput::make($name)->label($label)->numeric()->integer()
                 ->minValue(-99999999999)->maxValue(99999999999)->prefix('¥'),
             'summary' => TextInput::make($name)->label($label)->maxLength(255),
@@ -153,12 +153,12 @@ final class SaleForm
                 ->disabled(fn (Get $get): bool => ! self::isAdministrator() && filled($get('order_id')))
                 ->dehydrated(), '管理者のみ編集可能となっています。'),
             'assignees' => Select::make($name)->label($label)->placeholder('-----')->relationship('assignees', 'name')->multiple()->searchable()->preload(),
-            'order_quantity' => $entry(fn (Get $get): string => SalesFormat::number($order($get)?->quantity)),
-            'order_sold_quantity' => $entry(fn (Get $get): string => SalesFormat::number($order($get)?->getAttribute('sold_quantity'))),
-            'order_remaining' => $entry(fn (Get $get): string => SalesFormat::number($order($get)?->getAttribute('sales_remaining'))),
-            'order_sales_amount' => $entry(fn (Get $get): string => SalesFormat::yen($order($get)?->sales_amount)),
+            'order_quantity' => $entry(fn (Get $get): string => AppFormat::number($order($get)?->quantity)),
+            'order_sold_quantity' => $entry(fn (Get $get): string => AppFormat::number($order($get)?->getAttribute('sold_quantity'))),
+            'order_remaining' => $entry(fn (Get $get): string => AppFormat::number($order($get)?->getAttribute('sales_remaining'))),
+            'order_sales_amount' => $entry(fn (Get $get): string => AppFormat::yen($order($get)?->sales_amount)),
             'is_fsc' => $entry(fn (Get $get): string => $order($get)?->is_fsc === true ? SaleChoices::FSC_CODE : ''),
-            'order_sold_amount' => $entry(fn (Get $get): string => SalesFormat::yen($order($get)?->getAttribute('sold_amount'))),
+            'order_sold_amount' => $entry(fn (Get $get): string => AppFormat::yen($order($get)?->getAttribute('sold_amount'))),
             'allocations' => self::allocations(),
             'needs' => CheckboxList::make($name)->label($label)->options(SaleChoices::options(SaleChoices::NEEDS))->columns(4),
             'handover' => CheckboxList::make($name)->label($label)->options(SaleChoices::options(SaleChoices::HANDOVERS))->columns(3),
@@ -176,7 +176,7 @@ final class SaleForm
             'customer_code' => $entry(fn (Get $get): ?string => $customer($get)?->code),
             'customer_rounding' => $entry(fn (Get $get, ?Sale $record): string => self::rounding($get, $record)->value),
             'effective_closing_day' => $entry(fn (Get $get, ?Sale $record): ?string => self::effectiveClosingDay($get, $record)?->value),
-            'billing_month' => $entry(fn (?Sale $record): string => SalesFormat::month($record?->billing_month)),
+            'billing_month' => $entry(fn (?Sale $record): string => AppFormat::month($record?->billing_month)),
             'sales_month' => $entry(fn (Get $get): string => filled($get('sold_on')) ? substr((string) $get('sold_on'), 0, 4).'年'.substr((string) $get('sold_on'), 5, 2).'月' : ''),
             'legacy_id' => TextInput::make($name)->label($label)->numeric()->integer()->minValue(1)->unique(ignoreRecord: true),
             default => null,
@@ -193,7 +193,7 @@ final class SaleForm
             Select::make('user_id')->hiddenLabel()->native()->placeholder('-----')->relationship('user', 'name')->preload(),
             TextInput::make('ratio')->hiddenLabel()->numeric()->step('any')->rule('decimal:0,4')->minValue(0)->maxValue(100)->suffix('%')->live(onBlur: true),
             TextEntry::make('allocation_amount')->hiddenLabel()->alignEnd()->placeholder('')
-                ->state(fn (Get $get): string => SalesFormat::yen(SaleAllocation::share((int) $get('../../amount'), is_scalar($get('ratio')) ? (string) $get('ratio') : null))),
+                ->state(fn (Get $get): string => AppFormat::yen(SaleAllocation::share((int) $get('../../amount'), is_scalar($get('ratio')) ? (string) $get('ratio') : null))),
         ]);
     }
 

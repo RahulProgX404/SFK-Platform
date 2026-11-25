@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Modules\Core\Filament\Support;
 
 use App\Models\User;
+use Closure;
 use Filament\Facades\Filament;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -49,6 +51,21 @@ final class UserPopup
         return new HtmlString('<span class="sfk-user"><button type="button" class="sfk-user-name" aria-haspopup="dialog" aria-expanded="false" data-sfk-user="'
             .e((string) json_encode($card, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)).'"><span class="sfk-user-avatar sfk-user-avatar-sm" aria-hidden="true">'
             .e(mb_substr($user->name, 0, 1)).'</span>'.e($label ?? $user->name).'</button></span>');
+    }
+
+    /**
+     * The state of a column or entry showing the user of a belongs-to relation (e.g. 作成者 `creator`):
+     * `->state(UserPopup::of('creator'))->html()`.
+     *
+     * @return Closure(Model): HtmlString
+     */
+    public static function of(string $relation): Closure
+    {
+        return function (Model $record) use ($relation): HtmlString {
+            $user = $record->getRelationValue($relation);
+
+            return self::html($user instanceof User ? $user : null);
+        };
     }
 
     /**

@@ -206,10 +206,16 @@ it('enters a daily report per task in the quick-entry panel: costs it, 残業 as
         ->assertSet('screen', 'review')
         ->tap(fn (Testable $panel) => expect(shownInOrder($panel->html(), ['注番', $job->order_number, '機械名', '製袋機1号', '08:00', '17:00', '01:00', '平日・通常',
             '3,000枚', '2人', '前、中、後', '0枚 / 0枚', '作業時間', '8時間', '作業日', '2026-10-21', '作業者', '管理者', '追加情報を入力', 'この内容で登録']))->toBeTrue())
+        // a row of the check opens its step; the tap there comes back to the check (as in every quick entry, StepPanel)
         ->call('goTo', 'crew')
         ->assertSet('screen', 'crew')
+        ->assertSet('fromReview', true)
         ->call('choose', 'crew', '2')
-        ->call('goTo', 'review')
+        ->assertSet('screen', 'review')
+        // 戻る from a step opened on the check goes back to the check too
+        ->call('goTo', 'produced')
+        ->call('back')
+        ->assertSet('screen', 'review')
         // 追加情報を入力: the optional fields, then 登録
         ->call('showDetails')
         ->assertSet('screen', 'details')

@@ -84,7 +84,7 @@ final class PartnerTabs
                 'number' => (string) $sale->sales_number,
                 'date' => $sale->sold_on->format('Y-m-d'),
                 'product' => (string) $sale->getAttribute('product_name'),
-                'quantity' => SalesFormat::number($sale->getAttribute('quantity')),
+                'quantity' => AppFormat::number($sale->getAttribute('quantity')),
                 'amount' => AppFormat::yen($sale->amount),
             ])->all(),
             'urls' => $sales->map(fn (Sale $sale): string => SaleResource::getUrl('view', ['record' => $sale]))->all(),

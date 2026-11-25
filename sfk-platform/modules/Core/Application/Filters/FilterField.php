@@ -104,6 +104,15 @@ final class FilterField
         return $this;
     }
 
+    /**
+     * A text field showing the number of a related record (e.g. 注番 = the job's `order_number`): compared like a text
+     * field on that column, blank = no related record (RecordFilterQuery::relatedText()).
+     */
+    public function relatedText(string $relationship, string $column): self
+    {
+        return $this->query(fn (Builder $query, FilterCondition $condition) => RecordFilterQuery::relatedText($query, $relationship, $column, $condition));
+    }
+
     /** @param  Closure(Builder<*>, FilterCondition): void  $query */
     public function query(Closure $query): self
     {
